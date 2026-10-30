@@ -4568,9 +4568,74 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
 }
 
 
+/* Compress the `off_nbytes` bytes of chunk offsets of a frame into a new
+   *off_chunk of `dest_nbytes` bytes, at least off_nbytes + BLOSC2_MAX_OVERHEAD
+   (the room given can change the result, so each caller keeps its own).  The
+   typesize is always that of the offsets, whatever BLOSC_TYPESIZE says.
+   Returns the compressed size, or a negative value on error. */
+static int32_t compress_offsets(const int64_t* offsets, int32_t off_nbytes, int32_t dest_nbytes,
+                                uint8_t** off_chunk) {
+  *off_chunk = NULL;
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.splitmode = BLOSC_NEVER_SPLIT;
+  cparams.typesize = sizeof(int64_t);
+  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
+  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
+  cparams.compcode = BLOSC_BLOSCLZ;
+  blosc2_context* cctx = blosc2_create_cctx(cparams);
+  if (cctx == NULL) {
+    BLOSC_TRACE_ERROR("Error while creating the compression context");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
+  cctx->typesize = sizeof(int64_t);  // override a possible BLOSC_TYPESIZE env variable (or chaos may appear)
+  uint8_t* chunk = malloc((size_t)dest_nbytes);
+  if (chunk == NULL) {
+    blosc2_free_ctx(cctx);
+    BLOSC_TRACE_ERROR("Cannot allocate memory for the offsets chunk.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  int32_t off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes, chunk, dest_nbytes);
+  blosc2_free_ctx(cctx);
+  if (off_cbytes < 0) {
+    free(chunk);
+    return off_cbytes;
+  }
+  *off_chunk = chunk;
+  return off_cbytes;
+}
+
+
+/* Code a chunk of special values (see chunk_special_in_offset()) in its offset */
+static void special_offset(int64_t* offset, int special_value) {
+  uint64_t offset_value = ((uint64_t)1 << 63) + ((uint64_t)special_value << (8 * 7));
+  to_little(offset, &offset_value, sizeof(uint64_t));
+}
+
+/* Whether a frame whose header has `chunksize` and `nchunks` chunks of `nbytes`
+   in all needs the nbytes of its last chunk to tell whether it takes a chunk of
+   `chunk_nbytes` at the end (see frame_takes_chunk()). */
+static bool frame_needs_last_nbytes(int32_t chunksize, int64_t nchunks, int32_t chunk_nbytes) {
+  return chunksize > 0 && nchunks > 0 && chunk_nbytes < chunksize;
+}
+
+/* Whether such a frame, whose last chunk has `last_nbytes`, takes a chunk of
+   `chunk_nbytes` at the end: not two consecutive chunks shorter than the
+   chunksize (yet). */
+static bool frame_takes_chunk(int32_t chunksize, int64_t nchunks, int64_t nbytes, int32_t last_nbytes,
+                              int32_t chunk_nbytes) {
+  if (frame_needs_last_nbytes(chunksize, nchunks, chunk_nbytes) && last_nbytes < chunksize &&
+      nbytes < chunksize) {
+    BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
+                      "than the frame chunksize is not allowed yet: %d != %d.",
+                      chunk_nbytes, chunksize);
+    return false;
+  }
+  return true;
+}
+
+
 /* Append an existing chunk into a frame. */
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk) {
-  int8_t* chunk_ = chunk;
   int32_t header_len;
   int64_t frame_len;
   int64_t nbytes;
@@ -4606,8 +4671,8 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
   }
 
   // Check that we are not appending a small chunk after another small chunk
-  int32_t chunk_nbytes_last;
-  if ((chunksize > 0) && (nchunks > 0) && (chunk_nbytes < chunksize)) {
+  int32_t chunk_nbytes_last = 0;
+  if (frame_needs_last_nbytes(chunksize, nchunks, chunk_nbytes)) {
     uint8_t last_header[BLOSC_EXTENDED_HEADER_LENGTH];
     rc = frame_get_chunk_header(frame, nchunks - 1, last_header);
     if (rc < 0) {
@@ -4618,12 +4683,9 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
     if (rc < 0) {
       return NULL;
     }
-    if ((chunk_nbytes_last < chunksize) && (nbytes < chunksize)) {
-      BLOSC_TRACE_ERROR("Appending two consecutive chunks with a chunksize smaller "
-                        "than the frame chunksize is not allowed yet: %d != %d.",
-                        chunk_nbytes, chunksize);
-      return NULL;
-    }
+  }
+  if (!frame_takes_chunk(chunksize, nchunks, nbytes, chunk_nbytes_last, chunk_nbytes)) {
+    return NULL;
   }
 
   // Get the current offsets and add one more
@@ -4657,67 +4719,32 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 
   // Add the new offset
   int64_t sframe_chunk_id = -1;
-  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
-  uint64_t offset_value = ((uint64_t)1 << 63);
-  switch (special_value) {
-    case BLOSC2_SPECIAL_ZERO:
-      // Zero chunk.  Code it in a special way.
-      offset_value += (uint64_t) BLOSC2_SPECIAL_ZERO << (8 * 7);  // chunk of zeros
-      to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    case BLOSC2_SPECIAL_UNINIT:
-      // Non initizalized values chunk.  Code it in a special way.
-      offset_value += (uint64_t) BLOSC2_SPECIAL_UNINIT << (8 * 7);  // chunk of uninit values
-      to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    case BLOSC2_SPECIAL_NAN:
-      // NaN chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_NAN << (8 * 7);  // chunk of NANs
-      to_little(offsets + nchunks, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    default:
-      if (frame->sframe) {
-        // Compute the sframe_chunk_id value
-        for (int64_t i = 0; i < nchunks; ++i) {
-          if (offsets[i] > sframe_chunk_id) {
-            sframe_chunk_id = offsets[i];
-          }
-        }
-        offsets[nchunks] = ++sframe_chunk_id;
+  int special_value = chunk_special_in_offset(chunk, chunk_cbytes);
+  if (special_value) {
+    special_offset(offsets + nchunks, special_value);
+    chunk_cbytes = 0;   // we don't need to store the chunk
+  }
+  else if (frame->sframe) {
+    // Compute the sframe_chunk_id value
+    for (int64_t i = 0; i < nchunks; ++i) {
+      if (offsets[i] > sframe_chunk_id) {
+        sframe_chunk_id = offsets[i];
       }
-      else {
-        offsets[nchunks] = cbytes;
-      }
+    }
+    offsets[nchunks] = ++sframe_chunk_id;
+  }
+  else {
+    offsets[nchunks] = cbytes;
   }
 
   // Re-compress the offsets again
-  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
-  cparams.splitmode = BLOSC_NEVER_SPLIT;
-  cparams.typesize = sizeof(int64_t);
-  cparams.blocksize = 16 * 1024;  // based on experiments with create_frame.c bench
-  cparams.nthreads = 4;  // 4 threads seems a decent default for nowadays CPUs
-  cparams.compcode = BLOSC_BLOSCLZ;
-  blosc2_context* cctx = blosc2_create_cctx(cparams);
-  if (cctx == NULL) {
-    BLOSC_TRACE_ERROR("Error while creating the compression context");
-    free(offsets);
-    return NULL;
-  }
-  cctx->typesize = sizeof(int64_t);  // override a possible BLOSC_TYPESIZE env variable (or chaos may appear)
-  void* off_chunk = malloc((size_t)off_nbytes + BLOSC2_MAX_OVERHEAD);
-  int32_t new_off_cbytes = blosc2_compress_ctx(cctx, offsets, off_nbytes,
-                                               off_chunk, off_nbytes + BLOSC2_MAX_OVERHEAD);
-  blosc2_free_ctx(cctx);
+  uint8_t* off_chunk;
+  int32_t new_off_cbytes = compress_offsets(offsets, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD,
+                                            &off_chunk);
   free(offsets);
   if (new_off_cbytes < 0) {
-    free(off_chunk);
     return NULL;
   }
-  // printf("%f\n", (double) off_nbytes / new_off_cbytes);
 
   int64_t new_cbytes = cbytes + chunk_cbytes;
   int64_t new_frame_len;
@@ -4833,6 +4860,540 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 }
 
 
+/* The counters of a super-chunk and the offsets of its contiguous frame after
+   appending chunks one by one (see schunk_append_chunk_unlocked() and
+   frame_append_chunk()), tallied without touching the frame. */
+typedef struct {
+  int64_t nchunks;
+  int64_t nbytes;
+  int64_t cbytes;  // the chunk data in the frame; special chunks live in their offset
+  int32_t chunksize;
+  int32_t last_nbytes;
+  uint8_t flags2;  // of the first chunk
+  int64_t* offsets;
+  int32_t off_nbytes;  // of the offsets of all the chunks
+} chunk_tally;
+
+static int tally_init(chunk_tally* tally, int64_t nchunks, int32_t chunksize) {
+  memset(tally, 0, sizeof(*tally));
+  tally->chunksize = chunksize;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &tally->off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_DATA;
+  }
+  tally->offsets = malloc(tally->off_nbytes > 0 ? (size_t)tally->off_nbytes : 1);
+  if (tally->offsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate memory for the offsets.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+/* Add the next chunk to the tally.  Returns the number of bytes it takes in the
+   frame, where it goes at the tally->cbytes from before the call (0 for a special
+   chunk), or a negative value on error. */
+static int32_t tally_chunk(chunk_tally* tally, const uint8_t* chunk) {
+  int32_t chunk_nbytes;
+  int32_t chunk_cbytes;
+  int rc = blosc2_cbuffer_sizes(chunk, &chunk_nbytes, &chunk_cbytes, NULL);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t nchunk = tally->nchunks;
+  int32_t chunksize = tally->chunksize;  // as in the frame header before this chunk
+  uint8_t flags2 = get_chunk_flags2(chunk, chunk_cbytes);
+  if (nchunk == 0) {
+    tally->flags2 = flags2;
+  }
+  else if ((flags2 & BLOSC2_VL_BLOCKS) != (tally->flags2 & BLOSC2_VL_BLOCKS)) {
+    BLOSC_TRACE_ERROR("schunks cannot mix regular chunks and VL-block chunks.");
+    return BLOSC2_ERROR_CHUNK_APPEND;
+  }
+  if (!chunksize_after_adding(&tally->chunksize, nchunk, tally->last_nbytes, chunk_nbytes, true)) {
+    BLOSC_TRACE_ERROR("Appending chunks that have different lengths in the same schunk "
+                      "is not supported yet: %d > %d.", chunk_nbytes, tally->chunksize);
+    return BLOSC2_ERROR_CHUNK_APPEND;
+  }
+  if (!frame_takes_chunk(chunksize, nchunk, tally->nbytes, tally->last_nbytes, chunk_nbytes)) {
+    return BLOSC2_ERROR_CHUNK_APPEND;
+  }
+
+  int32_t stored = chunk_cbytes;
+  int special_value = chunk_special_in_offset(chunk, chunk_cbytes);
+  if (special_value) {
+    special_offset(tally->offsets + nchunk, special_value);
+    stored = 0;
+  }
+  else {
+    tally->offsets[nchunk] = tally->cbytes;
+  }
+  tally->nchunks++;
+  tally->nbytes += chunk_nbytes;
+  tally->cbytes += stored;
+  tally->last_nbytes = chunk_nbytes;
+  return stored;
+}
+
+/* Give `schunk` the counters of the tally and make `frame`, whose offsets are
+   already in place, `len` bytes long, with its header and trailer to match. */
+static int tally_finish(chunk_tally* tally, blosc2_frame_s* frame, blosc2_schunk* schunk, int64_t len) {
+  schunk->nchunks = tally->nchunks;
+  schunk->current_nchunk = tally->nchunks - 1;
+  schunk->nbytes = tally->nbytes;
+  schunk->cbytes = tally->cbytes;
+  schunk->chunksize = tally->chunksize;
+  schunk->flags2 = tally->flags2;
+  if (frame->coffsets != NULL) {
+    if (frame->coffsets_needs_free) {
+      free(frame->coffsets);
+    }
+    frame->coffsets = NULL;
+  }
+  frame->len = len;
+  return frame_update_header(frame, schunk, false);
+}
+
+
+/* Reads the chunks of the source super-chunk of a fill below, holding its shared
+   lock: a plain super-chunk or an in-memory frame hands out the chunks in place,
+   and a file frame is read through one handle, its header read once. */
+typedef struct {
+  blosc2_schunk* schunk;
+  blosc2_frame_s* frame;  // NULL for a plain super-chunk
+  bool locked;
+  frame_fields f;
+  blosc2_io_cb* io_cb;
+  void* fp;  // the reader of a contiguous file frame
+} chunk_source;
+
+static void source_close(chunk_source* s) {
+  if (s->fp != NULL) {
+    frame_reader_release(s->frame, s->io_cb, s->fp);
+    s->fp = NULL;
+  }
+  if (s->locked) {
+    frame_unlock(s->frame);
+    s->locked = false;
+  }
+}
+
+static int source_open(chunk_source* s, blosc2_schunk* schunk) {
+  memset(s, 0, sizeof(*s));
+  s->schunk = schunk;
+  s->frame = (blosc2_frame_s*)schunk->frame;
+  if (s->frame == NULL || schunk->nchunks == 0) {
+    // Without chunks there is nothing to read, so leave the frame alone: its
+    // file need not even hold the frame yet
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int rc = frame_lock(s->frame, false);
+  if (rc < 0) {
+    return rc;
+  }
+  s->locked = true;
+  // This also gives the super-chunk the counters of a frame that changed on disk
+  rc = get_frame_fields(s->frame, &s->f);
+  if (rc >= 0 && s->frame->cframe == NULL) {
+    s->io_cb = blosc2_get_io_cb(s->frame->schunk->storage->io->id);
+    if (s->io_cb == NULL) {
+      BLOSC_TRACE_ERROR("Error getting the input/output API");
+      rc = BLOSC2_ERROR_PLUGIN_IO;
+    }
+    else if (!s->frame->sframe) {
+      s->fp = frame_reader_acquire(s->frame, s->frame->schunk->storage->io);
+      if (s->fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", s->frame->urlpath);
+        rc = BLOSC2_ERROR_FILE_OPEN;
+      }
+    }
+  }
+  if (rc < 0) {
+    source_close(s);
+  }
+  return rc;
+}
+
+/* The header of chunk `nchunk` in *chunk: the whole chunk where it is in memory,
+   otherwise a copy of the header in `header` (BLOSC_EXTENDED_HEADER_LENGTH bytes).
+   Returns the cbytes of the chunk, or a negative value on error. */
+static int source_chunk_header(chunk_source* s, int64_t nchunk, uint8_t* header, const uint8_t** chunk) {
+  int rc;
+  if (s->frame == NULL) {
+    *chunk = s->schunk->data[nchunk];
+    if (*chunk == NULL) {
+      BLOSC_TRACE_ERROR("Chunk %" PRId64 " is missing.", nchunk);
+      return BLOSC2_ERROR_DATA;
+    }
+    int32_t chunk_cbytes;
+    rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+    return rc < 0 ? rc : chunk_cbytes;
+  }
+  int64_t offset;
+  rc = read_frame_chunk_header(s->frame, &s->f, nchunk, s->fp, header, &offset);
+  // read_frame_chunk_header() checked that the chunk is inside an in-memory frame
+  *chunk = (rc >= 0 && offset >= 0 && s->frame->cframe != NULL) ?
+           s->frame->cframe + s->f.header_len + offset : header;
+  return rc;
+}
+
+/* Copy chunk `nchunk`, whose header gave `cbytes`, into `dest`. */
+static int source_read_chunk(chunk_source* s, int64_t nchunk, int32_t cbytes, uint8_t* dest) {
+  int32_t read_cbytes;
+  if (s->frame == NULL || s->frame->cframe != NULL) {
+    uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+    const uint8_t* chunk;
+    read_cbytes = source_chunk_header(s, nchunk, header, &chunk);
+    if (read_cbytes < 0) {
+      return read_cbytes;
+    }
+    if (read_cbytes == cbytes && chunk != header) {
+      memcpy(dest, chunk, (size_t)cbytes);
+    }
+  }
+  else {
+    int64_t offset;
+    int rc = get_coffset(s->frame, s->f.header_len, s->f.cbytes, nchunk, s->f.nchunks, &offset);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Unable to get offset to chunk %" PRId64 ".", nchunk);
+      return rc;
+    }
+    int64_t chunk_end;
+    if (offset < 0 || (!s->frame->sframe && (!blosc2_checked_add_i64_nonneg(offset, cbytes, &chunk_end) ||
+                                             chunk_end > s->f.cbytes))) {
+      BLOSC_TRACE_ERROR("The super-chunk changed while reading it.");
+      return BLOSC2_ERROR_DATA;
+    }
+    void* fp = s->fp;
+    int64_t io_pos = s->frame->file_offset + s->f.header_len + offset;
+    if (s->frame->sframe) {
+      fp = sframe_open_chunk(s->frame->urlpath, offset, "rb", s->frame->schunk->storage->io);
+      if (fp == NULL) {
+        BLOSC_TRACE_ERROR("Error opening file in: %s", s->frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
+      io_pos = 0;
+    }
+    uint8_t* ptr = dest;
+    int64_t rbytes = s->io_cb->read((void**)&ptr, 1, cbytes, io_pos, fp);
+    if (rbytes == cbytes && ptr != dest) {
+      memcpy(dest, ptr, (size_t)cbytes);
+    }
+    if (s->frame->sframe) {
+      s->io_cb->close(fp);
+    }
+    if (rbytes != cbytes) {
+      BLOSC_TRACE_ERROR("Cannot read the chunk out of the frame.");
+      return BLOSC2_ERROR_FILE_READ;
+    }
+    rc = blosc2_cbuffer_sizes(dest, NULL, &read_cbytes, NULL);
+    if (rc < 0) {
+      return rc;
+    }
+  }
+  if (read_cbytes != cbytes) {
+    BLOSC_TRACE_ERROR("The super-chunk changed while reading it.");
+    return BLOSC2_ERROR_DATA;
+  }
+  return cbytes;
+}
+
+
+/* Make room for `len` bytes at `pos` of an in-memory frame being filled by
+   frame_fill_from_schunk(), growing it past `capacity` when needed. */
+static int fill_reserve(blosc2_frame_s* frame, int64_t* capacity, int64_t pos, int32_t len) {
+  if (pos + len > *capacity) {
+    int64_t new_capacity = (pos + len) + (pos + len) / 2;
+    uint8_t* cframe = realloc(frame->cframe, (size_t)new_capacity);
+    if (cframe == NULL) {
+      BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    frame->cframe = cframe;
+    *capacity = new_capacity;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+/* Store `len` bytes at `pos` of a frame being filled by frame_fill_from_schunk():
+   in memory (see fill_reserve()), or else through `fp`. */
+static int fill_put(blosc2_frame_s* frame, int64_t* capacity, blosc2_io_cb* io_cb, void* fp,
+                    int64_t pos, const uint8_t* src, int32_t len) {
+  if (frame->cframe == NULL) {
+    int64_t wbytes = io_cb->write(src, 1, len, frame->file_offset + pos, fp);
+    if (wbytes != len) {
+      BLOSC_TRACE_ERROR("Cannot write to frame (wrote %" PRId64 " of %d bytes at position %" PRId64 ").",
+                        wbytes, len, frame->file_offset + pos);
+      frame->file_end = 0;  // a partial write may have moved the end of the file
+      return BLOSC2_ERROR_FILE_WRITE;
+    }
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int rc = fill_reserve(frame, capacity, pos, len);
+  if (rc >= 0) {
+    memcpy(frame->cframe + pos, src, (size_t)len);
+  }
+  return rc;
+}
+
+
+static int fill_from_schunk_unlocked(blosc2_frame_s* frame, blosc2_schunk* schunk, chunk_source* src,
+                                     int32_t header_len) {
+  int64_t nchunks = src->schunk->nchunks;
+  chunk_tally tally;
+  int rc = tally_init(&tally, nchunks, schunk->chunksize);
+  if (rc < 0) {
+    return rc;
+  }
+  // In memory, size the frame for all the chunks up front (src->cbytes is exact for
+  // a consistent super-chunk) and grow it only when that falls short
+  int64_t capacity = 0;
+  blosc2_io_cb* io_cb = NULL;
+  void* fp = NULL;
+  if (frame->cframe != NULL) {
+    capacity = header_len + (src->schunk->cbytes > 0 ? src->schunk->cbytes : 0) +
+               nchunks * (int64_t)sizeof(int64_t) + BLOSC2_MAX_OVERHEAD + frame->trailer_len;
+    uint8_t* cframe = realloc(frame->cframe, (size_t)capacity);
+    if (cframe == NULL) {
+      BLOSC_TRACE_ERROR("Cannot realloc space for the frame.");
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    else {
+      frame->cframe = cframe;
+    }
+  }
+  else {
+    io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    fp = (io_cb == NULL) ? NULL : frame_writer_acquire(frame, io_cb);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      rc = BLOSC2_ERROR_FILE_OPEN;
+    }
+  }
+
+  // For chunks that are read from a file and written to one
+  uint8_t* buffer = NULL;
+  size_t buffer_capacity = 0;
+  for (int64_t nchunk = 0; rc >= 0 && nchunk < nchunks; nchunk++) {
+    uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+    const uint8_t* chunk;
+    rc = source_chunk_header(src, nchunk, header, &chunk);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Can not get the `chunk` %" PRId64 ".", nchunk);
+      break;
+    }
+    int64_t pos = header_len + tally.cbytes;
+    int32_t stored = tally_chunk(&tally, chunk);
+    rc = stored;
+    if (stored <= 0) {
+      continue;
+    }
+    if (chunk != header) {
+      rc = fill_put(frame, &capacity, io_cb, fp, pos, chunk, stored);
+    }
+    else if (frame->cframe != NULL) {
+      rc = fill_reserve(frame, &capacity, pos, stored);
+      if (rc >= 0) {
+        rc = source_read_chunk(src, nchunk, stored, frame->cframe + pos);
+      }
+    }
+    else {
+      if ((size_t)stored > buffer_capacity) {
+        free(buffer);
+        buffer = malloc((size_t)stored);
+        if (buffer == NULL) {
+          buffer_capacity = 0;
+          rc = BLOSC2_ERROR_MEMORY_ALLOC;
+          break;
+        }
+        buffer_capacity = (size_t)stored;
+      }
+      rc = source_read_chunk(src, nchunk, stored, buffer);
+      if (rc >= 0) {
+        rc = fill_put(frame, &capacity, io_cb, fp, pos, buffer, stored);
+      }
+    }
+  }
+  free(buffer);
+
+  uint8_t* off_chunk = NULL;
+  int32_t off_cbytes = 0;
+  if (rc >= 0) {
+    off_cbytes = compress_offsets(tally.offsets, tally.off_nbytes,
+                                  tally.off_nbytes + BLOSC2_MAX_OVERHEAD, &off_chunk);
+    rc = off_cbytes;
+  }
+  if (rc >= 0) {
+    rc = fill_put(frame, &capacity, io_cb, fp, header_len + tally.cbytes, off_chunk, off_cbytes);
+  }
+  free(off_chunk);
+  if (fp != NULL) {
+    frame_writer_release(frame, io_cb, fp);
+  }
+  if (rc >= 0) {
+    rc = tally_finish(&tally, frame, schunk, header_len + tally.cbytes + off_cbytes + frame->trailer_len);
+  }
+  free(tally.offsets);
+  if (rc < 0) {
+    return rc;
+  }
+  // This also trims the in-memory frame to its final size
+  return frame_update_trailer(frame, schunk);
+}
+
+
+/* Fill the empty contiguous frame of `schunk` with the chunks of `src`, as they are.
+
+   The frame and the counters of `schunk` end up the same as after appending every
+   chunk with blosc2_schunk_append_chunk(), but that re-reads and recompresses all
+   the offsets, rewrites the header and the trailer and grows the frame for each
+   chunk, after the caller has made a private copy of it.  Here every chunk is
+   copied (or written) once, straight from `src`, and the offsets, header and
+   trailer are written once at the end. */
+int frame_fill_from_schunk(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src) {
+  if (frame->sframe || schunk->nchunks != 0) {
+    BLOSC_TRACE_ERROR("Only an empty contiguous frame can be filled.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (src->nchunks == 0) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int rc = frame_lock(frame, true);
+  if (rc < 0) {
+    return rc;
+  }
+  rc = frame_check_stale(frame);
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t blocksize;
+  int32_t chunksize;
+  int64_t nchunks;
+  if (rc >= 0) {
+    rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
+                         &nchunks, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                         frame->schunk->storage->io);
+  }
+  chunk_source source;
+  if (rc >= 0) {
+    rc = source_open(&source, src);
+  }
+  if (rc >= 0) {
+    rc = fill_from_schunk_unlocked(frame, schunk, &source, header_len);
+    source_close(&source);
+  }
+  frame_unlock(frame);
+  return rc < 0 ? rc : BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Write the contiguous frame of `schunk`, an empty in-memory copy of `src` (see
+   blosc2_schunk_copy()), filled with the chunks of `src`, into the buffer that
+   `alloc` returns for its exact length.  This is the frame that
+   frame_fill_from_schunk() would build, but written in place: a first pass over
+   the chunk headers gives the length, a second one copies the chunks.  Returns the
+   frame length, or a negative value on error. */
+int64_t frame_fill_alloc(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src,
+                         uint8_t* (*alloc)(int64_t len, void* user_data), void* user_data) {
+  if (frame->cframe == NULL || schunk->nchunks != 0) {
+    BLOSC_TRACE_ERROR("Only an empty in-memory frame can be filled.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int32_t header_len;
+  from_big(&header_len, frame->cframe + FRAME_HEADER_LEN, sizeof(header_len));
+  // With no chunks yet, the trailer follows the header
+  int64_t trailer_len = frame->trailer_len;
+  if (header_len + trailer_len != frame->len) {
+    BLOSC_TRACE_ERROR("The frame to fill is not empty.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  // Each pass holds the lock of the source, but not the call to `alloc` in
+  // between, which may wait for something (Python's GIL) that a writer to the
+  // source holds while it waits for the lock
+  chunk_source source;
+  int rc = source_open(&source, src);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t nchunks = src->nchunks;
+  chunk_tally tally;
+  rc = tally_init(&tally, nchunks, schunk->chunksize);
+  // What each chunk takes in the frame, for the second pass
+  int32_t* stored = malloc((size_t)(nchunks > 0 ? nchunks : 1) * sizeof(int32_t));
+  if (rc >= 0 && stored == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  for (int64_t nchunk = 0; rc >= 0 && nchunk < nchunks; nchunk++) {
+    uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+    const uint8_t* chunk;
+    rc = source_chunk_header(&source, nchunk, header, &chunk);
+    if (rc < 0) {
+      BLOSC_TRACE_ERROR("Can not get the `chunk` %" PRId64 ".", nchunk);
+      break;
+    }
+    rc = stored[nchunk] = tally_chunk(&tally, chunk);
+  }
+  source_close(&source);
+  uint8_t* off_chunk = NULL;
+  int32_t off_cbytes = 0;
+  if (rc >= 0 && nchunks > 0) {
+    off_cbytes = compress_offsets(tally.offsets, tally.off_nbytes,
+                                  tally.off_nbytes + BLOSC2_MAX_OVERHEAD, &off_chunk);
+    rc = off_cbytes;
+  }
+  int64_t len = header_len + tally.cbytes + off_cbytes + trailer_len;
+  uint8_t* dest = NULL;
+  if (rc >= 0) {
+    dest = alloc(len, user_data);
+    if (dest == NULL) {
+      BLOSC_TRACE_ERROR("Cannot get a buffer for the frame.");
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+  }
+  if (rc >= 0) {
+    memcpy(dest + len - trailer_len, frame->cframe + header_len, (size_t)trailer_len);
+    if (nchunks > 0) {
+      // The header also gets the final length
+      rc = tally_finish(&tally, frame, schunk, len);
+    }
+  }
+  if (rc >= 0) {
+    memcpy(dest, frame->cframe, (size_t)header_len);
+    rc = source_open(&source, src);
+    if (rc >= 0 && src->nchunks != nchunks) {
+      BLOSC_TRACE_ERROR("The super-chunk changed while serializing it.");
+      rc = BLOSC2_ERROR_DATA;
+    }
+    // The chunks go one after the other, straight from the source
+    int64_t pos = header_len;
+    for (int64_t nchunk = 0; rc >= 0 && nchunk < nchunks; nchunk++) {
+      if (stored[nchunk] > 0) {
+        rc = source_read_chunk(&source, nchunk, stored[nchunk], dest + pos);
+        pos += stored[nchunk];
+        continue;
+      }
+      // Coded in its offset by the first pass: check that it still is
+      uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
+      const uint8_t* chunk;
+      rc = source_chunk_header(&source, nchunk, header, &chunk);
+      if (rc >= 0 && !chunk_special_in_offset(chunk, sw32_(chunk + BLOSC2_CHUNK_CBYTES))) {
+        BLOSC_TRACE_ERROR("The super-chunk changed while serializing it.");
+        rc = BLOSC2_ERROR_DATA;
+      }
+    }
+    source_close(&source);
+    if (rc >= 0 && off_cbytes > 0) {
+      memcpy(dest + header_len + tally.cbytes, off_chunk, (size_t)off_cbytes);
+    }
+  }
+  free(stored);
+  free(off_chunk);
+  free(tally.offsets);
+  return rc < 0 ? rc : len;
+}
+
+
 void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk) {
   uint8_t* chunk_ = chunk;
   int32_t header_len;
@@ -4897,41 +5458,22 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
   // Add the new offset
   int64_t sframe_chunk_id = -1;
-  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
-  uint64_t offset_value = ((uint64_t)1 << 63);
-  switch (special_value) {
-    case BLOSC2_SPECIAL_ZERO:
-      // Zero chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_ZERO << (8 * 7);  // indicate a chunk of zeros
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    case BLOSC2_SPECIAL_UNINIT:
-      // Non initizalized values chunk.  Code it in a special way.
-      offset_value += (uint64_t) BLOSC2_SPECIAL_UNINIT << (8 * 7);  // chunk of uninit values
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    case BLOSC2_SPECIAL_NAN:
-      // NaN chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_NAN << (8 * 7);  // indicate a chunk of NANs
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      chunk_cbytes = 0;   // we don't need to store the chunk
-      break;
-    default:
-      if (frame->sframe) {
-        for (int64_t i = 0; i <= nchunks; ++i) {
-          // offsets[nchunk] is still uninitialized here
-          if (i != nchunk && offsets[i] > sframe_chunk_id) {
-            sframe_chunk_id = offsets[i];
-          }
-        }
-        offsets[nchunk] = ++sframe_chunk_id;
+  int special_value = chunk_special_in_offset(chunk_, chunk_cbytes);
+  if (special_value) {
+    special_offset(offsets + nchunk, special_value);
+    chunk_cbytes = 0;   // we don't need to store the chunk
+  }
+  else if (frame->sframe) {
+    for (int64_t i = 0; i <= nchunks; ++i) {
+      // offsets[nchunk] is still uninitialized here
+      if (i != nchunk && offsets[i] > sframe_chunk_id) {
+        sframe_chunk_id = offsets[i];
       }
-      else {
-        offsets[nchunk] = cbytes;
-      }
+    }
+    offsets[nchunk] = ++sframe_chunk_id;
+  }
+  else {
+    offsets[nchunk] = cbytes;
   }
 
   // Re-compress the offsets again
@@ -5273,46 +5815,26 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       old_sframe_chunk_id = offsets[nchunk];
     }
   }
-  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
-  uint64_t offset_value = ((uint64_t)1 << 63);
-  bool is_special_chunk = false;
-  switch (special_value) {
-    case BLOSC2_SPECIAL_ZERO:
-      // Zero chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_ZERO << (8 * 7);  // indicate a chunk of zeros
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      is_special_chunk = true;
-      break;
-    case BLOSC2_SPECIAL_UNINIT:
-      // Non initialized values chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_UNINIT << (8 * 7);  // indicate a chunk of uninit values
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      is_special_chunk = true;
-      break;
-    case BLOSC2_SPECIAL_NAN:
-      // NaN chunk.  Code it in a special way.
-      offset_value += (uint64_t)BLOSC2_SPECIAL_NAN << (8 * 7);  // indicate a chunk of NANs
-      to_little(offsets + nchunk, &offset_value, sizeof(uint64_t));
-      is_special_chunk = true;
-      break;
-    default:
-      if (frame->sframe) {
-        if (sframe_chunk_id < 0) {
-          for (int64_t i = 0; i < nchunks; ++i) {
-            if (offsets[i] > sframe_chunk_id) {
-              sframe_chunk_id = offsets[i];
-            }
-          }
-          offsets[nchunk] = ++sframe_chunk_id;
+  int special_value = chunk_special_in_offset(chunk_, chunk_cbytes);
+  bool is_special_chunk = special_value != 0;
+  if (is_special_chunk) {
+    special_offset(offsets + nchunk, special_value);
+  }
+  else if (frame->sframe) {
+    if (sframe_chunk_id < 0) {
+      for (int64_t i = 0; i < nchunks; ++i) {
+        if (offsets[i] > sframe_chunk_id) {
+          sframe_chunk_id = offsets[i];
         }
       }
-      else {
-        if (old_chunk_is_regular) {
-          new_chunk_offset = old_offset;
-        }
-        offsets[nchunk] = new_chunk_offset;
-      }
+      offsets[nchunk] = ++sframe_chunk_id;
+    }
+  }
+  else {
+    if (old_chunk_is_regular) {
+      new_chunk_offset = old_offset;
+    }
+    offsets[nchunk] = new_chunk_offset;
   }
   if (is_special_chunk) {
     chunk_cbytes = 0;   // Special chunks are encoded in offsets and have no stored payload.

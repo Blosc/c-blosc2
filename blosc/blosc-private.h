@@ -111,6 +111,64 @@ static inline bool blosc2_nchunks_to_offsets_nbytes(int64_t nchunks, int32_t *of
   return true;
 }
 
+/* The flags2 byte lives in the extended header, at offset 0x1e, so it only
+   exists when the chunk actually carries one.  Whether it does is recorded in
+   the flags byte, the same way read_chunk_header() decides it -- not in the
+   chunk size: a Blosc1-style chunk with 16 or more bytes of payload is 32 bytes
+   or longer, yet offset 0x1e is compressed data there, and reading it as flags2
+   can mark a schunk as using variable-length blocks out of thin air.  The size
+   check stays as the bound that keeps a short chunk from being over-read. */
+static inline uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
+  uint8_t flags = chunk[BLOSC2_CHUNK_FLAGS];
+  bool extended_header = (flags & BLOSC_DOSHUFFLE) && (flags & BLOSC_DOBITSHUFFLE);
+  if (!extended_header || chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return 0;
+  }
+  return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+}
+
+/* The special value (BLOSC2_SPECIAL_ZERO, _NAN or _UNINIT) that a frame codes
+   `chunk` (`cbytes` long) with in its offset instead of storing it, or 0 if it
+   stores the chunk.  A chunk shorter than an extended header has no special value. */
+static inline int chunk_special_in_offset(const uint8_t *chunk, int32_t cbytes) {
+  if (cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return 0;
+  }
+  int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  switch (special_value) {
+    case BLOSC2_SPECIAL_ZERO:
+    case BLOSC2_SPECIAL_NAN:
+    case BLOSC2_SPECIAL_UNINIT:
+      return special_value;
+    default:
+      return 0;
+  }
+}
+
+/* The chunksize of a super-chunk (-1 before its first chunk, 0 once its chunks
+   vary in size) after adding a chunk of `nbytes` bytes at the end of (or, if not
+   `at_end`, among) its `nchunks` chunks, the last of which has `last_nbytes`: the
+   chunks stop having one size when the last one is shorter, or the new one is
+   longer, or is not of that size and goes in between.  `last_nbytes` is only read
+   when `*chunksize` is not 0 and `nchunks` > 0.  Returns false, and leaves
+   *chunksize, for a first chunk longer than a chunksize set in advance. */
+static inline bool chunksize_after_adding(int32_t *chunksize, int64_t nchunks, int32_t last_nbytes,
+                                         int32_t nbytes, bool at_end) {
+  if (*chunksize == 0) {
+    return true;
+  }
+  int32_t size = (*chunksize == -1) ? nbytes : *chunksize;
+  if (nchunks > 0 && (last_nbytes < size || nbytes > size || (!at_end && nbytes != size))) {
+    *chunksize = 0;
+    return true;
+  }
+  if (size > 0 && nbytes > size) {
+    return false;
+  }
+  *chunksize = size;
+  return true;
+}
+
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
   int32_t idest;

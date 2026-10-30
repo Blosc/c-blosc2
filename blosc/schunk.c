@@ -243,13 +243,11 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 }
 
 
-/* Create a copy of a super-chunk */
-blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
-  if (schunk == NULL) {
-    BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
-    return NULL;
-  }
-
+/* A new, empty super-chunk with `storage` and the metalayers of `schunk`: the
+   first part of blosc2_schunk_copy().  Sets *chunks_as_is to whether the chunks of
+   `schunk` can go into it as they are (else they have to be recompressed). */
+static blosc2_schunk* schunk_copy_skeleton(blosc2_schunk *schunk, blosc2_storage *storage,
+                                           bool *chunks_as_is) {
   // Check if cparams are equals
   bool cparams_equal = true;
   blosc2_cparams cparams = {0};
@@ -308,14 +306,62 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     blosc2_metalayer *meta = schunk->metalayers[nmeta];
     if (blosc2_meta_add(new_schunk, meta->name, meta->content, meta->content_len) < 0) {
       BLOSC_TRACE_ERROR("Can not add %s `metalayer`.", meta->name);
-      goto error;
+      blosc2_schunk_free(new_schunk);
+      return NULL;
     }
   }
 
-  // Copy chunks
-  bool uses_vlblocks = (schunk->flags2 & BLOSC2_VL_BLOCKS) != 0;
+  *chunks_as_is = cparams_equal || (schunk->flags2 & BLOSC2_VL_BLOCKS) != 0;
+  return new_schunk;
+}
 
-  if (cparams_equal || uses_vlblocks) {
+
+/* Copy the variable-length metalayers of `schunk` into `new_schunk`: the last
+   part of blosc2_schunk_copy(). */
+static int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk) {
+  for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
+    uint8_t *content = NULL;
+    int32_t content_len;
+    char* name = schunk->vlmetalayers[nmeta]->name;
+    if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
+      // Passing the (previously uninitialized) content pointer forward ended
+      // in a bogus free that aborted the process; bail out instead.
+      BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
+      BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
+      free(content);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    free(content);
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Create a copy of a super-chunk */
+blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
+  if (schunk == NULL) {
+    BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
+    return NULL;
+  }
+  bool chunks_as_is;
+  blosc2_schunk *new_schunk = schunk_copy_skeleton(schunk, storage, &chunks_as_is);
+  if (new_schunk == NULL) {
+    return NULL;
+  }
+
+  // Copy chunks
+  blosc2_frame_s* new_frame = (blosc2_frame_s*)new_schunk->frame;
+  if (chunks_as_is && new_frame != NULL && !new_frame->sframe) {
+    // A contiguous frame takes all the chunks in one go
+    if (frame_fill_from_schunk(new_frame, new_schunk, schunk) < 0) {
+      BLOSC_TRACE_ERROR("Can not copy the chunks into the new frame.");
+      goto error;
+    }
+  }
+  else if (chunks_as_is) {
     for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
       uint8_t *chunk;
       bool needs_free;
@@ -354,23 +400,8 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     free(buffer);
   }
 
-  // Copy vlmetalayers
-  for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
-    uint8_t *content = NULL;
-    int32_t content_len;
-    char* name = schunk->vlmetalayers[nmeta]->name;
-    if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
-      // Passing the (previously uninitialized) content pointer forward ended
-      // in a bogus free that aborted the process; bail out instead.
-      BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
-      goto error;
-    }
-    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
-      BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
-      free(content);
-      goto error;
-    }
-    free(content);
+  if (schunk_copy_vlmetalayers(schunk, new_schunk) < 0) {
+    goto error;
   }
   return new_schunk;
 
@@ -523,6 +554,57 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
 
   return cframe_len;
 
+}
+
+
+/* Convert a super-chunk into a contiguous frame in a buffer from the caller. */
+int64_t blosc2_schunk_to_buffer_alloc(blosc2_schunk* schunk,
+                                      uint8_t* (*alloc)(int64_t len, void* user_data), void* user_data) {
+  if (schunk == NULL || alloc == NULL) {
+    BLOSC_TRACE_ERROR("schunk and alloc cannot be NULL.");
+    return BLOSC2_ERROR_NULL_POINTER;
+  }
+  if (schunk->frame == NULL || schunk->storage->urlpath != NULL) {
+    // Anything but an in-memory frame: write the frame that blosc2_schunk_to_buffer()
+    // would build straight into the destination
+    blosc2_storage frame_storage = BLOSC2_STORAGE_DEFAULTS;
+    frame_storage.contiguous = true;
+    bool chunks_as_is;
+    blosc2_schunk* skeleton = schunk_copy_skeleton(schunk, &frame_storage, &chunks_as_is);
+    if (skeleton == NULL) {
+      BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
+      return BLOSC2_ERROR_SCHUNK_COPY;
+    }
+    if (chunks_as_is) {
+      // With no chunks yet, adding the vlmetalayers first gives the same frame
+      int64_t len = schunk_copy_vlmetalayers(schunk, skeleton);
+      if (len >= 0) {
+        len = frame_fill_alloc((blosc2_frame_s*)skeleton->frame, skeleton, schunk, alloc, user_data);
+      }
+      blosc2_schunk_free(skeleton);
+      return len;
+    }
+    blosc2_schunk_free(skeleton);
+  }
+
+  uint8_t* cframe;
+  bool needs_free;
+  int64_t len = blosc2_schunk_to_buffer(schunk, &cframe, &needs_free);
+  if (len < 0) {
+    return len;
+  }
+  uint8_t* dest = alloc(len, user_data);
+  if (dest == NULL) {
+    BLOSC_TRACE_ERROR("Cannot get a buffer for the frame.");
+    len = BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  else {
+    memcpy(dest, cframe, (size_t)len);
+  }
+  if (needs_free) {
+    free(cframe);
+  }
+  return len;
 }
 
 
@@ -958,22 +1040,6 @@ static int schunk_get_chunk_nbytes(blosc2_schunk *schunk, int64_t nchunk, int32_
   return blosc2_cbuffer_sizes(chunk, chunk_nbytes, NULL, NULL);
 }
 
-/* The flags2 byte lives in the extended header, at offset 0x1e, so it only
-   exists when the chunk actually carries one.  Whether it does is recorded in
-   the flags byte, the same way read_chunk_header() decides it -- not in the
-   chunk size: a Blosc1-style chunk with 16 or more bytes of payload is 32 bytes
-   or longer, yet offset 0x1e is compressed data there, and reading it as flags2
-   can mark a schunk as using variable-length blocks out of thin air.  The size
-   check stays as the bound that keeps a short chunk from being over-read. */
-static uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
-  uint8_t flags = chunk[BLOSC2_CHUNK_FLAGS];
-  bool extended_header = (flags & BLOSC_DOSHUFFLE) && (flags & BLOSC_DOBITSHUFFLE);
-  if (!extended_header || chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
-    return 0;
-  }
-  return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
-}
-
 static int schunk_get_chunk_flags2(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk_flags2) {
   uint8_t header[BLOSC_EXTENDED_HEADER_LENGTH];
   const uint8_t *chunk;
@@ -1045,24 +1111,15 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
     schunk->flags2 = flags2;
   }
 
-  int32_t chunksize = schunk->chunksize;
-  bool variable_chunksize = (chunksize == 0);
-  if (chunksize == -1) {
-    schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
-    chunksize = schunk->chunksize;
-  }
-  if (!variable_chunksize && nchunks > 0) {
-    int32_t last_nbytes;
+  int32_t last_nbytes = 0;
+  if (schunk->chunksize != 0 && nchunks > 0) {
     rc = schunk_get_chunk_nbytes(schunk, nchunks - 1, &last_nbytes);
     if (rc < 0) {
       return rc;
     }
-    if (last_nbytes < chunksize || chunk_nbytes > chunksize) {
-      variable_chunksize = true;
-      schunk->chunksize = 0;
-    }
   }
-  if (!variable_chunksize && chunksize > 0 && chunk_nbytes > chunksize) {
+  int32_t chunksize = schunk->chunksize;
+  if (!chunksize_after_adding(&schunk->chunksize, nchunks, last_nbytes, chunk_nbytes, true)) {
     BLOSC_TRACE_ERROR("Appending chunks that have different lengths in the same schunk "
                       "is not supported yet: %d > %d.", chunk_nbytes, chunksize);
     return BLOSC2_ERROR_CHUNK_APPEND;
@@ -1072,21 +1129,9 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
   schunk->current_nchunk = nchunks;
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += chunk_nbytes;
-  if (schunk->frame == NULL) {
+  // A frame codes special chunks in their offsets
+  if (schunk->frame == NULL || !chunk_special_in_offset(chunk, chunk_cbytes)) {
     schunk->cbytes += chunk_cbytes;
-  } else {
-    // A frame
-    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
-    switch (special_value) {
-      case BLOSC2_SPECIAL_ZERO:
-      case BLOSC2_SPECIAL_NAN:
-      case BLOSC2_SPECIAL_UNINIT:
-        schunk->cbytes += 0;
-        break;
-      default:
-        schunk->cbytes += chunk_cbytes;
-    }
   }
 
   if (copy) {
@@ -1190,26 +1235,16 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->flags2 = flags2;
   }
 
-  int32_t chunksize = schunk->chunksize;
-  bool variable_chunksize = (chunksize == 0);
-  if (chunksize == -1) {
-    schunk->chunksize = chunk_nbytes;  // The super-chunk is initialized now
-    chunksize = schunk->chunksize;
-  }
-
-  if (!variable_chunksize && nchunks > 0) {
-    int32_t last_nbytes;
+  int32_t last_nbytes = 0;
+  if (schunk->chunksize != 0 && nchunks > 0) {
     rc = schunk_get_chunk_nbytes(schunk, nchunks - 1, &last_nbytes);
     if (rc < 0) {
       return rc;
     }
-    if (last_nbytes < chunksize || chunk_nbytes > chunksize ||
-        (nchunk != nchunks && chunk_nbytes != chunksize)) {
-      variable_chunksize = true;
-      schunk->chunksize = 0;
-    }
   }
-  if (!variable_chunksize && chunksize > 0 && chunk_nbytes > chunksize) {
+  int32_t chunksize = schunk->chunksize;
+  if (!chunksize_after_adding(&schunk->chunksize, nchunks, last_nbytes, chunk_nbytes,
+                              nchunk == nchunks)) {
     BLOSC_TRACE_ERROR("Inserting chunks that have different lengths in the same schunk "
                       "is not supported yet: %d > %d.", chunk_nbytes, chunksize);
     return BLOSC2_ERROR_CHUNK_INSERT;
@@ -1219,21 +1254,9 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
   schunk->current_nchunk = nchunk;
   schunk->nchunks = nchunks + 1;
   schunk->nbytes += chunk_nbytes;
-  if (schunk->frame == NULL) {
+  // A frame codes special chunks in their offsets
+  if (schunk->frame == NULL || !chunk_special_in_offset(chunk, chunk_cbytes)) {
     schunk->cbytes += chunk_cbytes;
-  } else {
-    // A frame
-    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
-    switch (special_value) {
-      case BLOSC2_SPECIAL_ZERO:
-      case BLOSC2_SPECIAL_NAN:
-      case BLOSC2_SPECIAL_UNINIT:
-        schunk->cbytes += 0;
-        break;
-      default:
-        schunk->cbytes += chunk_cbytes;
-    }
   }
 
   if (copy) {
@@ -1384,21 +1407,13 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->cbytes += chunk_cbytes;
     schunk->cbytes -= chunk_cbytes_old;
   } else {
-    // A frame
-    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
-        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
+    // A frame codes special chunks in their offsets
     schunk->nbytes += chunk_nbytes;
     schunk->nbytes -= chunk_nbytes_old;
-    switch (special_value) {
-      case BLOSC2_SPECIAL_ZERO:
-      case BLOSC2_SPECIAL_NAN:
-      case BLOSC2_SPECIAL_UNINIT:
-        schunk->cbytes -= chunk_cbytes_old;
-        break;
-      default:
-        schunk->cbytes += chunk_cbytes;
-        schunk->cbytes -= chunk_cbytes_old;
+    if (!chunk_special_in_offset(chunk, chunk_cbytes)) {
+      schunk->cbytes += chunk_cbytes;
     }
+    schunk->cbytes -= chunk_cbytes_old;
   }
 
   // Update super-chunk or frame

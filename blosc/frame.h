@@ -178,6 +178,9 @@ get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, 
                 const blosc2_io *iodefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
+int frame_fill_from_schunk(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src);
+int64_t frame_fill_alloc(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src,
+                         uint8_t* (*alloc)(int64_t len, void* user_data), void* user_data);
 void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
 /* `cbytes_old` is the size of the chunk replaced, as the counters of `schunk` hold it */
 void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk,
