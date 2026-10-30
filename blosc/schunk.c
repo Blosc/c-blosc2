@@ -1734,6 +1734,38 @@ int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk, int32_t nbl
 }
 
 
+/* See blosc-private.h */
+int schunk_decompress_masked(blosc2_schunk *schunk, int64_t nchunk, const uint8_t *chunk, int32_t cbytes,
+                             const bool *maskout, int32_t nblocks, blosc2_postfilter_fn postfilter,
+                             void *user_data, void *dest, int32_t destsize) {
+  blosc2_context *dctx = schunk->dctx;
+  int rc = blosc2_set_maskout(dctx, (bool *) maskout, nblocks);
+  if (rc < 0) {
+    return rc;
+  }
+  blosc2_postfilter_fn saved_postfilter = dctx->postfilter;
+  blosc2_postfilter_params *saved_postparams = dctx->postparams;
+  blosc2_postfilter_params params;
+  if (postfilter != NULL) {
+    memset(&params, 0, sizeof(params));
+    params.user_data = user_data;
+    dctx->postfilter = postfilter;
+    dctx->postparams = &params;
+  }
+  if (chunk != NULL) {
+    rc = blosc2_decompress_ctx(dctx, chunk, cbytes, dest, destsize);
+  }
+  else {
+    rc = blosc2_schunk_decompress_chunk(schunk, nchunk, dest, destsize);
+  }
+  dctx->postfilter = saved_postfilter;
+  dctx->postparams = saved_postparams;
+  // A decompression that failed early, or a missing chunk, leaves the mask set
+  ctx_clear_maskout(dctx);
+  return rc;
+}
+
+
 int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
@@ -2034,12 +2066,8 @@ int blosc2_schunk_get_sparse_buffer(blosc2_schunk *schunk, int64_t ncoords, cons
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (schunk->filters[i] == BLOSC_DELTA) {
-      return schunk_get_sparse_getitem(schunk, ncoords, coords, buffer);
-    }
-  }
-  if (schunk->dctx != NULL && schunk->dctx->postfilter != NULL) {
+  if (filters_contain(schunk->filters, BLOSC_DELTA) ||
+      (schunk->dctx != NULL && schunk->dctx->postfilter != NULL)) {
     return schunk_get_sparse_getitem(schunk, ncoords, coords, buffer);
   }
   if (ncoords <= 1) {

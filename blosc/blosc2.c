@@ -2803,14 +2803,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
                         context->block_maskout_nitems, context->nblocks);
       return BLOSC2_ERROR_DATA;
     }
-    bool has_delta = false;
-    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-      if (context->filters[i] == BLOSC_DELTA) {
-        has_delta = true;
-        break;
-      }
-    }
-    if (has_delta) {
+    if (filters_contain(context->filters, BLOSC_DELTA)) {
       bool any_needed = false;
       for (int i = 0; i < context->block_maskout_nitems; ++i) {
         if (!context->block_maskout[i]) {
@@ -4110,11 +4103,7 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, int32_t srcs
   result = blosc_run_decompression_with_context(context, src, srcsize, dest, destsize);
 
   // Reset a possible block_maskout
-  if (context->block_maskout != NULL) {
-    free(context->block_maskout);
-    context->block_maskout = NULL;
-  }
-  context->block_maskout_nitems = 0;
+  ctx_clear_maskout(context);
 
   return result;
 }
@@ -4619,14 +4608,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return ntbytes;
   }
 
-  bool has_delta = false;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (context->filters[i] == BLOSC_DELTA) {
-      has_delta = true;
-      break;
-    }
-  }
-  if (has_delta) {
+  if (filters_contain(context->filters, BLOSC_DELTA)) {
     uint8_t* full_chunk = malloc((size_t)header->nbytes);
     if (full_chunk == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;
@@ -4911,14 +4893,7 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  bool has_delta = false;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (context->filters[i] == BLOSC_DELTA) {
-      has_delta = true;
-      break;
-    }
-  }
-  if (has_delta) {
+  if (filters_contain(context->filters, BLOSC_DELTA)) {
     uint8_t* full_chunk = malloc((size_t)header.nbytes);
     if (full_chunk == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;

@@ -127,6 +127,16 @@ static inline uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbyte
   return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
 }
 
+/* Whether the filter pipeline `filters` (BLOSC2_MAX_FILTERS codes) has filter `id` */
+static inline bool filters_contain(const uint8_t *filters, uint8_t id) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    if (filters[i] == id) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /* The special value (BLOSC2_SPECIAL_ZERO, _NAN or _UNINIT) that a frame codes
    `chunk` (`cbytes` long) with in its offset instead of storing it, or 0 if it
    stores the chunk.  A chunk shorter than an extended header has no special value. */
@@ -168,6 +178,16 @@ static inline bool chunksize_after_adding(int32_t *chunksize, int64_t nchunks, i
   *chunksize = size;
   return true;
 }
+
+/* Decompress chunk `nchunk` of `schunk`, or `chunk` (`cbytes` long) if it is not NULL,
+   with the decompression context of `schunk`, decoding only the blocks that `maskout`
+   (`nblocks` items) leaves in and, if `postfilter` is not NULL, running it (with
+   `user_data`) instead of the context's own postfilter.  The context gets its own
+   postfilter back and loses the mask in any case.  Returns what the decompression
+   returns. */
+int schunk_decompress_masked(blosc2_schunk *schunk, int64_t nchunk, const uint8_t *chunk, int32_t cbytes,
+                             const bool *maskout, int32_t nblocks, blosc2_postfilter_fn postfilter,
+                             void *user_data, void *dest, int32_t destsize);
 
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
