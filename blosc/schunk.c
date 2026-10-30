@@ -2433,7 +2433,7 @@ int blosc2_meta_update(blosc2_schunk *schunk, const char *name, uint8_t *content
 
   // Update the contents of the metalayer
   if (content_len > 0) {
-    memcpy(metalayer->content, content, content_len);
+    memmove(metalayer->content, content, content_len);
   }
 
   // Update the metalayers in frame (as size has not changed, we don't need to update the trailer)
