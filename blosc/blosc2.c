@@ -1048,11 +1048,14 @@ static int blosc2_initialize_header_from_context(blosc2_context* context, blosc_
   return 0;
 }
 
-void _cycle_buffers(uint8_t **src, uint8_t **dest, uint8_t **tmp) {
-  uint8_t *tmp2 = *src;
+/* Cycle buffers for the compression pipeline.  The input block is read-only
+   (and the DELTA filter needs it unmodified as a reference), so it must never
+   be recycled as a destination; ping-pong between the two scratch buffers. */
+static void _cycle_buffers_forward(uint8_t **src, uint8_t **dest, uint8_t **tmp,
+                                   const uint8_t *input) {
+  uint8_t *prev_src = *src;
   *src = *dest;
-  *dest = *tmp;
-  *tmp = tmp2;
+  *dest = (prev_src == input) ? *tmp : prev_src;
 }
 
 uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
@@ -1109,7 +1112,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
       // No more filters are required
       return _dest;
     }
-    _cycle_buffers(&_src, &_dest, &_tmp);
+    _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
   }
 
   /* Process the filter pipeline */
@@ -1181,7 +1184,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
     // Cycle buffers when required
     if (filters[i] != BLOSC_NOFILTER) {
-      _cycle_buffers(&_src, &_dest, &_tmp);
+      _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
     }
   }
   return _src;
@@ -1477,17 +1480,56 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 }
 
 
+static void delta_dref_sync(blosc2_context* context, blosc2_pthread_mutex_t** delta_mutex,
+                            blosc2_pthread_cond_t** delta_cv, int** dref_not_init) {
+  struct blosc_job_group* job = context->job;
+  *delta_mutex = job != NULL ? &job->delta_mutex : &context->delta_mutex;
+  *delta_cv = job != NULL ? &job->delta_cv : &context->delta_cv;
+  *dref_not_init = job != NULL ? &job->dref_not_init : &context->dref_not_init;
+}
+
+
+static void delta_wait_dref(blosc2_context* context) {
+  blosc2_pthread_mutex_t* delta_mutex;
+  blosc2_pthread_cond_t* delta_cv;
+  int* dref_not_init;
+
+  delta_dref_sync(context, &delta_mutex, &delta_cv, &dref_not_init);
+  blosc2_pthread_mutex_lock(delta_mutex);
+  while (*dref_not_init) {
+    blosc2_pthread_cond_wait(delta_cv, delta_mutex);
+  }
+  blosc2_pthread_mutex_unlock(delta_mutex);
+}
+
+
+static void delta_release_dref(blosc2_context* context) {
+  blosc2_pthread_mutex_t* delta_mutex;
+  blosc2_pthread_cond_t* delta_cv;
+  int* dref_not_init;
+
+  delta_dref_sync(context, &delta_mutex, &delta_cv, &dref_not_init);
+  blosc2_pthread_mutex_lock(delta_mutex);
+  if (*dref_not_init) {
+    *dref_not_init = 0;
+    blosc2_pthread_cond_broadcast(delta_cv);
+  }
+  blosc2_pthread_mutex_unlock(delta_mutex);
+}
+
+
 /* Process the filter pipeline (decompression mode) */
 int pipeline_backward(struct thread_context* thread_context, const int32_t bsize, uint8_t* dest,
                       const int32_t offset, uint8_t* src, uint8_t* tmp,
                       uint8_t* tmp2, int last_filter_index, int32_t nblock) {
+  (void)tmp2;
   blosc2_context* context = thread_context->parent_context;
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  uint8_t* _src = src;
+  uint8_t* _src = (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') == BLOSC_DELTA &&
+                   context->postfilter == NULL) ? (dest + offset) : src;
   uint8_t* _dest = tmp;
-  uint8_t* _tmp = tmp2;
   int errcode = 0;
 
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
@@ -1497,6 +1539,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (last_copy_filter && context->postfilter == NULL &&
         (filters[i] == BLOSC_DELTA || _src != dest + offset)) {
       _dest = dest + offset;
+    } else {
+      _dest = (_src == src) ? tmp : src;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
@@ -1511,30 +1555,13 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           }
           break;
         case BLOSC_DELTA:
-          if (context->nthreads == 1) {
-            /* Serial mode */
-            delta_decoder(dest, offset, bsize, typesize, _dest);
-          } else {
-            struct blosc_job_group *job = context->job;
-            blosc2_pthread_mutex_t *delta_mutex = job != NULL ? &job->delta_mutex : &context->delta_mutex;
-            blosc2_pthread_cond_t *delta_cv = job != NULL ? &job->delta_cv : &context->delta_cv;
-            int *dref_not_init = job != NULL ? &job->dref_not_init : &context->dref_not_init;
-            /* Force the thread in charge of the block 0 to go first */
-            blosc2_pthread_mutex_lock(delta_mutex);
-            if (*dref_not_init) {
-              if (offset != 0) {
-                blosc2_pthread_cond_wait(delta_cv, delta_mutex);
-              } else {
-                delta_decoder(dest, offset, bsize, typesize, _dest);
-                *dref_not_init = 0;
-                blosc2_pthread_cond_broadcast(delta_cv);
-              }
-            }
-            blosc2_pthread_mutex_unlock(delta_mutex);
-            if (offset != 0) {
-              delta_decoder(dest, offset, bsize, typesize, _dest);
-            }
+          if (_src != _dest) {
+            memcpy(_dest, _src, (size_t)bsize);
           }
+          if (offset != 0 && thread_context != context->serial_context) {
+            delta_wait_dref(context);
+          }
+          delta_decoder(offset == 0 ? _dest : dest, offset, bsize, typesize, _dest);
           break;
         case BLOSC_TRUNC_PREC:
           // TRUNC_PREC filter does not need to be undone
@@ -1577,9 +1604,9 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       urfiltersuccess:;
     }
 
-    // Cycle buffers when required
+    // Update input buffer for the next filter in the backward pipeline
     if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
-      _cycle_buffers(&_src, &_dest, &_tmp);
+      _src = _dest;
     }
     if (last_filter_index == i) {
       break;
@@ -5086,6 +5113,9 @@ static void t_blosc_do_job(void *ctxt)
                          src, srcsize, src_offset, nblock_,
                          dest_block, dest_offset, tmp, tmp2);
       }
+      if (nblock_ == 0 || cbytes < 0) {
+        delta_release_dref(context);
+      }
     }
 
     if (context->thread_giveup_code <= 0) {
@@ -5208,6 +5238,9 @@ static void t_blosc_do_job(void *ctxt) {
     blosc2_pthread_mutex_lock(&job->mutex);
     job->giveup_code = BLOSC2_ERROR_MEMORY_ALLOC;
     blosc2_pthread_mutex_unlock(&job->mutex);
+    if (!compress) {
+      delta_release_dref(context);
+    }
     goto job_done;
   }
 
@@ -5289,6 +5322,9 @@ static void t_blosc_do_job(void *ctxt) {
         cbytes = blosc_d(thcontext, bsize, leftoverblock, memcpyed,
                          src, srcsize, src_offset, nblock_,
                          dest_block, dest_offset, tmp, tmp2);
+      }
+      if (nblock_ == 0 || cbytes < 0) {
+        delta_release_dref(context);
       }
     }
 
