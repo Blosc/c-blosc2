@@ -111,6 +111,10 @@ static inline bool blosc2_nchunks_to_offsets_nbytes(int64_t nchunks, int32_t *of
   return true;
 }
 
+/* Copy the variable-length metalayers of `schunk` into `new_schunk`, compressed
+   with `cparams` (NULL for the defaults of blosc2_vlmeta_add()). */
+int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, blosc2_cparams *cparams);
+
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
   int32_t idest;

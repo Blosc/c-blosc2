@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /* Have problems using posix barriers when symbol value is 200112L */
 /* Requires more investigation, but this will work for the moment */
@@ -160,6 +161,13 @@ struct thread_context {
 
 static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
   return context != NULL && context->thread_backend != BLOSC_BACKEND_SERIAL && context->nthreads > 1;
+}
+
+/* Drop the block mask of a decompression context, if any */
+static inline void ctx_clear_maskout(blosc2_context *context) {
+  free(context->block_maskout);
+  context->block_maskout = NULL;
+  context->block_maskout_nitems = 0;
 }
 
 #endif  /* BLOSC_CONTEXT_H */

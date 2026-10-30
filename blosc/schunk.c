@@ -180,6 +180,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
   // ...and update internal properties
   if (update_schunk_properties(schunk) < 0) {
     BLOSC_TRACE_ERROR("Error when updating schunk properties");
+    blosc2_schunk_free(schunk);
     return NULL;
   }
 
@@ -194,6 +195,8 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     // Create directory
     if (mkdir(urlpath, 0777) == -1) {
       BLOSC_TRACE_ERROR("Error during the creation of the directory, maybe it already exists.");
+      free(urlpath);
+      blosc2_schunk_free(schunk);
       return NULL;
     }
     // We want a sparse (directory) frame as storage
@@ -201,6 +204,7 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     free(urlpath);
     if (frame == NULL) {
       BLOSC_TRACE_ERROR("Error creating sparse frame.");
+      blosc2_schunk_free(schunk);
       return NULL;
     }
     frame->sframe = true;
@@ -210,6 +214,8 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
+      frame_free(frame);
+      blosc2_schunk_free(schunk);
       return NULL;
     }
     schunk->frame = (blosc2_frame*)frame;
@@ -219,12 +225,14 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     if (storage->urlpath != NULL) {
       if (file_exists(storage->urlpath)) {
         BLOSC_TRACE_ERROR("You are trying to overwrite an existing frame.  Remove it first!");
+        blosc2_schunk_free(schunk);
         return NULL;
       }
     }
     blosc2_frame_s* frame = frame_new(storage->urlpath);
     if (frame == NULL) {
       BLOSC_TRACE_ERROR("Error creating contiguous frame.");
+      blosc2_schunk_free(schunk);
       return NULL;
     }
     frame->sframe = false;
@@ -234,6 +242,8 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
     int64_t frame_len = frame_from_schunk(schunk, frame);
     if (frame_len < 0) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to frame.");
+      frame_free(frame);
+      blosc2_schunk_free(schunk);
       return NULL;
     }
     schunk->frame = (blosc2_frame*)frame;
@@ -243,12 +253,39 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 }
 
 
+/* See blosc-private.h */
+int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, blosc2_cparams *cparams) {
+  for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
+    uint8_t *content = NULL;
+    int32_t content_len;
+    char* name = schunk->vlmetalayers[nmeta]->name;
+    if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
+      // Passing the (previously uninitialized) content pointer forward ended
+      // in a bogus free that aborted the process; bail out instead.
+      BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, cparams) < 0) {
+      BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
+      free(content);
+      return BLOSC2_ERROR_FAILURE;
+    }
+    free(content);
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 /* Create a copy of a super-chunk */
-blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
+blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *dest_storage) {
   if (schunk == NULL) {
     BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
     return NULL;
   }
+  // A copy, so that the defaults below do not end up in the caller's storage: a
+  // pointer to the local cparams left there would dangle after the return
+  blosc2_storage storage_ = *dest_storage;
+  blosc2_storage *storage = &storage_;
 
   // Check if cparams are equals
   bool cparams_equal = true;
@@ -327,6 +364,7 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
       rc = blosc2_schunk_append_chunk(new_schunk, chunk, !needs_free);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Can not append the `chunk` into super-chunk.");
+        // A failed append leaves a chunk passed without a copy to us
         if (needs_free) {
           free(chunk);
         }
@@ -335,17 +373,20 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     }
   } else {
     int32_t chunksize = schunk->chunksize == -1 ? 0 : schunk->chunksize;
-    uint8_t *buffer = malloc(chunksize);
-    if (buffer == NULL && chunksize > 0) {
+    uint8_t *buffer = malloc(chunksize > 0 ? chunksize : 1);
+    if (buffer == NULL) {
+      BLOSC_TRACE_ERROR("Can not allocate memory for decompressing the chunks.");
       goto error;
     }
     for (int nchunk = 0; nchunk < schunk->nchunks; ++nchunk) {
-      if (blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, schunk->chunksize) < 0) {
+      // The last chunk can be shorter
+      int nbytes = blosc2_schunk_decompress_chunk(schunk, nchunk, buffer, chunksize);
+      if (nbytes < 0) {
         BLOSC_TRACE_ERROR("Can not decompress the `chunk` %d.", nchunk);
         free(buffer);
         goto error;
       }
-      if (blosc2_schunk_append_buffer(new_schunk, buffer, schunk->chunksize) < 0) {
+      if (blosc2_schunk_append_buffer(new_schunk, buffer, nbytes) < 0) {
         BLOSC_TRACE_ERROR("Can not append the `buffer` into super-chunk.");
         free(buffer);
         goto error;
@@ -354,23 +395,8 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
     free(buffer);
   }
 
-  // Copy vlmetalayers
-  for (int nmeta = 0; nmeta < schunk->nvlmetalayers; ++nmeta) {
-    uint8_t *content = NULL;
-    int32_t content_len;
-    char* name = schunk->vlmetalayers[nmeta]->name;
-    if (blosc2_vlmeta_get(schunk, name, &content, &content_len) < 0) {
-      // Passing the (previously uninitialized) content pointer forward ended
-      // in a bogus free that aborted the process; bail out instead.
-      BLOSC_TRACE_ERROR("Can not get %s `vlmetalayer`.", name);
-      goto error;
-    }
-    if (blosc2_vlmeta_add(new_schunk, name, content, content_len, NULL) < 0) {
-      BLOSC_TRACE_ERROR("Can not add %s `vlmetalayer`.", name);
-      free(content);
-      goto error;
-    }
-    free(content);
+  if (schunk_copy_vlmetalayers(schunk, new_schunk, NULL) < 0) {
+    goto error;
   }
   return new_schunk;
 
@@ -1531,6 +1557,7 @@ int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int3
   int64_t nchunks = blosc2_schunk_append_chunk(schunk, chunk, false);
   if (nchunks < 0) {
     BLOSC_TRACE_ERROR("Error appending a buffer in super-chunk");
+    // A failed append leaves the chunk to us
     free(chunk);
     return nchunks;
   }
@@ -2242,11 +2269,18 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       uint8_t *chunk = malloc(chunksize + BLOSC2_MAX_OVERHEAD);
       if (blosc2_compress_ctx(schunk->cctx, src_ptr, chunksize, chunk, chunksize + BLOSC2_MAX_OVERHEAD) < 0) {
         BLOSC_TRACE_ERROR("Cannot compress data of chunk ('%" PRId64 "').", nchunk);
+        free(chunk);
+        free(data);
         return BLOSC2_ERROR_FAILURE;
       }
       nchunks = blosc2_schunk_update_chunk(schunk, nchunk, chunk, false);
       if (nchunks != schunk->nchunks) {
         BLOSC_TRACE_ERROR("Cannot update chunk ('%" PRId64 "').", nchunk);
+        // A failed update leaves the chunk to us
+        if (nchunks < 0) {
+          free(chunk);
+        }
+        free(data);
         return BLOSC2_ERROR_CHUNK_UPDATE;
       }
     }
@@ -2254,17 +2288,24 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       nbytes = blosc2_schunk_decompress_chunk(schunk, nchunk, data, schunk->chunksize);
       if (nbytes < 0) {
         BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
+        free(data);
         return BLOSC2_ERROR_FAILURE;
       }
       memcpy(&data[chunk_start], src_ptr, chunk_stop - chunk_start);
       uint8_t *chunk = malloc(nbytes + BLOSC2_MAX_OVERHEAD);
       if (blosc2_compress_ctx(schunk->cctx, data, nbytes, chunk, nbytes + BLOSC2_MAX_OVERHEAD) < 0) {
         BLOSC_TRACE_ERROR("Cannot compress data of chunk ('%" PRId64 "').", nchunk);
+        free(chunk);
+        free(data);
         return BLOSC2_ERROR_FAILURE;
       }
       nchunks = blosc2_schunk_update_chunk(schunk, nchunk, chunk, false);
       if (nchunks != schunk->nchunks) {
         BLOSC_TRACE_ERROR("Cannot update chunk ('%" PRId64 "').", nchunk);
+        if (nchunks < 0) {
+          free(chunk);
+        }
+        free(data);
         return BLOSC2_ERROR_CHUNK_UPDATE;
       }
     }
