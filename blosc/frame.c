@@ -3230,7 +3230,7 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       BLOSC_TRACE_ERROR("Cannot inspect the first chunk in frame.");
       goto error;
     }
-    schunk->flags2 = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+    schunk->flags2 = (rc >= BLOSC_EXTENDED_HEADER_LENGTH) ? chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2] : 0;
     if (needs_free) {
       free(chunk);
     }
@@ -4415,7 +4415,8 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
 
   // Add the new offset
   int64_t sframe_chunk_id = -1;
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
     case BLOSC2_SPECIAL_ZERO:
@@ -4654,7 +4655,8 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   }
   // Add the new offset
   int64_t sframe_chunk_id = -1;
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
   uint64_t offset_value = ((uint64_t)1 << 63);
   switch (special_value) {
     case BLOSC2_SPECIAL_ZERO:
@@ -5051,7 +5053,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       old_sframe_chunk_id = offsets[nchunk];
     }
   }
-  int special_value = (chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+      ((chunk_[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
   uint64_t offset_value = ((uint64_t)1 << 63);
   bool is_special_chunk = false;
   switch (special_value) {

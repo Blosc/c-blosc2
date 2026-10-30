@@ -1050,7 +1050,8 @@ static int64_t schunk_append_chunk_unlocked(blosc2_schunk *schunk, uint8_t *chun
     schunk->cbytes += chunk_cbytes;
   } else {
     // A frame
-    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
     switch (special_value) {
       case BLOSC2_SPECIAL_ZERO:
       case BLOSC2_SPECIAL_NAN:
@@ -1196,7 +1197,8 @@ static int64_t schunk_insert_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->cbytes += chunk_cbytes;
   } else {
     // A frame
-    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
     switch (special_value) {
       case BLOSC2_SPECIAL_ZERO:
       case BLOSC2_SPECIAL_NAN:
@@ -1371,7 +1373,8 @@ static int64_t schunk_update_chunk_unlocked(blosc2_schunk *schunk, int64_t nchun
     schunk->cbytes -= chunk_cbytes_old;
   } else {
     // A frame
-    int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+    int special_value = (chunk_cbytes >= BLOSC_EXTENDED_HEADER_LENGTH) ?
+        ((chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK) : 0;
     schunk->nbytes += chunk_nbytes;
     schunk->nbytes -= chunk_nbytes_old;
     switch (special_value) {
