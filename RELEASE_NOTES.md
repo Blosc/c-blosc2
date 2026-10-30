@@ -4,7 +4,11 @@ Release notes for C-Blosc2
 Changes from 3.4.0 to 3.4.1
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a bugfix release that brings substantial performance improvements for
+in-place writes to on-disk contiguous frames (especially on NFS), security and
+robustness fixes for sparse frames, fixes for filter pipelines with 3 or more
+filters alongside multithreaded DELTA decoding, and an example for sparse
+coordinate handling.
 
 * **Faster in-place writes to on-disk contiguous frames, especially on NFS**:
   appending, inserting, updating or deleting a chunk (and so b2nd
@@ -21,6 +25,25 @@ Changes from 3.4.0 to 3.4.1
   released.  The writable handle comes out of the same budget as the cached
   read handle (`BLOSC_MAX_CACHED_READERS`), so a schunk that has been written
   to can hold two file descriptors.
+* **Security fix for sparse (directory) frame chunk reading**:
+  `sframe_get_chunk()` and `frame_decompress_chunk()` now validate that the
+  chunk's compressed length (`cbytes`) recorded in the chunk header does not
+  exceed the actual size of the chunk file on disk.  Previously, a truncated or
+  crafted chunk file could cause an out-of-bounds heap read during decompression
+  (#822).  Thanks to Mar Dominguez (@mardgez).
+* **Fix filter pipeline buffer cycling and multithreaded DELTA decoding**:
+  - In `pipeline_forward()`, cycling buffers now strictly alternates between
+    thread-local scratch buffers so the caller's read-only input buffer is never
+    recycled as a destination buffer when 3 or more filters are active.
+    Previously, the 3rd active filter overwrote block 0 of the input buffer,
+    corrupting the reference block used by subsequent blocks in the DELTA filter
+    (#820).
+  - In `pipeline_backward()`, prevented destination buffer aliasing across
+    multiple out-of-place backward filters, ensured intermediate buffers are
+    copied before in-place DELTA decoding, and postponed signaling `dref`
+    readiness until block 0 completes its entire backward pipeline.
+* Added a new example demonstrating sparse coordinates storage and retrieval
+  (`examples/sparse_coords.c`).
 
 Changes from 3.3.5 to 3.4.0
 ===========================
