@@ -322,6 +322,8 @@ static char* test_removed_file(void) {
   blosc2_remove_urlpath(URLPATH);
   mu_assert("An append to a removed file must fail",
             blosc2_schunk_append_buffer(schunk, data, CHUNKSIZE * sizeof(int32_t)) < 0);
+  mu_assert("The failed append must not be counted",
+            schunk->nchunks == 1 && schunk->nbytes == CHUNKSIZE * (int64_t)sizeof(int32_t));
   mu_assert("The failed append must not recreate the file", file_size(URLPATH) < 0);
   blosc2_schunk_free(schunk);
   return EXIT_SUCCESS;
