@@ -1773,6 +1773,58 @@ int blosc2_schunk_get_vlblock(blosc2_schunk *schunk, int64_t nchunk, int32_t nbl
   return result;
 }
 
+/* Whether a read of `nbytes` bytes at `chunk_start` that is not the whole chunk should decompress
+   the blocks it needs in parallel (see masked_slice_read()) instead of one after the other with
+   getitem. */
+static bool use_masked_slice_read(blosc2_schunk *schunk, const uint8_t *chunk, int32_t cbytes,
+                                  int32_t blocksize, int32_t chunk_start, int32_t nbytes) {
+  blosc2_context *dctx = schunk->dctx;
+  if (dctx->new_nthreads <= 1 || dctx->postfilter != NULL || blocksize <= 0 ||
+      cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return false;
+  }
+  uint8_t flags = chunk[BLOSC2_CHUNK_FLAGS];
+  uint8_t blosc2_flags = chunk[BLOSC2_CHUNK_BLOSC2_FLAGS];
+  bool extended_header = (flags & BLOSC_DOSHUFFLE) && (flags & BLOSC_DOBITSHUFFLE);
+  // Memcpyed and special-value chunks cost getitem nothing to decode, VL-block ones do not support
+  // it, and the postfilter that does the copy is bypassed by instrumented codecs
+  if (!extended_header || (flags & BLOSC_MEMCPYED) || ((blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK) != 0 ||
+      (blosc2_flags & BLOSC2_INSTR_CODEC) || (get_chunk_flags2(chunk, cbytes) & BLOSC2_VL_BLOCKS)) {
+    return false;
+  }
+  // DELTA decodes against the first block of the destination, which the postfilter never writes
+  if (filters_contain(chunk + BLOSC2_CHUNK_FILTER_CODES, BLOSC_DELTA)) {
+    return false;
+  }
+  // Let getitem report a range that the chunk does not hold
+  if ((int64_t) chunk_start + nbytes > sw32_(chunk + BLOSC2_CHUNK_NBYTES)) {
+    return false;
+  }
+  int32_t nblocks_needed = (chunk_start + nbytes - 1) / blocksize - chunk_start / blocksize + 1;
+  // Below this, waking the threads costs more than decoding serially (LZ4, 256 KB blocks: 2 blocks
+  // took 1.5x longer in parallel, 8 blocks 2.4x shorter)
+  return nblocks_needed >= 4 && nbytes >= 1024 * 1024;
+}
+
+
+typedef struct {
+  uint8_t *dest;
+  int32_t start;
+  int32_t stop;
+} range_scatter;
+
+
+// Copy the part of a decompressed block that falls into the slice, in the thread that decoded it
+static int range_scatter_postfilter(blosc2_postfilter_params *params) {
+  const range_scatter *scatter = params->user_data;
+  int32_t lo = params->offset > scatter->start ? params->offset : scatter->start;
+  int32_t hi = params->offset + params->size < scatter->stop ? params->offset + params->size : scatter->stop;
+  if (lo < hi) {
+    memcpy(scatter->dest + (lo - scatter->start), params->input + (lo - params->offset), hi - lo);
+  }
+  return 0;
+}
+
 
 /* See blosc-private.h */
 int schunk_decompress_masked(blosc2_schunk *schunk, int64_t nchunk, const uint8_t *chunk, int32_t cbytes,
@@ -1803,6 +1855,37 @@ int schunk_decompress_masked(blosc2_schunk *schunk, int64_t nchunk, const uint8_
   // A decompression that failed early, or a missing chunk, leaves the mask set
   ctx_clear_maskout(dctx);
   return rc;
+}
+
+
+/* Read `nbytes` bytes at `chunk_start` of `chunk` into `dest`: the threads of the decompression
+   context decode only the blocks that hold them, and copy each one straight to `dest`. */
+static int masked_slice_read(blosc2_schunk *schunk, uint8_t *chunk, int32_t cbytes, int32_t blocksize,
+                             int32_t chunk_start, int32_t nbytes, uint8_t *dest) {
+  int32_t chunk_nbytes = sw32_(chunk + BLOSC2_CHUNK_NBYTES);
+  int32_t nblocks = chunk_nbytes / blocksize + (chunk_nbytes % blocksize != 0);
+  int32_t nblock_start = chunk_start / blocksize;
+  int32_t nblock_stop = (chunk_start + nbytes - 1) / blocksize;
+  // The decompressor wants a chunk-sized destination, but with a postfilter it never writes to it
+  uint8_t *unused_dest = malloc(chunk_nbytes);
+  bool *maskout = malloc(nblocks);
+  if (unused_dest == NULL || maskout == NULL) {
+    free(unused_dest);
+    free(maskout);
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  for (int32_t nblock = 0; nblock < nblocks; nblock++) {
+    maskout[nblock] = (nblock < nblock_start) || (nblock > nblock_stop);
+  }
+  range_scatter scatter;
+  scatter.dest = dest;
+  scatter.start = chunk_start;
+  scatter.stop = chunk_start + nbytes;
+  int rc = schunk_decompress_masked(schunk, -1, chunk, cbytes, maskout, nblocks, range_scatter_postfilter,
+                                    &scatter, unused_dest, chunk_nbytes);
+  free(maskout);
+  free(unused_dest);
+  return rc < 0 ? rc : nbytes;
 }
 
 
@@ -1843,14 +1926,8 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       return BLOSC2_ERROR_DATA;
     }
 
-    int32_t nblock_start = (int32_t) (chunk_start / blocksize);
-    int32_t nblock_stop = (int32_t) ((chunk_stop - 1) / blocksize);
     if (nchunk == (schunk->nchunks - 1) && schunk->nbytes % schunk->chunksize != 0) {
       chunksize = schunk->nbytes % schunk->chunksize;
-    }
-    int32_t nblocks = chunksize / blocksize;
-    if (chunksize % blocksize != 0) {
-      nblocks++;
     }
 
     if (chunk_start == 0 && chunk_stop == chunksize) {
@@ -1865,38 +1942,21 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       }
     }
     else {
-      // After extensive timing I have not been able to see lots of situations where
-      // a maskout read is better than a getitem one.  Disabling for now.
-      // if (nblock_start != nblock_stop) {
-      if (false) {
-        uint8_t *data = malloc(chunksize);
-        /* We have more than 1 block to read, so use a masked read */
-        bool *block_maskout = calloc(nblocks, 1);
-        for (int32_t nblock = 0; nblock < nblocks; nblock++) {
-          if ((nblock < nblock_start) || (nblock > nblock_stop)) {
-            block_maskout[nblock] = true;
-          }
-        }
-        if (blosc2_set_maskout(schunk->dctx, block_maskout, nblocks) < 0) {
-          BLOSC_TRACE_ERROR("Cannot set maskout");
-          return BLOSC2_ERROR_FAILURE;
-        }
-
-        nbytes = blosc2_decompress_ctx(schunk->dctx, chunk, cbytes, data, chunksize);
+      int32_t nbytes_wanted = chunk_stop - chunk_start;
+      if (use_masked_slice_read(schunk, chunk, cbytes, blocksize, chunk_start, nbytes_wanted)) {
+        nbytes = masked_slice_read(schunk, chunk, cbytes, blocksize, chunk_start, nbytes_wanted, dst_ptr);
         if (nbytes < 0) {
           BLOSC_TRACE_ERROR("Cannot decompress chunk ('%" PRId64 "').", nchunk);
+          if (needs_free) {
+            free(chunk);
+          }
           return BLOSC2_ERROR_FAILURE;
         }
-        nbytes = chunk_stop - chunk_start;
-        memcpy(dst_ptr, &data[chunk_start], nbytes);
-        free(block_maskout);
-        free(data);
       }
       else {
-        /* Less than 1 block to read; use a getitem call.  Counting in bytes
+        /* Few blocks to read; use a getitem call.  Counting in bytes
            keeps this right for typesizes above BLOSC_MAX_TYPESIZE, which chunks
            record as 1. */
-        int32_t nbytes_wanted = chunk_stop - chunk_start;
         nbytes = blosc2_getitem_bytes_ctx(schunk->dctx, chunk, cbytes, chunk_start,
                                           nbytes_wanted, dst_ptr, nbytes_wanted);
         if (nbytes < 0) {
