@@ -10,6 +10,7 @@
    block size, so that the items may or may not start at a block boundary and
    span one or more blocks (including a leftover block). */
 
+#include "config.h"
 #include "test_common.h"
 
 #define NITEMS 250       // 15 full blocks and a leftover block
@@ -64,7 +65,12 @@ static char* check_getitem_ranges(int compcode, int clevel) {
 
 
 static char* test_getitem_ranges(void) {
-  const int compcodes[] = {BLOSC_BLOSCLZ, BLOSC_LZ4, BLOSC_ZSTD};
+  const int compcodes[] = {
+      BLOSC_BLOSCLZ, BLOSC_LZ4,
+#ifdef HAVE_ZSTD
+      BLOSC_ZSTD,
+#endif
+  };
   char *msg;
   for (size_t i = 0; i < sizeof(compcodes) / sizeof(compcodes[0]); i++) {
     // clevel 0 gives a memcpyed chunk
