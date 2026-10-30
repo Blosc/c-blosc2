@@ -983,8 +983,14 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   h2p += sizeof(nmetalayers);
   int32_t current_header_len = (int32_t)(h2p - h2);
   int32_t *offtooff = malloc(nmetalayers * sizeof(int32_t));
+  if (offtooff == NULL) {
+    free(h2);
+    return NULL;
+  }
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     if (frame == NULL) {
+      free(offtooff);
+      free(h2);
       return NULL;
     }
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
@@ -994,6 +1000,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
     // Store the metalayer
     if (namelen >= (1U << 5U)) {  // metalayer strings cannot be longer than 32 bytes
       free(offtooff);
+      free(h2);
       return NULL;
     }
     *h2p = (uint8_t)0xa0 + namelen;  // str
@@ -1009,11 +1016,15 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   int32_t hsize2 = (int32_t)(h2p - h2);
   if (hsize2 != current_header_len) {  // sanity check
+    free(offtooff);
+    free(h2);
     return NULL;
   }
 
   // Map size + int16 size
   if ((uint32_t) (hsize2 - hsize) >= (1U << 16U)) {
+    free(offtooff);
+    free(h2);
     return NULL;
   }
   uint16_t map_size = (uint16_t) (hsize2 - hsize);
@@ -1032,6 +1043,8 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   current_header_len = (int32_t)(h2p - h2);
   for (int nmetalayer = 0; nmetalayer < nmetalayers; nmetalayer++) {
     if (frame == NULL) {
+      free(offtooff);
+      free(h2);
       return NULL;
     }
     blosc2_metalayer *metalayer = schunk->metalayers[nmetalayer];
@@ -1051,6 +1064,7 @@ void *new_header_frame(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   free(offtooff);
   hsize = (int32_t)(h2p - h2);
   if (hsize != current_header_len) {  // sanity check
+    free(h2);
     return NULL;
   }
 
@@ -2544,6 +2558,9 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
 
   // Build a new header
   uint8_t* h2 = new_header_frame(schunk, frame);
+  if (h2 == NULL) {
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   uint32_t h2len;
   from_big(&h2len, h2 + FRAME_HEADER_LEN, sizeof(h2len));
 
@@ -2556,6 +2573,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
 
   if (!new && prev_h2len != h2len) {
     BLOSC_TRACE_ERROR("The new metalayer sizes should be equal the existing ones.");
+    free(h2);
     return BLOSC2_ERROR_DATA;
   }
 
@@ -2571,6 +2589,7 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
     }
     if (fp == NULL) {
       BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      free(h2);
       return BLOSC2_ERROR_FILE_OPEN;
     }
     int64_t io_pos = frame->file_offset;
@@ -2579,7 +2598,12 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
   }
   else {
     if (new) {
-      frame->cframe = realloc(frame->cframe, h2len);
+      void *new_cframe = realloc(frame->cframe, h2len);
+      if (new_cframe == NULL) {
+        free(h2);
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      frame->cframe = new_cframe;
     }
     memcpy(frame->cframe, h2, h2len);
   }

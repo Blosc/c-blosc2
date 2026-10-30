@@ -2213,7 +2213,6 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
           BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
           csize = blosc2_chunk_zeros(*cparams, array->sc->chunksize, chunk, BLOSC_EXTENDED_HEADER_LENGTH);
           if (csize < 0) {
-            free(chunk);
             free(aux);
             free(cparams);
             BLOSC_TRACE_ERROR("Blosc error when creating a chunk");
@@ -2221,7 +2220,6 @@ int extend_shape(b2nd_array_t *array, const int64_t *new_shape, const int64_t *s
           }
           nchunks_ = blosc2_schunk_insert_chunk(array->sc, i, chunk, false);
           if (nchunks_ < 0) {
-            free(chunk);
             free(aux);
             free(cparams);
             BLOSC_TRACE_ERROR("Blosc error when inserting a chunk");
