@@ -11,8 +11,9 @@
   at the frame end after every kind of update (append, update to a smaller and a
   larger chunk, insert, delete), after reopening, and when the frame file is
   replaced underneath the open handle; that a write to a removed frame file
-  fails instead of getting lost; and that with locking on no writer stays open
-  once the lock is released.
+  fails instead of getting lost; that with locking on no writer stays open
+  once the lock is released; and that opened and created frames hold no more
+  handles than they need.
 
   Run with "nocache" to set the handle budget to zero, so that every call falls
   back to a private per-call handle, and with "budget1" to allow a single cached
@@ -307,6 +308,88 @@ static char* test_replaced_file_writer_only(void) {
 }
 
 
+/* Opening a frame keeps the handle that read its header as the cached reader
+   instead of opening the file a second time.  Whichever handle it ends up
+   with, an open frame must hold exactly one descriptor (none without a handle
+   budget) before and after its first read and none once freed, and its reads
+   must notice that the file was replaced. */
+static char* test_open_adopts_reader(void) {
+#if !defined(_WIN32)
+  blosc2_storage storage = {.contiguous=true, .cparams=&cparams, .dparams=&dparams};
+  char* urlpaths[2] = {URLPATH, URLPATH2};
+  for (int i = 0; i < 2; i++) {
+    blosc2_remove_urlpath(urlpaths[i]);
+    storage.urlpath = urlpaths[i];
+    blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+    mu_assert("Cannot create the schunk", schunk != NULL);
+    for (int n = 0; n < 2; n++) {
+      fill(i * REPLACED_BASE + n * CHUNKSIZE, true);
+      mu_assert("Cannot append", blosc2_schunk_append_buffer(schunk, data, CHUNKSIZE * sizeof(int32_t)) > 0);
+    }
+    blosc2_schunk_free(schunk);
+  }
+
+  int nfds = count_open_fds();
+  int cached = getenv("BLOSC_MAX_CACHED_READERS") != NULL &&
+               strcmp(getenv("BLOSC_MAX_CACHED_READERS"), "0") == 0 ? 0 : 1;
+  blosc2_schunk* schunk = blosc2_schunk_open(URLPATH);
+  mu_assert("Cannot open the schunk", schunk != NULL);
+  mu_assert("An open frame must hold at most its cached reader", count_open_fds() == nfds + cached);
+  // Without a budget, the frame must not ask for it on every read
+  mu_assert("A frame that cannot cache its reader must be flagged so",
+            ((blosc2_frame_s*)schunk->frame)->read_fp_nocache == (cached == 0));
+  int32_t nbytes = blosc2_schunk_decompress_chunk(schunk, 1, rdata, CHUNKSIZE * sizeof(int32_t));
+  mu_assert("Cannot decompress", nbytes == (int32_t)(CHUNKSIZE * sizeof(int32_t)));
+  fill(CHUNKSIZE, true);
+  mu_assert("Wrong chunk contents", memcmp(data, rdata, CHUNKSIZE * sizeof(int32_t)) == 0);
+  mu_assert("The first read must not open another handle", count_open_fds() == nfds + cached);
+
+  blosc2_remove_urlpath(URLPATH);
+  mu_assert("Cannot move the replacement in place", rename(URLPATH2, URLPATH) == 0);
+  nbytes = blosc2_schunk_decompress_chunk(schunk, 1, rdata, CHUNKSIZE * sizeof(int32_t));
+  mu_assert("Cannot decompress", nbytes == (int32_t)(CHUNKSIZE * sizeof(int32_t)));
+  fill(REPLACED_BASE + CHUNKSIZE, true);
+  mu_assert("Reads must see the replacement", memcmp(data, rdata, CHUNKSIZE * sizeof(int32_t)) == 0);
+  blosc2_schunk_free(schunk);
+  mu_assert("The free must close the cached reader", count_open_fds() == nfds);
+  blosc2_remove_urlpath(URLPATH);
+#endif
+  return EXIT_SUCCESS;
+}
+
+
+/* A frame created on disk keeps the handle it created the file with as its
+   cached writer, and reads through a duplicate of it: two descriptors (one
+   with a budget of one, none without a budget) while it lives, none after. */
+static char* test_create_handles(void) {
+#if !defined(_WIN32)
+  const char* budget = getenv("BLOSC_MAX_CACHED_READERS");
+  int cached = budget == NULL ? 2 : atoi(budget) < 2 ? atoi(budget) : 2;
+  blosc2_remove_urlpath(URLPATH);
+  int nfds = count_open_fds();
+  blosc2_storage storage = {.contiguous=true, .urlpath=URLPATH,
+                            .cparams=&cparams, .dparams=&dparams};
+  blosc2_schunk* schunk = blosc2_schunk_new(&storage);
+  mu_assert("Cannot create the schunk", schunk != NULL);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  mu_assert("A frame that cannot cache its handles must be flagged so",
+            frame->write_fp_nocache == (cached < 1) && frame->read_fp_nocache == (cached < 2));
+  for (int n = 0; n < 2; n++) {
+    fill(n * CHUNKSIZE, true);
+    mu_assert("Cannot append", blosc2_schunk_append_buffer(schunk, data, CHUNKSIZE * sizeof(int32_t)) > 0);
+  }
+  int32_t expected[2] = {0, CHUNKSIZE};
+  bool noisy[2] = {true, true};
+  mu_assert("create", check_contents(schunk, expected, noisy, 2) == EXIT_SUCCESS);
+  mu_assert("Unexpected number of cached handles", count_open_fds() == nfds + cached);
+  blosc2_schunk_free(schunk);
+  mu_assert("The free must close the cached handles", count_open_fds() == nfds);
+  blosc2_remove_urlpath(URLPATH);
+#endif
+  return EXIT_SUCCESS;
+}
+
+
 /* Remove the frame file underneath an open schunk that has already written
    through its cached handle: the next write must fail, as it did when every
    write reopened the path, instead of going to the unlinked inode. */
@@ -399,6 +482,8 @@ static char* all_tests(void) {
   mu_run_test(test_replaced_file);
   mu_run_test(test_replaced_file_writer_only);
   mu_run_test(test_removed_file);
+  mu_run_test(test_open_adopts_reader);
+  mu_run_test(test_create_handles);
   mu_run_test(test_locking);
   return EXIT_SUCCESS;
 }

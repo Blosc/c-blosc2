@@ -422,6 +422,14 @@ blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  /* Shuffling single bytes is the identity; the generic routine would copy them one by one. */
+  if (typesize == 1) {
+    if (dest != src) {
+      memcpy(dest, src, (size_t)blocksize);
+    }
+    return blocksize;
+  }
+
   /* The implementation is initialized.
      Dispatch to its shuffle routine. */
   (host_implementation.shuffle)(typesize, blocksize, src, dest);
@@ -439,6 +447,14 @@ blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
 
   if (typesize < 1 || typesize > 256 || blocksize < 0) {
     return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* Unshuffling single bytes is the identity (see blosc2_shuffle). */
+  if (typesize == 1) {
+    if (dest != src) {
+      memcpy(dest, src, (size_t)blocksize);
+    }
+    return blocksize;
   }
 
   /* The implementation is initialized.

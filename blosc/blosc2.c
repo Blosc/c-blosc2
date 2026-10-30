@@ -614,7 +614,18 @@ static int get_accel(const blosc2_context* context) {
 }
 
 
-int do_nothing(uint8_t filter, char cmode) {
+/* The bytes that a SHUFFLE at position `i` of the pipeline groups: its meta, if not 0, or the typesize */
+static int32_t shuffle_size(const blosc2_context* context, int i) {
+  return context->filters_meta[i] == 0 ? context->typesize : context->filters_meta[i];
+}
+
+
+int do_nothing(const blosc2_context* context, int i, char cmode) {
+  uint8_t filter = context->filters[i];
+  if (filter == BLOSC_SHUFFLE) {
+    // Shuffling single bytes is the identity, so skip it instead of copying the block
+    return shuffle_size(context, i) == 1;
+  }
   if (cmode == 'c') {
     return (filter == BLOSC_NOFILTER);
   } else {
@@ -624,20 +635,20 @@ int do_nothing(uint8_t filter, char cmode) {
 }
 
 
-int next_filter(const uint8_t* filters, int current_filter, char cmode) {
+int next_filter(const blosc2_context* context, int current_filter, char cmode) {
   for (int i = current_filter - 1; i >= 0; i--) {
-    if (!do_nothing(filters[i], cmode)) {
-      return filters[i];
+    if (!do_nothing(context, i, cmode)) {
+      return context->filters[i];
     }
   }
   return BLOSC_NOFILTER;
 }
 
 
-int last_filter(const uint8_t* filters, char cmode) {
+int last_filter(const blosc2_context* context, char cmode) {
   int last_index = -1;
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
-    if (!do_nothing(filters[i], cmode))  {
+    if (!do_nothing(context, i, cmode))  {
       last_index = i;
     }
   }
@@ -1103,11 +1114,13 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
   /* Process the filter pipeline */
   for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
     int rc = BLOSC2_ERROR_SUCCESS;
+    if (do_nothing(context, i, 'c')) {
+      continue;
+    }
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-          // if filters_meta is different to 0, interpret it as grouped bytes to shuffle
-          blosc2_shuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
+          blosc2_shuffle(shuffle_size(context, i), bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (context->blosc1_format && ((bsize / typesize) % 8) != 0) {
@@ -1128,10 +1141,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
           }
           break;
         default:
-          if (filters[i] != BLOSC_NOFILTER) {
-            BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
-            return NULL;
-          }
+          BLOSC_TRACE_ERROR("Filter %d not handled during compression\n", filters[i]);
+          return NULL;
       }
     }
     else {
@@ -1167,10 +1178,8 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 
     }
 
-    // Cycle buffers when required
-    if (filters[i] != BLOSC_NOFILTER) {
-      _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
-    }
+    // do_nothing() skipped the filters that leave the block as it is
+    _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
   }
   return _src;
 }
@@ -1221,7 +1230,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
   int accel;
   const uint8_t* _src;
   uint8_t *_tmp = tmp, *_tmp2 = tmp2;
-  int last_filter_index = last_filter(context->filters, 'c');
+  int last_filter_index = last_filter(context, 'c');
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
   bool instr_codec = context->blosc2_flags & BLOSC2_INSTR_CODEC;
   blosc_timestamp_t last, current;
@@ -1512,15 +1521,18 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
   int32_t typesize = context->typesize;
   uint8_t* filters = context->filters;
   uint8_t* filters_meta = context->filters_meta;
-  uint8_t* _src = (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') == BLOSC_DELTA &&
+  uint8_t* _src = (next_filter(context, BLOSC2_MAX_FILTERS, 'd') == BLOSC_DELTA &&
                    context->postfilter == NULL) ? (dest + offset) : src;
   uint8_t* _dest = tmp;
   int errcode = 0;
 
   for (int i = BLOSC2_MAX_FILTERS - 1; i >= 0; i--) {
+    if (do_nothing(context, i, 'd')) {
+      continue;
+    }
     // Delta filter requires the whole chunk ready
     int last_copy_filter = (last_filter_index == i) || (filters[i] == BLOSC_DELTA) ||
-                           (next_filter(filters, i, 'd') == BLOSC_DELTA);
+                           (next_filter(context, i, 'd') == BLOSC_DELTA);
     if (last_copy_filter && context->postfilter == NULL &&
         (filters[i] == BLOSC_DELTA || _src != dest + offset)) {
       _dest = dest + offset;
@@ -1531,8 +1543,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
-        // if filters_meta is not 0, interpret as number of bytes to be grouped together for shuffle
-          blosc2_unshuffle(filters_meta[i] == 0 ? typesize : filters_meta[i], bsize, _src, _dest);
+          blosc2_unshuffle(shuffle_size(context, i), bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
           if (bitunshuffle(typesize, bsize, _src, _dest, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
@@ -1548,15 +1559,9 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           }
           delta_decoder(offset == 0 ? _dest : dest, offset, bsize, typesize, _dest);
           break;
-        case BLOSC_TRUNC_PREC:
-          // TRUNC_PREC filter does not need to be undone
-          break;
         default:
-          if (filters[i] != BLOSC_NOFILTER) {
-            BLOSC_TRACE_ERROR("Filter %d not handled during decompression.",
-                              filters[i]);
-            errcode = -1;
-          }
+          BLOSC_TRACE_ERROR("Filter %d not handled during decompression.", filters[i]);
+          errcode = -1;
       }
     } else {
         // Look for the filters_meta in user filters and run it
@@ -1589,10 +1594,9 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       urfiltersuccess:;
     }
 
-    // Update input buffer for the next filter in the backward pipeline
-    if ((filters[i] != BLOSC_NOFILTER) && (filters[i] != BLOSC_TRUNC_PREC)) {
-      _src = _dest;
-    }
+    // do_nothing() skipped the filters that leave the block as it is (TRUNC_PREC is not undone);
+    // the output of this filter is the input of the next one
+    _src = _dest;
     if (last_filter_index == i) {
       break;
     }
@@ -1732,7 +1736,6 @@ static int blosc_d(
     int32_t leftoverblock, bool memcpyed, const uint8_t* src, int32_t srcsize, int32_t src_offset,
     int32_t nblock, uint8_t* dest, int32_t dest_offset, uint8_t* tmp, uint8_t* tmp2) {
   blosc2_context* context = thread_context->parent_context;
-  uint8_t* filters = context->filters;
   uint8_t *tmp3 = thread_context->tmp4;
   bool vlblocks = (context->blosc2_flags2 & BLOSC2_VL_BLOCKS) != 0;
   int32_t compformat = (context->header_flags & (uint8_t)0xe0) >> 5u;
@@ -1970,13 +1973,13 @@ static int blosc_d(
     srcsize -= src_offset;
   }
 
-  int last_filter_index = last_filter(filters, 'd');
+  int last_filter_index = last_filter(context, 'd');
   if (instr_codec) {
     // If instrumented, we don't want to run the filters
     _dest = dest + dest_offset;
   }
   else if (((last_filter_index >= 0) &&
-       (next_filter(filters, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) ||
+       (next_filter(context, BLOSC2_MAX_FILTERS, 'd') != BLOSC_DELTA)) ||
     context->postfilter != NULL) {
     // We are making use of some filter, so use a temp for destination
     _dest = tmp;
@@ -2800,14 +2803,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
                         context->block_maskout_nitems, context->nblocks);
       return BLOSC2_ERROR_DATA;
     }
-    bool has_delta = false;
-    for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-      if (context->filters[i] == BLOSC_DELTA) {
-        has_delta = true;
-        break;
-      }
-    }
-    if (has_delta) {
+    if (filters_contain(context->filters, BLOSC_DELTA)) {
       bool any_needed = false;
       for (int i = 0; i < context->block_maskout_nitems; ++i) {
         if (!context->block_maskout[i]) {
@@ -2877,8 +2873,9 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
   }
   srcsize -= bstarts_end;
 
-  /* Read optional dictionary if flag set */
-  if ((context->blosc2_flags & BLOSC2_USEDICT) && !is_lazy) {
+  /* Read optional dictionary if flag set.  A memcpyed chunk has none, even if the flag says so
+     (older versions left it on chunks with a dictionary that did not compress) */
+  if ((context->blosc2_flags & BLOSC2_USEDICT) && !memcpyed && !is_lazy) {
     context->use_dict = 1;
     // The dictionary section is after the bstarts block: [int32 size | raw bytes]
     if (srcsize < (signed)sizeof(int32_t)) {
@@ -2913,7 +2910,7 @@ static int initialize_context_decompression(blosc2_context* context, blosc_heade
 #endif   // HAVE_ZSTD
     // For LZ4/LZ4HC: dict_buffer and dict_size are sufficient; no digested object needed.
   }
-  else if ((context->blosc2_flags & BLOSC2_USEDICT) && is_lazy) {
+  else if ((context->blosc2_flags & BLOSC2_USEDICT) && !memcpyed && is_lazy) {
     rc = load_lazy_chunk_dict(context, header, bstarts_end);
     if (rc < 0) {
       return rc;
@@ -3136,6 +3133,10 @@ static int blosc_compress_context(blosc2_context* context) {
       }
       // Success!  update the memcpy bit in header
       context->dest[BLOSC2_CHUNK_FLAGS] = context->header_flags;
+      if (context->dict_cdict != NULL) {
+        // The copy overwrote the dictionary that this pass was going to use
+        context->dest[BLOSC2_CHUNK_BLOSC2_FLAGS] &= ~(uint8_t)BLOSC2_USEDICT;
+      }
       // and clear the memcpy bit in context (for next reuse)
       context->header_flags &= ~(uint8_t)BLOSC_MEMCPYED;
     }
@@ -4107,11 +4108,7 @@ int blosc2_decompress_ctx(blosc2_context* context, const void* src, int32_t srcs
   result = blosc_run_decompression_with_context(context, src, srcsize, dest, destsize);
 
   // Reset a possible block_maskout
-  if (context->block_maskout != NULL) {
-    free(context->block_maskout);
-    context->block_maskout = NULL;
-  }
-  context->block_maskout_nitems = 0;
+  ctx_clear_maskout(context);
 
   return result;
 }
@@ -4616,14 +4613,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return ntbytes;
   }
 
-  bool has_delta = false;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (context->filters[i] == BLOSC_DELTA) {
-      has_delta = true;
-      break;
-    }
-  }
-  if (has_delta) {
+  if (filters_contain(context->filters, BLOSC_DELTA)) {
     uint8_t* full_chunk = malloc((size_t)header->nbytes);
     if (full_chunk == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;
@@ -4908,14 +4898,7 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
     return BLOSC2_ERROR_WRITE_BUFFER;
   }
 
-  bool has_delta = false;
-  for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
-    if (context->filters[i] == BLOSC_DELTA) {
-      has_delta = true;
-      break;
-    }
-  }
-  if (has_delta) {
+  if (filters_contain(context->filters, BLOSC_DELTA)) {
     uint8_t* full_chunk = malloc((size_t)header.nbytes);
     if (full_chunk == NULL) {
       return BLOSC2_ERROR_MEMORY_ALLOC;
@@ -6303,6 +6286,144 @@ int blosc2_free_resources(void) {
 }
 
 
+#define BLOSC2_TMP_CACHE_SLOTS 4
+#define BLOSC2_TMP_CACHE_MIN (64 * 1024)
+#define BLOSC2_TMP_CACHE_MAX (64 * 1024 * 1024)
+
+#if !defined(_WIN32)
+typedef struct {
+  void *ptr[BLOSC2_TMP_CACHE_SLOTS];
+  size_t size[BLOSC2_TMP_CACHE_SLOTS];
+} tmp_cache_t;
+
+static pthread_key_t tmp_cache_key;
+static pthread_once_t tmp_cache_once = PTHREAD_ONCE_INIT;
+static bool tmp_cache_ready = false;
+
+static void tmp_cache_release(void *arg) {
+  tmp_cache_t *cache = arg;
+  for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+    free(cache->ptr[i]);
+  }
+  free(cache);
+}
+
+static void tmp_cache_init(void) {
+  tmp_cache_ready = pthread_key_create(&tmp_cache_key, tmp_cache_release) == 0;
+}
+
+static tmp_cache_t *tmp_cache_get(bool create) {
+  pthread_once(&tmp_cache_once, tmp_cache_init);
+  if (!tmp_cache_ready) {
+    return NULL;
+  }
+  tmp_cache_t *cache = pthread_getspecific(tmp_cache_key);
+  if (cache == NULL && create) {
+    cache = calloc(1, sizeof(tmp_cache_t));
+    if (cache != NULL && pthread_setspecific(tmp_cache_key, cache) != 0) {
+      free(cache);
+      cache = NULL;
+    }
+  }
+  return cache;
+}
+#endif
+
+void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity) {
+  *capacity = nbytes;
+#if !defined(_WIN32)
+  tmp_cache_t *cache = nbytes >= BLOSC2_TMP_CACHE_MIN ? tmp_cache_get(false) : NULL;
+  if (cache != NULL) {
+    // The smallest buffer that fits, and not one far larger than needed
+    int best = -1;
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      if (cache->ptr[i] != NULL && cache->size[i] >= nbytes && cache->size[i] / 2 <= nbytes &&
+          (best < 0 || cache->size[i] < cache->size[best])) {
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      void *ptr = cache->ptr[best];
+      *capacity = cache->size[best];
+      cache->ptr[best] = NULL;
+      cache->size[best] = 0;
+      return ptr;
+    }
+  }
+#endif
+  return malloc(nbytes);
+}
+
+void blosc2_tmp_free(void *ptr, size_t capacity) {
+  if (ptr == NULL) {
+    return;
+  }
+#if !defined(_WIN32)
+  tmp_cache_t *cache = NULL;
+  if (capacity >= BLOSC2_TMP_CACHE_MIN && capacity <= BLOSC2_TMP_CACHE_MAX / 2) {
+    cache = tmp_cache_get(true);
+  }
+  if (cache != NULL) {
+    // Make room by dropping the smallest buffers (each one smaller than this)
+    for (;;) {
+      size_t total = capacity;
+      int empty = -1;
+      int smallest = -1;
+      for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+        if (cache->ptr[i] == NULL) {
+          empty = i;
+          continue;
+        }
+        total += cache->size[i];
+        if (smallest < 0 || cache->size[i] < cache->size[smallest]) {
+          smallest = i;
+        }
+      }
+      if (empty >= 0 && total <= BLOSC2_TMP_CACHE_MAX) {
+        cache->ptr[empty] = ptr;
+        cache->size[empty] = capacity;
+        return;
+      }
+      if (smallest < 0 || cache->size[smallest] >= capacity) {
+        break;
+      }
+      free(cache->ptr[smallest]);
+      cache->ptr[smallest] = NULL;
+      cache->size[smallest] = 0;
+    }
+  }
+#else
+  BLOSC_UNUSED_PARAM(capacity);
+#endif
+  free(ptr);
+}
+
+void blosc2_tmp_cache_clear(void) {
+#if !defined(_WIN32)
+  tmp_cache_t *cache = tmp_cache_get(false);
+  if (cache != NULL) {
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      free(cache->ptr[i]);
+      cache->ptr[i] = NULL;
+      cache->size[i] = 0;
+    }
+  }
+#endif
+}
+
+size_t blosc2_tmp_cache_nbytes(void) {
+  size_t nbytes = 0;
+#if !defined(_WIN32)
+  tmp_cache_t *cache = tmp_cache_get(false);
+  if (cache != NULL) {
+    for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
+      nbytes += cache->size[i];
+    }
+  }
+#endif
+  return nbytes;
+}
+
 void blosc2_destroy(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return;
@@ -6310,6 +6431,7 @@ void blosc2_destroy(void) {
   blosc2_free_resources();
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
+  blosc2_tmp_cache_clear();
 
   /* Bump the epoch so any live context can detect its pool is now stale.
    * Do this before freeing the pools so that release_thread_backend callers
@@ -6729,11 +6851,8 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
 
 /* Set a maskout in decompression context */
 int blosc2_set_maskout(blosc2_context *ctx, bool *maskout, int nblocks) {
-
-  if (ctx->block_maskout != NULL) {
-    // Get rid of a possible mask here
-    free(ctx->block_maskout);
-  }
+  // Get rid of a possible mask here (also if the allocation below fails)
+  ctx_clear_maskout(ctx);
 
   bool *maskout_ = malloc(nblocks);
   BLOSC_ERROR_NULL(maskout_, BLOSC2_ERROR_MEMORY_ALLOC);

@@ -6,6 +6,101 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* **The shuffle filter no longer slows down 1-byte types**: for
+  `typesize == 1` (uint8, int8, bool, ...) a byte shuffle is the identity, but
+  the SIMD dispatchers fell back to the generic routine, which copied every
+  byte on its own.  With SHUFFLE in the pipeline (the python-blosc2 default)
+  this made compression of uint8 data about 2x and decompression about 3.5x
+  slower than without a filter.  The filter pipeline now skips a byte shuffle
+  of 1-byte elements, and `blosc2_shuffle()`/`blosc2_unshuffle()` copy the
+  block in that case.  The compressed format is unchanged.
+* **New `blosc2_schunk_to_buffer_alloc()`**: serializes a super-chunk into a
+  contiguous frame in memory that the caller provides through a callback,
+  called once with the exact length (e.g. the final `bytes` object of a
+  binding), which saves copying the frame afterwards.  Unless the super-chunk
+  already is an in-memory frame, the frame is written there in place.  It is
+  the same frame that `blosc2_schunk_to_buffer()` returns.
+* **The documentation of `blosc2_schunk_update_chunk()` states who owns the
+  chunk**, in the words already used for appending and inserting: with
+  `copy=false` the super-chunk owns the chunk only after a successful call;
+  after a failed one the caller keeps it and must free it.
+* **Faster b2nd slices**: `b2nd_get_slice_cbuffer()` and
+  `b2nd_set_slice_cbuffer()` decompress (compress) every chunk that lies in
+  the slice and forms one run of the buffer straight into (from) the caller's
+  buffer, and a read no longer zeroes the part of the buffer that the slice
+  fills.  For chunks read or written in part, the worker threads copy each
+  block between the buffer and the block they decode (encode), instead of the
+  calling thread going through a chunk-sized scratch.  On Linux, a fresh read
+  buffer of 4 MB or more that gets transparent huge pages is prefaulted from
+  the calling thread, as threads faulting on the same huge page together spend
+  most of the read in the kernel.  With 28 threads, reading a 315 MB array
+  went from 41 to 24 ms, a random 128^3 patch from 1.9 to 1.0 ms, and writing
+  the whole array from 94 to 75 ms.  `blosc2_schunk_get_slice_buffer()`
+  decompresses large parts of chunks with the context threads (half of an
+  8 MB chunk: 0.53 to 0.16 ms).
+* **Faster frame copies, serialization and saves**: `blosc2_schunk_copy()`
+  into a new contiguous frame (behind `blosc2_schunk_to_buffer()` of anything
+  but an in-memory frame, `blosc2_schunk_to_file()` and `b2nd_copy()` to a
+  file) writes every chunk once, straight from the source, and the offsets,
+  header and trailer once at the end, instead of appending the chunks one by
+  one; the frames are byte-identical.  Serializing a 315 MB array (241 MB
+  compressed) went from 103 to 54 ms (15 ms with
+  `blosc2_schunk_to_buffer_alloc()`), saving it to a file from 57 to 45 ms,
+  the raw write speed of the disk.
+* **Writes to on-disk frames read chunk headers only**: appending, inserting,
+  updating and deleting a chunk read whole chunks (a reference chunk for one
+  flags byte, the replaced chunk for its sizes, twice for an update); they now
+  read the 32-byte chunk headers.  Writing a whole 315 MB array on disk takes
+  20-31% less time on local disks and 38% less on NFS.
+* **Chunk-sized temporaries are reused**: b2nd slice reads and writes on
+  frames, and the chunk reads of on-disk frames, take their buffers from a
+  per-thread cache instead of a malloc/free per call, whose memory glibc gave
+  back to the kernel each time, so that it was page-faulted in again: 16 slice
+  writes on an on-disk array went from 71 to 38 ms.  The cache holds at most
+  four buffers of 64 KB to 32 MB and 64 MB per thread; it is freed when the
+  thread exits and, for the calling thread, by `blosc2_destroy()`.  Not on
+  Windows.
+* **Fewer opens on NFS**: opening a frame file with the default backend keeps
+  the handle that read its header as the cached reader, and creating one keeps
+  the creating handle as the cached writer (and reads through a duplicate of
+  it).  Opening costs one OPEN/CLOSE round trip instead of two, creating an
+  array 4 RPCs instead of 9.
+* **Locked slice reads see one state of the frame**: with locking on,
+  `b2nd_get_slice_cbuffer()` and `blosc2_schunk_get_slice_buffer()` hold the
+  shared frame lock from the refresh of the shape (counters) to the last chunk
+  read, and `b2nd_set_slice_cbuffer()` refreshes under its exclusive lock.
+  Before, every chunk access took the lock on its own, so a writer could
+  shrink or rewrite the frame in the middle of a read ("nchunk exceeds the
+  number of chunks", or chunks of different versions).  Unlocked handles are
+  unchanged.
+* **Frame offsets are always compressed with typesize 8**: insert, update,
+  delete and reorder now pin it as append did.  Frames differ from before
+  only when the `BLOSC_TYPESIZE` environment variable is set (they were
+  readable either way).
+* **Uninitialized chunks read as zeros on every b2nd slice path**: reads of
+  part of a chunk made by `b2nd_uninit()` could return stale scratch memory,
+  and a partial write into such a chunk stored it around the slice.
+* **Fixed chunks with a dictionary that could not be read back**: with
+  `use_dict` (LZ4, LZ4HC, ZSTD), data that did not compress was stored as is,
+  but the chunk kept the dictionary flag, so decompressing it failed with
+  `BLOSC2_ERROR_CODEC_DICT`.  Such chunks are now written without the flag,
+  and the ones written before are readable again.  Chunks that compress with
+  a dictionary are unchanged.
+* **Fixed**: leaks on error paths of `blosc2_schunk_new()` (and of
+  `frame_from_schunk()` behind it), `b2nd_empty()` and friends,
+  `b2nd_copy()` (which also handed the freed array back), `b2nd_full()`,
+  `b2nd_concatenate()`, `blosc2_schunk_set_slice_buffer()` and the extension
+  of a b2nd array by `b2nd_resize()`; `frame_delete_chunk()` leaked the new
+  offsets chunk on its later error paths, and a failed realloc there lost an
+  in-memory frame; `blosc2_schunk_copy()` left a pointer to its own stack in
+  the storage it was passed; a recompressing `blosc2_schunk_copy()` padded a
+  shorter last chunk with the tail of the previous one; frames without chunks
+  `memcpy()`ed a NULL offsets chunk; a masked read that failed before
+  decompressing left the block mask on the context, so the next
+  decompression skipped blocks (also in a failed orthogonal selection, which
+  leaked its buffers too), and `blosc2_set_maskout()` left a freed mask there
+  when its allocation failed.
+
 Changes from 3.4.0 to 3.4.1
 ===========================
 

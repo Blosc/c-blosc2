@@ -178,8 +178,13 @@ get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, 
                 const blosc2_io *iodefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
+int frame_fill_from_schunk(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src);
+int64_t frame_fill_alloc(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src,
+                         uint8_t* (*alloc)(int64_t len, void* user_data), void* user_data);
 void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
-void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
+/* `cbytes_old` is the size of the chunk replaced, as the counters of `schunk` hold it */
+void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk,
+                         int32_t cbytes_old);
 void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* schunk);
 int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, blosc2_schunk* schunk);
 
@@ -280,6 +285,15 @@ void frame_writer_close(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
+
+/**
+ * @brief Copy the header of chunk @p nchunk into @p header, which holds
+ * BLOSC_EXTENDED_HEADER_LENGTH bytes: the same bytes that frame_get_lazychunk()
+ * starts with, for a fraction of the cost where nothing else is needed.
+ *
+ * @return The cbytes of the chunk, or a negative value on error.
+ */
+int frame_get_chunk_header(blosc2_frame_s* frame, int64_t nchunk, uint8_t* header);
 int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t nchunk,
                            void *dest, int32_t nbytes);
 

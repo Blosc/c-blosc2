@@ -111,6 +111,93 @@ static inline bool blosc2_nchunks_to_offsets_nbytes(int64_t nchunks, int32_t *of
   return true;
 }
 
+/* The flags2 byte lives in the extended header, at offset 0x1e, so it only
+   exists when the chunk actually carries one.  Whether it does is recorded in
+   the flags byte, the same way read_chunk_header() decides it -- not in the
+   chunk size: a Blosc1-style chunk with 16 or more bytes of payload is 32 bytes
+   or longer, yet offset 0x1e is compressed data there, and reading it as flags2
+   can mark a schunk as using variable-length blocks out of thin air.  The size
+   check stays as the bound that keeps a short chunk from being over-read. */
+static inline uint8_t get_chunk_flags2(const uint8_t *chunk, int32_t chunk_cbytes) {
+  uint8_t flags = chunk[BLOSC2_CHUNK_FLAGS];
+  bool extended_header = (flags & BLOSC_DOSHUFFLE) && (flags & BLOSC_DOBITSHUFFLE);
+  if (!extended_header || chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return 0;
+  }
+  return chunk[BLOSC2_CHUNK_BLOSC2_FLAGS2];
+}
+
+/* Whether the filter pipeline `filters` (BLOSC2_MAX_FILTERS codes) has filter `id` */
+static inline bool filters_contain(const uint8_t *filters, uint8_t id) {
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    if (filters[i] == id) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/* The special value (BLOSC2_SPECIAL_ZERO, _NAN or _UNINIT) that a frame codes
+   `chunk` (`cbytes` long) with in its offset instead of storing it, or 0 if it
+   stores the chunk.  A chunk shorter than an extended header has no special value. */
+static inline int chunk_special_in_offset(const uint8_t *chunk, int32_t cbytes) {
+  if (cbytes < BLOSC_EXTENDED_HEADER_LENGTH) {
+    return 0;
+  }
+  int special_value = (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+  switch (special_value) {
+    case BLOSC2_SPECIAL_ZERO:
+    case BLOSC2_SPECIAL_NAN:
+    case BLOSC2_SPECIAL_UNINIT:
+      return special_value;
+    default:
+      return 0;
+  }
+}
+
+/* The chunksize of a super-chunk (-1 before its first chunk, 0 once its chunks
+   vary in size) after adding a chunk of `nbytes` bytes at the end of (or, if not
+   `at_end`, among) its `nchunks` chunks, the last of which has `last_nbytes`: the
+   chunks stop having one size when the last one is shorter, or the new one is
+   longer, or is not of that size and goes in between.  `last_nbytes` is only read
+   when `*chunksize` is not 0 and `nchunks` > 0.  Returns false, and leaves
+   *chunksize, for a first chunk longer than a chunksize set in advance. */
+static inline bool chunksize_after_adding(int32_t *chunksize, int64_t nchunks, int32_t last_nbytes,
+                                         int32_t nbytes, bool at_end) {
+  if (*chunksize == 0) {
+    return true;
+  }
+  int32_t size = (*chunksize == -1) ? nbytes : *chunksize;
+  if (nchunks > 0 && (last_nbytes < size || nbytes > size || (!at_end && nbytes != size))) {
+    *chunksize = 0;
+    return true;
+  }
+  if (size > 0 && nbytes > size) {
+    return false;
+  }
+  *chunksize = size;
+  return true;
+}
+
+/* Copy the variable-length metalayers of `schunk` into `new_schunk`, compressed
+   with `cparams` (NULL for the defaults of blosc2_vlmeta_add()). */
+int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, blosc2_cparams *cparams);
+
+/* blosc2_schunk_update_chunk(schunk, nchunk, chunk, true) for a chunk in private memory of the
+   caller, which keeps it: unlike a chunk that may point anywhere, a frame writes it out without
+   copying it first.  It must not point into the storage of any frame (in memory or mapped). */
+int64_t schunk_update_chunk_lent(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk);
+
+/* Decompress chunk `nchunk` of `schunk`, or `chunk` (`cbytes` long) if it is not NULL,
+   with the decompression context of `schunk`, decoding only the blocks that `maskout`
+   (`nblocks` items) leaves in and, if `postfilter` is not NULL, running it (with
+   `user_data`) instead of the context's own postfilter.  The context gets its own
+   postfilter back and loses the mask in any case.  Returns what the decompression
+   returns. */
+int schunk_decompress_masked(blosc2_schunk *schunk, int64_t nchunk, const uint8_t *chunk, int32_t cbytes,
+                             const bool *maskout, int32_t nblocks, blosc2_postfilter_fn postfilter,
+                             void *user_data, void *dest, int32_t destsize);
+
 /* Copy 4 bytes from @p *pa to int32_t, changing endianness if necessary. */
 static inline int32_t sw32_(const void* pa) {
   int32_t idest;
@@ -207,6 +294,21 @@ int fill_tuner(blosc2_tuner *tuner);
 
 extern blosc2_tuner g_tuners[256];
 extern int g_ntuners;
+
+/* Large short-lived buffers (chunk scratch, compressed chunks) cycle through a
+   small per-thread cache instead of malloc/free on every call: glibc trims
+   freed memory at the top of the heap back to the kernel, so a buffer of
+   several MB freed per call is page-faulted in again by the next one.
+   blosc2_tmp_malloc() returns memory for at least `nbytes` (malloc'ed, so it
+   may be released with plain free()) and its real size in *capacity;
+   blosc2_tmp_free() keeps it for reuse or frees it.  At most
+   BLOSC2_TMP_CACHE_MAX bytes stay cached per thread, released at thread exit
+   or by blosc2_destroy() for the calling thread. */
+void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity);
+void blosc2_tmp_free(void *ptr, size_t capacity);
+void blosc2_tmp_cache_clear(void);
+/* Bytes currently held by the calling thread's cache (for tests). */
+size_t blosc2_tmp_cache_nbytes(void);
 
 
 #if defined(_WIN32)
