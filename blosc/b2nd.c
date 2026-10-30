@@ -2282,17 +2282,28 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
   BLOSC_ERROR_NULL(new_shape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
+  for (int i = 0; i < array->ndim; ++i) {
+    if (new_shape[i] < 0) {
+      BLOSC_TRACE_ERROR("`new_shape` cannot have negative entries");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+    if (new_shape[i] != array->shape[i] && (array->chunkshape[i] <= 0 || array->chunknitems <= 0)) {
+      BLOSC_TRACE_ERROR("Cannot resize array with zero chunkshape");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+  }
+
   if (start != NULL) {
     for (int i = 0; i < array->ndim; ++i) {
-      if (start[i] > array->shape[i]) {
-        BLOSC_TRACE_ERROR("`start` must be lower or equal than old array shape in all dims");
+      if (start[i] < 0 || start[i] > array->shape[i]) {
+        BLOSC_TRACE_ERROR("`start` must be in [0, shape] in all dims");
         BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
       }
       if ((new_shape[i] > array->shape[i] && start[i] != array->shape[i])
           || (new_shape[i] < array->shape[i]
               && (start[i] + array->shape[i] - new_shape[i]) != array->shape[i])) {
         // Chunks cannot be cut unless they are in the last position
-        if (start[i] % array->chunkshape[i] != 0) {
+        if (array->chunkshape[i] <= 0 || start[i] % array->chunkshape[i] != 0) {
           BLOSC_TRACE_ERROR("If array end is not being modified "
                               "`start` must be a multiple of chunkshape in all dims");
           BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
@@ -2340,8 +2351,12 @@ int b2nd_insert(b2nd_array_t *array, const void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
-  if (axis >= array->ndim) {
-    BLOSC_TRACE_ERROR("`axis` cannot be greater than the number of dimensions");
+  if (axis < 0 || axis >= array->ndim) {
+    BLOSC_TRACE_ERROR("`axis` must be in [0, ndim)");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (insert_start < 0 || insert_start > array->shape[axis] || buffersize < 0) {
+    BLOSC_TRACE_ERROR("`insert_start` must be in [0, shape[axis]] and `buffersize` non-negative");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
@@ -2353,8 +2368,8 @@ int b2nd_insert(b2nd_array_t *array, const void *buffer, int64_t buffersize,
       buffershape[i] = array->shape[i];
     }
   }
-  if (buffersize % axis_size != 0) {
-    BLOSC_TRACE_ERROR("`buffersize` must be multiple of the array");
+  if (axis_size <= 0 || buffersize % axis_size != 0) {
+    BLOSC_TRACE_ERROR("`buffersize` must be multiple of the array cross-section");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
   int64_t newshape[B2ND_MAX_DIM];
@@ -2385,7 +2400,16 @@ int b2nd_append(b2nd_array_t *array, const void *buffer, int64_t buffersize,
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
+  if (axis < 0 || axis >= array->ndim || buffersize < 0) {
+    BLOSC_TRACE_ERROR("`axis` must be in [0, ndim) and `buffersize` non-negative");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+
   int32_t chunksize = array->sc->chunksize;
+  if (chunksize <= 0) {
+    BLOSC_TRACE_ERROR("Cannot append to array with non-positive chunksize");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
   int64_t nchunks_append = buffersize / chunksize;
   // Check whether chunkshape and blockshape are compatible with accelerated path.
   // Essentially, we are checking whether the buffer is a multiple of the chunksize
@@ -2429,8 +2453,13 @@ int b2nd_delete(b2nd_array_t *array, const int8_t axis,
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
-  if (axis >= array->ndim) {
-    BLOSC_TRACE_ERROR("axis cannot be greater than the number of dimensions");
+  if (axis < 0 || axis >= array->ndim) {
+    BLOSC_TRACE_ERROR("axis must be in [0, ndim)");
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (delete_start < 0 || delete_len < 0 || delete_len > array->shape[axis] ||
+      delete_start > array->shape[axis] - delete_len) {
+    BLOSC_TRACE_ERROR("Invalid delete range");
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 

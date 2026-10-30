@@ -57,13 +57,11 @@ static int emit(const char *dir, const char *name, int8_t ndim,
   cparams.typesize = typesize;
   cparams.clevel = clevel;
   cparams.nthreads = 1;
-  if (blosc1_set_compressor((char *)compname) < 0) {
+  int compcode = blosc2_compname_to_compcode(compname);
+  if (compcode < 0) {
     return -1;
   }
-  cparams.compcode = blosc1_get_compressor();
-  if (cparams.compcode == BLOSC_NOSHUFFLE) {
-    cparams.compcode = BLOSC_BLOSCLZ;
-  }
+  cparams.compcode = (uint8_t)compcode;
   cparams.filters[BLOSC2_MAX_FILTERS - 1] = filter;
 
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
@@ -82,9 +80,15 @@ static int emit(const char *dir, const char *name, int8_t ndim,
   for (int8_t d = 0; d < ndim; d++) {
     nitems *= shape[d];
   }
-  uint32_t *data = (uint32_t *)malloc((size_t)nitems * typesize);
-  for (int64_t i = 0; i < nitems * (int64_t)typesize / 4; i++) {
-    data[i] = pattern(i);
+  size_t nbytes = (size_t)nitems * typesize;
+  uint8_t *data = (uint8_t *)calloc(1, nbytes > 0 ? nbytes : 1);
+  if (data == NULL) {
+    b2nd_free_ctx(ctx);
+    return -1;
+  }
+  for (size_t i = 0; i < nbytes; i++) {
+    uint32_t p = pattern((int64_t)(i / 4));
+    data[i] = (uint8_t)(p >> ((i % 4) * 8));
   }
 
   b2nd_array_t *arr = NULL;
@@ -115,11 +119,7 @@ static int emit(const char *dir, const char *name, int8_t ndim,
 }
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
-    fprintf(stderr, "usage: %s <output-dir>\n", argv[0]);
-    return 1;
-  }
-  const char *dir = argv[1];
+  const char *dir = (argc >= 2) ? argv[1] : ".";
 
   blosc2_init();
   { int64_t shape[] = {512};

@@ -64,18 +64,36 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int64_t start[FUZZ_MAX_DIM] = {0};
   int64_t stop[FUZZ_MAX_DIM] = {0};
   int64_t diff[FUZZ_MAX_DIM] = {0};
+  int64_t shape_items = 1;
+  int64_t chunk_items = 1;
+  int64_t nchunks_est = 1;
   int64_t req = 1;
   int8_t d;
 
   for (d = 0; d < ndim; d++) {
     int64_t ext = tail_dim(&r);
-    if (req * ext > FUZZ_MAX_ITEMS) {
+    if (ext > 0 && shape_items * ext > FUZZ_MAX_ITEMS) {
       ext = 1;
     }
     shape[d] = ext;
-    req *= ext;
-    chunkshape[d] = (int32_t)(tail_u8(&r) % FUZZ_MAX_EXTENT + 1);
-    blockshape[d] = (int32_t)(tail_u8(&r) % FUZZ_MAX_EXTENT + 1);
+    if (ext > 0) {
+      shape_items *= ext;
+    }
+
+    int32_t c_ext = (int32_t)(tail_u8(&r) % FUZZ_MAX_EXTENT + 1);
+    if (chunk_items * c_ext > FUZZ_MAX_ITEMS) {
+      c_ext = 1;
+    }
+    int64_t dim_chunks = ext > 0 ? (ext + c_ext - 1) / c_ext : 1;
+    if (nchunks_est * dim_chunks > 64 && ext > 0) {
+      c_ext = (int32_t)ext;
+      dim_chunks = 1;
+    }
+    chunkshape[d] = c_ext;
+    chunk_items *= c_ext;
+    nchunks_est *= dim_chunks;
+
+    blockshape[d] = (int32_t)(tail_u8(&r) % c_ext + 1);
   }
   for (d = 0; d < ndim; d++) {
     start[d] = tail_dim(&r);
@@ -83,11 +101,21 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     diff[d] = stop[d] - start[d];
     if (diff[d] < 0) {
       diff[d] = 0;
+      stop[d] = start[d];
     }
-    if (req * diff[d] > FUZZ_MAX_ITEMS) {
+    if (diff[d] > 0 && req * diff[d] > FUZZ_MAX_ITEMS) {
       diff[d] = 1;
+      stop[d] = start[d] + 1;
     }
-    req *= diff[d];
+    if (diff[d] > 0) {
+      req *= diff[d];
+    }
+  }
+  for (d = 0; d < ndim; d++) {
+    if (diff[d] == 0) {
+      req = 0;
+      break;
+    }
   }
 
   /* The head bytes that were not consumed as control bytes are the payload. */
@@ -102,10 +130,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     b2nd_array_t *parsed = NULL;
     if (b2nd_from_cframe((uint8_t *)data, (int64_t)size, false, &parsed) >= 0 &&
         parsed != NULL) {
-      uint8_t *buf = (uint8_t *)malloc(FUZZ_MAX_ITEMS * 8);
-      if (buf != NULL) {
-        b2nd_to_cbuffer(parsed, buf, FUZZ_MAX_ITEMS * 8);
-        free(buf);
+      if (parsed->nitems >= 0 && parsed->nitems <= FUZZ_MAX_ITEMS &&
+          parsed->extchunknitems >= 0 && parsed->extchunknitems <= FUZZ_MAX_ITEMS * 8 &&
+          parsed->sc != NULL && parsed->sc->typesize > 0 && parsed->sc->typesize <= 8) {
+        uint8_t *buf = (uint8_t *)malloc(FUZZ_MAX_ITEMS * 8);
+        if (buf != NULL) {
+          b2nd_to_cbuffer(parsed, buf, FUZZ_MAX_ITEMS * 8);
+          free(buf);
+        }
       }
       b2nd_free(parsed);
     }
@@ -185,21 +217,41 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     /* Read the whole array back. */
     b2nd_to_cbuffer(arr, buf, (int64_t)FUZZ_MAX_ITEMS * 8);
 
-    /* Grow along axis 0 and insert at the front (bounded by payload cap). */
-    size_t grow_len = payload_len < 4096 ? payload_len : 4096;
+    /* Grow along axis 0 and insert at the front (bounded by payload & chunk cap). */
+    size_t max_grow = (arr->sc != NULL && arr->sc->chunksize > 0)
+                          ? (size_t)arr->sc->chunksize * 4
+                          : 4096;
+    if (max_grow > 4096) {
+      max_grow = 4096;
+    }
+    size_t grow_len = payload_len < max_grow ? payload_len : max_grow;
     if (grow_len > 0) {
       b2nd_append(arr, payload, (int64_t)grow_len, 0);
       b2nd_insert(arr, payload, (int64_t)grow_len, 0, 0);
     }
 
-    /* Resize one dimension up (bounded). */
+    /* Resize up (bounded by both items and chunk count). */
     int64_t new_shape[FUZZ_MAX_DIM];
     int64_t new_total = 1;
+    int64_t new_nchunks = 1;
     for (d = 0; d < ndim; d++) {
-      new_shape[d] = shape[d] < FUZZ_MAX_EXTENT ? shape[d] + 1 : shape[d];
-      new_total *= new_shape[d];
+      int64_t cand = arr->shape[d] < FUZZ_MAX_EXTENT ? arr->shape[d] + 1 : arr->shape[d];
+      int64_t cand_chunks = (cand > 0 && arr->chunkshape[d] > 0)
+                                ? (cand + arr->chunkshape[d] - 1) / arr->chunkshape[d]
+                                : 1;
+      if (cand > 0 && (new_total * cand > 2 * FUZZ_MAX_ITEMS || new_nchunks * cand_chunks > 64)) {
+        cand = arr->shape[d];
+        cand_chunks = (cand > 0 && arr->chunkshape[d] > 0)
+                          ? (cand + arr->chunkshape[d] - 1) / arr->chunkshape[d]
+                          : 1;
+      }
+      new_shape[d] = cand;
+      if (cand > 0) {
+        new_total *= cand;
+      }
+      new_nchunks *= cand_chunks;
     }
-    if (new_total <= 2 * FUZZ_MAX_ITEMS) {
+    if (new_total <= 2 * FUZZ_MAX_ITEMS && new_nchunks <= 64) {
       b2nd_resize(arr, new_shape, start);
     }
 
