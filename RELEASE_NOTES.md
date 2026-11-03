@@ -9,6 +9,14 @@ Changes from 3.4.1 to 3.4.2
 * Open frames through Windows file symlinks even when CRT path metadata reports
   a zero size; validate and cache the size of the opened target instead.
 
+* **The shuffle filter no longer slows down 1-byte types**: for
+  `typesize == 1` (uint8, int8, bool, ...) a byte shuffle is the identity, but
+  the SIMD dispatchers fell back to the generic routine, which copied every
+  byte on its own.  With SHUFFLE in the pipeline (the python-blosc2 default)
+  this made compression of uint8 data about 2x and decompression about 3.5x
+  slower than without a filter.  The filter pipeline now skips a byte shuffle
+  of 1-byte elements, and `blosc2_shuffle()`/`blosc2_unshuffle()` copy the
+  block in that case.  The compressed format is unchanged.
 * **The documentation of `blosc2_schunk_update_chunk()` states who owns the
   chunk**, in the words already used for appending and inserting: with
   `copy=false` the super-chunk owns the chunk only after a successful call;
