@@ -280,6 +280,13 @@ void frame_writer_close(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
+
+/**
+ * @brief Where chunks nchunks[0..n) of a contiguous frame on disk are in its file: ranges[2 k] and ranges[2 k + 1]
+ * get the position and the size of chunk nchunks[k] (see blosc2_schunk_get_chunk_range()).
+ */
+int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges);
+
 int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t nchunk,
                            void *dest, int32_t nbytes);
 

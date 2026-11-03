@@ -9,6 +9,10 @@ Changes from 3.4.1 to 3.4.2
 * Open frames through Windows file symlinks even when CRT path metadata reports
   a zero size; validate and cache the size of the opened target instead.
 
+* **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
+  a contiguous frame on disk is in its file (offset and size), from the frame
+  header and the chunk index, so that callers can read or prefetch the chunks
+  they need themselves.
 * **The shuffle filter no longer slows down 1-byte types**: for
   `typesize == 1` (uint8, int8, bool, ...) a byte shuffle is the identity, but
   the SIMD dispatchers fell back to the generic routine, which copied every

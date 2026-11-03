@@ -48,6 +48,7 @@ Dealing with chunks
 
 .. doxygenfunction:: blosc2_schunk_get_chunk
 .. doxygenfunction:: blosc2_schunk_get_lazychunk
+.. doxygenfunction:: blosc2_schunk_get_chunk_range
 .. doxygenfunction:: blosc2_schunk_get_vlblock
 .. doxygenfunction:: blosc2_schunk_decompress_chunk
 .. doxygenfunction:: blosc2_schunk_append_chunk
