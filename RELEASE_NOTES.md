@@ -31,6 +31,20 @@ Changes from 3.4.1 to 3.4.2
   chunk**, in the words already used for appending and inserting: with
   `copy=false` the super-chunk owns the chunk only after a successful call;
   after a failed one the caller keeps it and must free it.
+* **Faster b2nd slices**: `b2nd_get_slice_cbuffer()` and
+  `b2nd_set_slice_cbuffer()` decompress (compress) every chunk that lies in
+  the slice and forms one run of the buffer straight into (from) the caller's
+  buffer, and a read no longer zeroes the part of the buffer that the slice
+  fills.  For chunks read or written in part, the worker threads copy each
+  block between the buffer and the block they decode (encode), instead of the
+  calling thread going through a chunk-sized scratch.  On Linux, a fresh read
+  buffer of 4 MB or more that gets transparent huge pages is prefaulted from
+  the calling thread, as threads faulting on the same huge page together spend
+  most of the read in the kernel.  With 28 threads, reading a 315 MB array
+  went from 41 to 24 ms, a random 128^3 patch from 1.9 to 1.0 ms, and writing
+  the whole array from 94 to 75 ms.  `blosc2_schunk_get_slice_buffer()`
+  decompresses large parts of chunks with the context threads (half of an
+  8 MB chunk: 0.53 to 0.16 ms).
 * **Faster frame copies, serialization and saves**: `blosc2_schunk_copy()`
   into a new contiguous frame (behind `blosc2_schunk_to_buffer()` of anything
   but an in-memory frame, `blosc2_schunk_to_file()` and `b2nd_copy()` to a
@@ -62,6 +76,9 @@ Changes from 3.4.1 to 3.4.2
   delete and reorder now pin it as append did.  Frames differ from before
   only when the `BLOSC_TYPESIZE` environment variable is set (they were
   readable either way).
+* **Uninitialized chunks read as zeros on every b2nd slice path**: reads of
+  part of a chunk made by `b2nd_uninit()` could return stale scratch memory,
+  and a partial write into such a chunk stored it around the slice.
 * **Fixed chunks with a dictionary that could not be read back**: with
   `use_dict` (LZ4, LZ4HC, ZSTD), data that did not compress was stored as is,
   but the chunk kept the dictionary flag, so decompressing it failed with
