@@ -56,5 +56,8 @@ if(BUILD_TESTS)
                     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>)
             endif()
         endforeach()
+        # decompress_file reads the frame that compress_file writes: never run them at the same time
+        set_tests_properties(test_example_compress_file PROPERTIES FIXTURES_SETUP example_cmakecache_frame)
+        set_tests_properties(test_example_decompress_file PROPERTIES FIXTURES_REQUIRED example_cmakecache_frame)
     endif()
 endif()
