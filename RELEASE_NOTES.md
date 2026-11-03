@@ -9,6 +9,12 @@ Changes from 3.4.1 to 3.4.2
 * Open frames through Windows file symlinks even when CRT path metadata reports
   a zero size; validate and cache the size of the opened target instead.
 
+* **New `blosc2_schunk_to_buffer_alloc()`**: serializes a super-chunk into a
+  contiguous frame in memory that the caller provides through a callback,
+  called once with the exact length (e.g. the final `bytes` object of a
+  binding), which saves copying the frame afterwards.  Unless the super-chunk
+  already is an in-memory frame, the frame is written there in place.  It is
+  the same frame that `blosc2_schunk_to_buffer()` returns.
 * **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
   a contiguous frame on disk is in its file (offset and size), from the frame
   header and the chunk index, so that callers can read or prefetch the chunks
@@ -25,6 +31,15 @@ Changes from 3.4.1 to 3.4.2
   chunk**, in the words already used for appending and inserting: with
   `copy=false` the super-chunk owns the chunk only after a successful call;
   after a failed one the caller keeps it and must free it.
+* **Faster frame copies, serialization and saves**: `blosc2_schunk_copy()`
+  into a new contiguous frame (behind `blosc2_schunk_to_buffer()` of anything
+  but an in-memory frame, `blosc2_schunk_to_file()` and `b2nd_copy()` to a
+  file) writes every chunk once, straight from the source, and the offsets,
+  header and trailer once at the end, instead of appending the chunks one by
+  one; the frames are byte-identical.  Serializing a 315 MB array (241 MB
+  compressed) went from 103 to 54 ms (15 ms with
+  `blosc2_schunk_to_buffer_alloc()`), saving it to a file from 57 to 45 ms,
+  the raw write speed of the disk.
 * **Writes to on-disk frames read chunk headers only**: appending, inserting,
   updating and deleting a chunk read whole chunks (a reference chunk for one
   flags byte, the replaced chunk for its sizes, twice for an update); they now
