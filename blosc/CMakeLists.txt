@@ -175,6 +175,7 @@ list(APPEND SOURCES
     blosc/fastcopy.h
     blosc/schunk.c
     blosc/frame.c
+    blosc/prefetch.c
     blosc/stune.c
     blosc/stune.h
     blosc/context.h

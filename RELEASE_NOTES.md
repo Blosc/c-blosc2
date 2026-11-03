@@ -6,6 +6,21 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* **Read-ahead for slices of frames on disk**, off by default: with
+  `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the
+  `BLOSC_PREFETCH` environment variable), `b2nd_get_slice_cbuffer()`,
+  `b2nd_get_slice()`, `b2nd_get_orthogonal_selection()` and
+  `blosc2_schunk_get_slice_buffer()` read the chunks a slice needs and that
+  are not in the page cache with a few background threads, in pieces of at
+  most `piece_size` bytes (1 MiB by default) and in the order they decompress
+  them, at most `max_ahead` bytes ahead, and decompress each chunk as soon as
+  it is in.  Of chunks that a slice of an array covers only in part, only the
+  blocks it needs are read (after the chunk's header).  Without it every block
+  of a cold slice is a synchronous read of at most the kernel's read-ahead
+  window, which on network file systems is one round trip each.  Cold patches
+  of 3D images on NFS got 3-5x faster, on a local NVMe disk 1.5-3x.  See
+  `README_THREADED.rst` for which settings to use.  POSIX only (Linux, macOS);
+  a no-op on Windows.
 * **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
   a contiguous frame on disk is in its file (offset and size), from the frame
   header and the chunk index, so that callers can read or prefetch the chunks

@@ -50,3 +50,33 @@ Here, `threads_callback` is a function of the form:
 that simply calls `dojob` on the given `jobdata` array for `numjobs` elements of size `jobdata_elsize`, returning when all of the `dojob` calls have completed.  The key point is that your `threads_callback` routine can execute the `dojob` calls *in parallel* if it wants.  For example, if you are using OpenMP your `threads_callback` function might use `#pragma omp parallel for`.
 
 The `blosc2_set_threads_callback` function should be called before any Blosc function (before any Blosc contexts are created), to inhibit Blosc from spawning its own worker threads.   In this case, `blosc2_set_nthreads` and similar functions set an upper bound to the `numjobs` that is passed to your `threads_callback` rather than an actual number of threads.
+
+Read-ahead threads
+------------------
+
+The threads above compress and decompress: they split the blocks of one chunk between them, and each chunk is done
+before the next one starts.  Reading a slice of a frame on disk is a different job.  Each block that is not in the
+page cache yet has to wait for the storage, and on a network file system every such wait is a round trip to the
+server.  `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the `BLOSC_PREFETCH` environment variable) starts
+a separate, process-wide pool of read-ahead threads for that.  When a slice starts (`b2nd_get_slice_cbuffer`,
+`b2nd_get_slice`, `b2nd_get_orthogonal_selection`, `blosc2_schunk_get_slice_buffer`), they read all the chunks it
+needs (that are not cached already) in pieces of at most `piece_size` bytes, in parallel and in the order the slice
+decompresses them, at most `max_ahead` bytes ahead of it; the slice waits for each chunk only right before
+decompressing it.  Of a chunk that a slice of an array covers only in part, only the blocks the slice needs are read
+(after the chunk's header, which says where they are: one round trip more when it is not cached).
+
+Read-ahead threads spend most of their time waiting for the storage, but reading is not free: the kernel copies the
+data, and it spends more CPU per byte the more threads read the same file at once.  Which settings to use:
+
+* 4 threads and the default 1 MiB pieces, on network file systems (NFS, SMB, ...) and on local disks.  On NFS,
+  cold patches of 3D images got 3-5x faster this way (8 threads: 10-25% faster still, for 20-40% more CPU per read);
+  on NVMe disks 1.5-3x.
+* Less CPU on local disks: fewer threads (1-2) or larger pieces (4-8 MiB).  On one NVMe system that kept the speed at
+  up to 40% less CPU; on another it cost 10-30% of the speed.
+* Many reader processes at once: the processes already read in parallel.  When the CPU is the limit (tens of
+  processes reading data that is not cached on one node), the kernel time read-ahead adds can make it slower than
+  without; fewer threads per process (1-2), or none, are better there.
+
+The two kinds of threads are independent: a program that runs many reader processes can keep one decompression thread
+per process (`nthreads=1`) and still use read-ahead threads in each.  Read-ahead is off by default and has no effect on
+Windows.
