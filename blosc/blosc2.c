@@ -14,6 +14,7 @@
 #include "blosc-checked.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
 #include "frame.h"
+#include "prefetch.h"
 #include "sframe.h"
 #include "b2nd-private.h"
 #include "schunk-private.h"
@@ -6255,6 +6256,15 @@ void blosc2_init(void) {
 
   _blosc2_register_io_cb(&BLOSC2_IO_CB_MMAP);
 
+  // BLOSC_PREFETCH=<nthreads> turns read-ahead on without touching the sources (see blosc2_set_prefetch())
+  const char *prefetch_env = getenv("BLOSC_PREFETCH");
+  if (prefetch_env != NULL && prefetch_env[0] != '\0') {
+    long nthreads = strtol(prefetch_env, NULL, 10);
+    if (nthreads > 0 && nthreads <= BLOSC2_PREFETCH_MAX_NTHREADS) {
+      blosc2_set_prefetch((int) nthreads, 0, 0);
+    }
+  }
+
   g_ncodecs = 0;
   g_nfilters = 0;
   g_ntuners = 0;
@@ -6429,6 +6439,7 @@ void blosc2_destroy(void) {
   if (!g_initlib) return;
 
   blosc2_free_resources();
+  prefetch_destroy();
   g_initlib = 0;
   blosc2_free_ctx(g_global_context);
   blosc2_tmp_cache_clear();

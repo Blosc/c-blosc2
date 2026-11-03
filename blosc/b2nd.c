@@ -14,6 +14,7 @@
 #endif
 
 #include "b2nd.h"
+#include "prefetch.h"
 #include "context.h"
 #include "frame.h"
 #include "blosc-private.h"
@@ -1377,9 +1378,118 @@ static int compress_update_chunk(b2nd_array_t *array, int64_t nchunk, const uint
 }
 
 
-// Setting and getting slices
+/* Set the blocks of a chunk that the slice does not touch in @p maskout (for blosc2_set_maskout()); with the delta
+   filter block 0 is needed too as soon as any is.  Returns how many blocks the slice touches. */
+static int64_t slice_chunk_maskout(const slice_chunk_t *c, int64_t nblocks, bool has_delta, bool *maskout) {
+  int64_t nneeded = 0;
+  for (int64_t nblock = 0; nblock < nblocks; ++nblock) {
+    maskout[nblock] = !block_slice_overlap(c, nblock, NULL);
+    nneeded += !maskout[nblock];
+  }
+  if (has_delta && nneeded > 0) {
+    maskout[0] = false;
+  }
+  return nneeded;
+}
+
+
+/* Whether a slice read decompresses a chunk that it needs @p nblocks_needed blocks of block by block, straight from
+   the (lazy) chunk (the compact path), rather than the whole chunk with a maskout (see get_set_slice()) */
+static bool slice_chunk_compact(const b2nd_array_t *array, int64_t nblocks_needed, bool has_delta) {
+  bool on_disk = array->sc->storage != NULL && array->sc->storage->urlpath != NULL;
+  int64_t frac = on_disk ? 4 : 16;
+  int64_t block_nbytes = (int64_t) array->blocknitems * array->sc->typesize;
+  int64_t data_nbytes = array->extchunknitems * array->sc->typesize;
+  return !has_delta && nblocks_needed * block_nbytes * frac <= data_nbytes;
+}
+
+
+/* The box [chunk_start, chunk_stop) of chunk @p nchunk of @p array, clipped to its shape; whether [start, stop)
+   covers only part of it */
+static bool chunk_box(const b2nd_array_t *array, int64_t nchunk, const int64_t *start, const int64_t *stop,
+                      int64_t *chunk_start, int64_t *chunk_stop) {
+  int64_t chunks_in_array[B2ND_MAX_DIM];
+  int64_t nchunk_ndim[B2ND_MAX_DIM];
+  for (int i = 0; i < array->ndim; ++i) {
+    chunks_in_array[i] = array->extshape[i] / array->chunkshape[i];
+  }
+  blosc2_unidim_to_multidim(array->ndim, chunks_in_array, nchunk, nchunk_ndim);
+  bool partial = false;
+  for (int i = 0; i < array->ndim; ++i) {
+    chunk_start[i] = nchunk_ndim[i] * array->chunkshape[i];
+    chunk_stop[i] = chunk_start[i] + array->chunkshape[i] < array->shape[i] ?
+                    chunk_start[i] + array->chunkshape[i] : array->shape[i];
+    partial |= start[i] > chunk_start[i] || stop[i] < chunk_stop[i];
+  }
+  return partial;
+}
+
+
+/* Start reading the chunks of [start, stop) of an array in a frame on disk ahead (see blosc2_set_prefetch()); NULL if
+   read-ahead is off or does not apply.  Of a chunk the slice covers in part only the blocks it needs, if that is all
+   the read takes from the file: with the mmap I/O (the chunk is in the mapping), or on the compact path (the default
+   I/O otherwise reads the whole chunk). */
+static prefetch_batch* prefetch_slice(const b2nd_array_t *array, const int64_t *start, const int64_t *stop) {
+  blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
+  if (!prefetch_applies(frame)) {
+    return NULL;
+  }
+  int8_t ndim = array->ndim;
+  int64_t nblocks = array->blocknitems > 0 ? array->extchunknitems / array->blocknitems : 0;
+  int64_t *nchunks = NULL;
+  int64_t n = b2nd_get_slice_nchunks(array, start, stop, &nchunks);
+  int64_t chunk_start[B2ND_MAX_DIM];
+  int64_t chunk_stop[B2ND_MAX_DIM];
+  int64_t npartial = 0;
+  for (int64_t c = 0; c < n && nblocks > 0; ++c) {
+    npartial += chunk_box(array, nchunks[c], start, stop, chunk_start, chunk_stop);
+  }
+  // One maskout per chunk covered in part (NULL for a chunk read whole), all in one allocation
+  const bool **maskouts = NULL;
+  if (npartial > 0) {
+    maskouts = calloc(1, n * sizeof(bool *) + npartial * nblocks * sizeof(bool));
+  }
+  if (maskouts != NULL) {
+    bool *row = (bool *) (maskouts + n);
+    int64_t blocks_in_chunk[B2ND_MAX_DIM];
+    int64_t blockshape[B2ND_MAX_DIM];
+    for (int i = 0; i < ndim; ++i) {
+      blocks_in_chunk[i] = array->extchunkshape[i] / array->blockshape[i];
+      blockshape[i] = array->blockshape[i];
+    }
+    blosc2_io_cb *io_cb = blosc2_get_io_cb(array->sc->storage->io->id);
+    bool mapped = io_cb != NULL && !io_cb->is_allocation_necessary;
+    bool has_delta = filters_contain(array->sc->filters, BLOSC_DELTA);
+    slice_chunk_t slice_chunk;
+    memset(&slice_chunk, 0, sizeof(slice_chunk));
+    slice_chunk.array = array;
+    slice_chunk.start = start;
+    slice_chunk.stop = stop;
+    slice_chunk.chunk_start = chunk_start;
+    slice_chunk.chunk_stop = chunk_stop;
+    slice_chunk.blocks_in_chunk = blocks_in_chunk;
+    slice_chunk.blockshape = blockshape;
+    for (int64_t c = 0; c < n; ++c) {
+      if (!chunk_box(array, nchunks[c], start, stop, chunk_start, chunk_stop)) {
+        continue;  // read whole
+      }
+      int64_t nneeded = slice_chunk_maskout(&slice_chunk, nblocks, has_delta, row);
+      if (mapped || slice_chunk_compact(array, nneeded, has_delta)) {
+        maskouts[c] = row;
+        row += nblocks;
+      }
+    }
+  }
+  prefetch_batch *batch = prefetch_batch_new(frame, nchunks, n, maskouts, nblocks);
+  free(maskouts);
+  free(nchunks);
+  return batch;
+}
+
+
+// Setting and getting slices; a read uses the read-ahead batch @p prefetch, or starts its own if that is NULL
 int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const int64_t *stop,
-                  const int64_t *shape, b2nd_array_t *array, bool set_slice) {
+                  const int64_t *shape, b2nd_array_t *array, bool set_slice, prefetch_batch *prefetch) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -1538,6 +1648,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     update_nchunks *= update_shape[i];
   }
 
+  prefetch_batch *own_prefetch = set_slice || prefetch != NULL ? NULL : prefetch_slice(array, start, stop);
+  prefetch = own_prefetch != NULL ? own_prefetch : prefetch;
+
   for (int64_t update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
@@ -1564,6 +1677,8 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     if (chunk_empty) {
       continue;
     }
+    // Decompress each chunk as soon as it has been read ahead, while the later ones are still coming in
+    prefetch_batch_wait(prefetch, nchunk);
     slice_chunk_t slice_chunk;
     memset(&slice_chunk, 0, sizeof(slice_chunk));
     slice_chunk.array = array;
@@ -1692,20 +1807,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           goto out;
         }
       }
-      int32_t nblocks_needed = 0;
-      for (int nblock = 0; nblock < nblocks; ++nblock) {
-        bool block_empty = !block_slice_overlap(&slice_chunk, nblock, NULL);
-        block_maskout[nblock] = block_empty;
-        if (!block_empty) {
-          nblocks_needed++;
-        }
-      }
-
-      if (has_delta && nblocks_needed > 0) {
-        // Delta filter encodes subsequent blocks relative to the reference block (block 0).
-        // If any block in the chunk is needed, block 0 must be decompressed as reference.
-        block_maskout[0] = false;
-      }
+      // Delta filter encodes subsequent blocks relative to the reference block (block 0): if any block in the chunk
+      // is needed, block 0 must be decompressed as reference
+      int32_t nblocks_needed = (int32_t) slice_chunk_maskout(&slice_chunk, nblocks, has_delta, block_maskout);
 
       // Compact get path: when only a fraction of the chunk's blocks is
       // needed, decompress just those blocks -- one at a time, straight
@@ -1726,10 +1830,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       // 1-2 block reads, where compact always wins or ties).
       //
       // If DELTA is used, blocks cannot be decompressed independently; keep maskout path.
-      bool on_disk = array->sc->storage != NULL && array->sc->storage->urlpath != NULL;
-      int64_t frac = on_disk ? 4 : 16;
-      use_compact = !has_delta &&
-                    (((int64_t) nblocks_needed * block_nbytes) * frac <= (int64_t) data_nbytes);
+      use_compact = slice_chunk_compact(array, nblocks_needed, has_delta);
       if (use_compact) {
         lazychunk_cbytes = blosc2_schunk_get_lazychunk(array->sc, nchunk, &lazychunk,
                                                        &lazychunk_needs_free);
@@ -1859,6 +1960,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   out:
+  prefetch_batch_free(own_prefetch);
   blosc2_tmp_free(data, data_capacity);
   blosc2_tmp_free(block_data, block_data_capacity);
   free(block_maskout);
@@ -1880,12 +1982,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 // SWMR's transient errors.
 static int locked_get_set_slice(void *buffer, int64_t buffersize, const int64_t *start,
                                 const int64_t *stop, const int64_t *shape, b2nd_array_t *array,
-                                bool set_slice) {
+                                bool set_slice, prefetch_batch *prefetch) {
   blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
   BLOSC_ERROR(frame_lock(frame, set_slice));
   int rc = refresh_if_stale(array);
   if (rc >= 0) {
-    rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice);
+    rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice, prefetch);
   }
   frame_unlock(frame);
   BLOSC_ERROR(rc);
@@ -1903,7 +2005,7 @@ int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, cons
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
   return locked_get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *) array,
-                              false);
+                              false, NULL);
 }
 
 
@@ -1915,8 +2017,12 @@ int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffershape, int64
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  return locked_get_set_slice((void *) buffer, buffersize, start, stop, buffershape, array, true);
+  return locked_get_set_slice((void *) buffer, buffersize, start, stop, buffershape, array, true, NULL);
 }
+
+
+static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src,
+                            const int64_t *start, prefetch_batch *prefetch);
 
 
 int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src, const int64_t *start,
@@ -1939,6 +2045,17 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
     return BLOSC2_ERROR_SUCCESS;
   }
 
+  // Read the chunks of the whole source slice ahead, not only those of one result chunk at a time
+  prefetch_batch *prefetch = prefetch_slice(src, start, stop);
+  int rc = get_slice_chunks(ctx, array, src, start, prefetch);
+  prefetch_batch_free(prefetch);
+  return rc;
+}
+
+
+/* Fill the chunks of the result of b2nd_get_slice() one after the other from the source slice */
+static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src,
+                            const int64_t *start, prefetch_batch *prefetch) {
   int8_t ndim = (*array)->ndim;
   int64_t chunks_in_array[B2ND_MAX_DIM] = {0};
   for (int i = 0; i < ndim; ++i) {
@@ -1993,8 +2110,8 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
       *array = NULL;
       BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
     }
-    int g_rc = b2nd_get_slice_cbuffer(src, src_start, src_stop, buffer, chunk_shape,
-                                      (int64_t)buffersize);
+    int g_rc = locked_get_set_slice(buffer, (int64_t) buffersize, src_start, src_stop, chunk_shape,
+                                    (b2nd_array_t *) src, false, prefetch);
     if (g_rc < 0) {
       free(buffer);
       b2nd_free(*array);
@@ -3068,7 +3185,8 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
                int64_t *bufferstrides,
                bool get,
                uint8_t *chunk_data,
-               int32_t chunk_data_nbytes) {
+               int32_t chunk_data_nbytes,
+               prefetch_batch *prefetch) {
   p_ordered_selection_0[ndim] = ordered_selection[ndim];
   p_ordered_selection_1[ndim] = ordered_selection[ndim];
   while (p_ordered_selection_1[ndim] - ordered_selection[ndim] < selection_size[ndim]) {
@@ -3137,6 +3255,7 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
           goto chunk_done;
         }
       }
+      prefetch_batch_wait(prefetch, nchunk);
       if (blosc2_schunk_decompress_chunk(array->sc, nchunk, data, data_nbytes) < 0) {
         BLOSC_TRACE_ERROR("Error decompressing chunk");
         // A read that failed before decompressing leaves the mask on the context
@@ -3182,12 +3301,69 @@ int iter_chunk(b2nd_array_t *array, int8_t ndim,
     } else {
       BLOSC_ERROR(iter_chunk(array, (int8_t) (ndim + 1), selection_size,
                              ordered_selection, p_ordered_selection_0, p_ordered_selection_1,
-                             buffer, buffershape, bufferstrides, get, chunk_data, chunk_data_nbytes));
+                             buffer, buffershape, bufferstrides, get, chunk_data, chunk_data_nbytes,
+                             prefetch));
     }
 
     p_ordered_selection_0[ndim] = p_ordered_selection_1[ndim];
   }
   return BLOSC2_ERROR_SUCCESS;
+}
+
+
+/* Start reading the chunks an orthogonal selection touches ahead (see blosc2_set_prefetch()), in the order iter_chunk()
+   visits them: per axis the chunks of the sorted selection, combined in C order.  NULL if read-ahead is off or does
+   not apply. */
+static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_selection_t **ordered_selection,
+                                          const int64_t *selection_size) {
+  if (!prefetch_applies((blosc2_frame_s *) array->sc->frame) || array->nitems == 0) {  // empty: chunk shape has a 0
+    return NULL;
+  }
+  int8_t ndim = array->ndim;
+  int64_t *axis_chunks[B2ND_MAX_DIM] = {NULL};
+  int64_t naxis_chunks[B2ND_MAX_DIM] = {0};
+  int64_t strides[B2ND_MAX_DIM];
+  int64_t n = 1;
+  int64_t *nchunks = NULL;
+  prefetch_batch *batch = NULL;
+  for (int i = ndim - 1; i >= 0; --i) {
+    strides[i] = i == ndim - 1 ? 1 : strides[i + 1] * (array->extshape[i + 1] / array->chunkshape[i + 1]);
+  }
+  for (int i = 0; i < ndim; ++i) {
+    axis_chunks[i] = malloc((selection_size[i] > 0 ? selection_size[i] : 1) * sizeof(int64_t));
+    if (axis_chunks[i] == NULL) {
+      goto out;
+    }
+    for (int64_t j = 0; j < selection_size[i]; ++j) {
+      int64_t value = ordered_selection[i][j].value;
+      int64_t c = value / array->chunkshape[i];
+      if (value >= 0 && value < array->shape[i] && (naxis_chunks[i] == 0 || axis_chunks[i][naxis_chunks[i] - 1] != c)) {
+        axis_chunks[i][naxis_chunks[i]++] = c;
+      }
+    }
+    n *= naxis_chunks[i];
+  }
+  nchunks = n > 0 ? malloc(n * sizeof(int64_t)) : NULL;
+  if (nchunks != NULL) {
+    int64_t index[B2ND_MAX_DIM] = {0};
+    for (int64_t k = 0; k < n; ++k) {
+      nchunks[k] = 0;
+      for (int i = 0; i < ndim; ++i) {
+        nchunks[k] += axis_chunks[i][index[i]] * strides[i];
+      }
+      for (int i = ndim - 1; i >= 0 && ++index[i] == naxis_chunks[i]; --i) {
+        index[i] = 0;
+      }
+    }
+    batch = prefetch_batch_new((blosc2_frame_s *) array->sc->frame, nchunks, n, NULL, 0);
+  }
+
+  out:
+  free(nchunks);
+  for (int i = 0; i < ndim; ++i) {
+    free(axis_chunks[i]);
+  }
+  return batch;
 }
 
 
@@ -3233,6 +3409,7 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 
   // Sort selections
   int rc = BLOSC2_ERROR_SUCCESS;
+  prefetch_batch *prefetch = NULL;
   b2nd_selection_t **ordered_selection = calloc(ndim, sizeof(b2nd_selection_t *));
   // Pointers to iterate over ordered_selection data
   b2nd_selection_t **p_ordered_selection_0 = malloc(ndim * sizeof(b2nd_selection_t *));
@@ -3265,14 +3442,16 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
     bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
+  prefetch = get ? prefetch_selection(array, ordered_selection, selection_size) : NULL;
   rc = iter_chunk(array, 0,
                   selection_size, ordered_selection,
                   p_ordered_selection_0,
                   p_ordered_selection_1,
                   buffer, buffershape, bufferstrides, get,
-                  chunk_data, chunk_data_nbytes);
+                  chunk_data, chunk_data_nbytes, prefetch);
 
   out:
+  prefetch_batch_free(prefetch);
   free(chunk_data);
   free(p_ordered_selection_0);
   free(p_ordered_selection_1);

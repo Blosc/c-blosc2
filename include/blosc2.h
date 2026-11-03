@@ -535,6 +535,9 @@ static char *print_error(int rc) {
  * Blosc to be used simultaneously in a multi-threaded environment, in
  * which case you can use the #blosc2_compress_ctx #blosc2_decompress_ctx pair.
  *
+ * The **BLOSC_PREFETCH** environment variable, set to a number of threads, turns on read-ahead for frames on disk
+ * here (see #blosc2_set_prefetch).
+ *
  * @sa #blosc2_destroy
  */
 BLOSC_EXPORT void blosc2_init(void);
@@ -766,6 +769,63 @@ BLOSC_EXPORT int16_t blosc2_get_nthreads(void);
  * @return The previous number of threads.
  */
 BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
+
+
+/**
+ * @brief Default for the @p max_ahead parameter of #blosc2_set_prefetch.
+ */
+#define BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT ((int64_t)64 * 1024 * 1024)
+
+/**
+ * @brief Most read-ahead threads #blosc2_set_prefetch accepts.
+ */
+#define BLOSC2_PREFETCH_MAX_NTHREADS 256
+
+/**
+ * @brief Default for the @p piece_size parameter of #blosc2_set_prefetch.
+ */
+#define BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT (1024 * 1024)
+
+/**
+ * @brief Smallest @p piece_size #blosc2_set_prefetch accepts.
+ */
+#define BLOSC2_PREFETCH_MIN_PIECE_SIZE (64 * 1024)
+
+/**
+ * @brief Read ahead when reading slices of arrays and super-chunks stored in contiguous frames on disk with the
+ * default filesystem or the memory-mapped I/O: #b2nd_get_slice_cbuffer, #b2nd_get_slice,
+ * #b2nd_get_orthogonal_selection and #blosc2_schunk_get_slice_buffer.
+ *
+ * Without read-ahead, a slice reads the blocks it needs one after the other, each with at most the kernel's read-ahead
+ * window per read; on a network file system every such read is a round trip.  With read-ahead, the chunks the slice
+ * needs (and that are not in the page cache yet) are read by @p nthreads background threads in pieces of at most
+ * @p piece_size bytes, in the order the slice decompresses them and at most @p max_ahead bytes ahead of it, and each
+ * chunk is decompressed as soon as its bytes are in.  Of a chunk that a slice (#b2nd_get_slice_cbuffer,
+ * #b2nd_get_slice) covers only in part, only the blocks it needs are read, after the chunk's header (which says where
+ * they are; one round trip more when it is not cached).  Opening such a frame also asks for its trailer while reading its header.  The data goes to the page cache
+ * (memory-mapped reads stay zero-copy); pages that are cached already are not read again (asked with cachestat() on
+ * Linux >= 6.5, else mincore()).  On Linux the kernel answers that only for files the process owns or may write to
+ * (before 6.5: only files it owns); other files are read again even when cached, which is correct but costs a copy.
+ *
+ * Reads that are not cached get faster on any storage, most on high-latency ones; 4 threads and the default piece
+ * size give most of the speed.  The threads mostly wait for the storage, but the kernel spends CPU on every byte they
+ * read; README_THREADED.rst has which settings to use when.  Each thread keeps a buffer as large as the largest piece
+ * it has read.
+ *
+ * Off by default; the **BLOSC_PREFETCH** environment variable, set to a number of threads, turns it on at
+ * #blosc2_init.  The setting and the threads are per process; a child process created with fork() starts its own
+ * threads on first use.  Supported on POSIX systems; elsewhere (Windows) this has no effect.
+ *
+ * @param nthreads Number of read-ahead threads, at most #BLOSC2_PREFETCH_MAX_NTHREADS; 0 turns read-ahead off.
+ * Threads are started on first use and run until #blosc2_destroy (lowering the number does not stop them).
+ * @param max_ahead Most bytes read ahead of the chunk being decompressed (0 for the default,
+ * #BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT).
+ * @param piece_size Largest read handed to one thread, in bytes (0 for the default,
+ * #BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT; at least #BLOSC2_PREFETCH_MIN_PIECE_SIZE).
+ *
+ * @return The previous number of threads, or a negative error code.
+ */
+BLOSC_EXPORT int blosc2_set_prefetch(int nthreads, int64_t max_ahead, int64_t piece_size);
 
 
 /**

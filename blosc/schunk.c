@@ -9,6 +9,8 @@
 **********************************************************************/
 
 #include "frame.h"
+#include "prefetch.h"
+#include "schunk-private.h"
 #include "stune.h"
 #include "blosc-private.h"
 #include "blosc-checked.h"
@@ -1932,7 +1934,8 @@ static int masked_slice_read(blosc2_schunk *schunk, uint8_t *chunk, int32_t cbyt
 }
 
 
-static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer,
+                                            prefetch_batch *prefetch) {
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
@@ -1955,6 +1958,7 @@ static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start
   int32_t chunksize = schunk->chunksize;
 
   while (nbytes_read < ((stop - start) * schunk->typesize)) {
+    prefetch_batch_wait(prefetch, nchunk);
     cbytes = blosc2_schunk_get_lazychunk(schunk, nchunk, &chunk, &needs_free);
     if (cbytes < 0) {
       BLOSC_TRACE_ERROR("Cannot get lazychunk ('%" PRId64 "').", nchunk);
@@ -2040,6 +2044,20 @@ static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start
 }
 
 
+/* Start reading the chunks of items [start, stop) of a super-chunk in a frame on disk ahead (see
+   blosc2_set_prefetch()); NULL if read-ahead is off or does not apply */
+static prefetch_batch* prefetch_items(blosc2_schunk *schunk, int64_t start, int64_t stop) {
+  if (!prefetch_applies((blosc2_frame_s *) schunk->frame) || schunk->chunksize <= 0 || stop <= start) {
+    return NULL;
+  }
+  int64_t *nchunks = NULL;
+  int64_t n = schunk_get_slice_nchunks(schunk, start, stop, &nchunks);
+  prefetch_batch *batch = prefetch_batch_new((blosc2_frame_s *) schunk->frame, nchunks, n, NULL, 0);
+  free(nchunks);
+  return batch;
+}
+
+
 int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   // With locking on, hold the shared frame lock from the refresh to the last chunk read, as
   // b2nd_get_slice_cbuffer() does: with a lock per chunk access, a writer could change the
@@ -2054,7 +2072,9 @@ int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
     rc = frame_check_stale(frame);
   }
   if (rc >= 0) {
-    rc = schunk_get_slice_buffer_unlocked(schunk, start, stop, buffer);
+    prefetch_batch *prefetch = prefetch_items(schunk, start, stop);
+    rc = schunk_get_slice_buffer_unlocked(schunk, start, stop, buffer, prefetch);
+    prefetch_batch_free(prefetch);
   }
   frame_unlock(frame);
   return rc;
