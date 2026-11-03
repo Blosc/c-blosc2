@@ -6,6 +6,15 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* **The shuffle filter no longer slows down 1-byte types**: for
+  `typesize == 1` (uint8, int8, bool, ...) a byte shuffle is the identity, but
+  the SIMD dispatchers fell back to the generic routine, which copied every
+  byte on its own.  With SHUFFLE in the pipeline (the python-blosc2 default)
+  this made compression of uint8 data about 2x and decompression about 3.5x
+  slower than without a filter.  The filter pipeline now skips a byte shuffle
+  of 1-byte elements, and `blosc2_shuffle()`/`blosc2_unshuffle()` copy the
+  block in that case.  The compressed format is unchanged.
+
 Changes from 3.4.0 to 3.4.1
 ===========================
 
