@@ -6,6 +6,35 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* **The documentation of `blosc2_schunk_update_chunk()` states who owns the
+  chunk**, in the words already used for appending and inserting: with
+  `copy=false` the super-chunk owns the chunk only after a successful call;
+  after a failed one the caller keeps it and must free it.
+* **Frame offsets are always compressed with typesize 8**: insert, update,
+  delete and reorder now pin it as append did.  Frames differ from before
+  only when the `BLOSC_TYPESIZE` environment variable is set (they were
+  readable either way).
+* **Fixed chunks with a dictionary that could not be read back**: with
+  `use_dict` (LZ4, LZ4HC, ZSTD), data that did not compress was stored as is,
+  but the chunk kept the dictionary flag, so decompressing it failed with
+  `BLOSC2_ERROR_CODEC_DICT`.  Such chunks are now written without the flag,
+  and the ones written before are readable again.  Chunks that compress with
+  a dictionary are unchanged.
+* **Fixed**: leaks on error paths of `blosc2_schunk_new()` (and of
+  `frame_from_schunk()` behind it), `b2nd_empty()` and friends,
+  `b2nd_copy()` (which also handed the freed array back), `b2nd_full()`,
+  `b2nd_concatenate()`, `blosc2_schunk_set_slice_buffer()` and the extension
+  of a b2nd array by `b2nd_resize()`; `frame_delete_chunk()` leaked the new
+  offsets chunk on its later error paths, and a failed realloc there lost an
+  in-memory frame; `blosc2_schunk_copy()` left a pointer to its own stack in
+  the storage it was passed; a recompressing `blosc2_schunk_copy()` padded a
+  shorter last chunk with the tail of the previous one; frames without chunks
+  `memcpy()`ed a NULL offsets chunk; a masked read that failed before
+  decompressing left the block mask on the context, so the next
+  decompression skipped blocks (also in a failed orthogonal selection, which
+  leaked its buffers too), and `blosc2_set_maskout()` left a freed mask there
+  when its allocation failed.
+
 Changes from 3.4.0 to 3.4.1
 ===========================
 
