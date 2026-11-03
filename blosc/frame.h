@@ -287,6 +287,12 @@ int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 
 /**
+ * @brief Where chunks nchunks[0..n) of a contiguous frame on disk are in its file: ranges[2 k] and ranges[2 k + 1]
+ * get the position and the size of chunk nchunks[k] (see blosc2_schunk_get_chunk_range()).
+ */
+int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges);
+
+/**
  * @brief Copy the header of chunk @p nchunk into @p header, which holds
  * BLOSC_EXTENDED_HEADER_LENGTH bytes: the same bytes that frame_get_lazychunk()
  * starts with, for a fraction of the cost where nothing else is needed.
