@@ -287,7 +287,6 @@ int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 
 /**
-/**
  * @brief Where chunks nchunks[0..n) of a contiguous frame on disk are in its file: ranges[2 k] and ranges[2 k + 1]
  * get the position and the size of chunk nchunks[k] (see blosc2_schunk_get_chunk_range()).
  */
