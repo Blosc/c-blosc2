@@ -6,6 +6,11 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
+  a contiguous frame on disk is in its file (offset and size), from the frame
+  header and the chunk index, so that callers can read or prefetch the chunks
+  they need themselves.
+
 Changes from 3.4.0 to 3.4.1
 ===========================
 

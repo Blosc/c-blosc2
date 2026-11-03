@@ -2284,6 +2284,25 @@ BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchu
                                              bool *needs_free);
 
 /**
+ * @brief Where a chunk of a super-chunk stored in a contiguous frame on disk is in its file.
+ *
+ * This lets callers read (or ask the operating system to read ahead) the bytes of the chunks they will need,
+ * e.g. in parallel, without reading any chunk to find them: the answer comes from the frame header and the chunk
+ * index, which opening the frame has read already (and which stay in the page cache).
+ *
+ * @param schunk The super-chunk.
+ * @param nchunk The chunk.
+ * @param offset Position of its first byte in the file.
+ * @param nbytes Its size in the file: the distance to the next chunk, which is the compressed size for chunks
+ * written in order and otherwise at most the largest possible chunk size.  0 for chunks that the index codes as a
+ * special value (zeros, NaNs, uninitialized), which have no bytes in the file.
+ *
+ * @return 0 on success, or a negative error code (e.g. for super-chunks in memory or in sparse frames).
+ */
+BLOSC_EXPORT int blosc2_schunk_get_chunk_range(blosc2_schunk *schunk, int64_t nchunk, int64_t *offset,
+                                               int64_t *nbytes);
+
+/**
  * @brief Decompress a single variable-length block from a schunk chunk.
  *
  * Convenience wrapper around #blosc2_vldecompress_block_ctx that fetches the

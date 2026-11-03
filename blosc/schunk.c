@@ -1643,6 +1643,31 @@ int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chu
 }
 
 
+/* See blosc2.h */
+int blosc2_schunk_get_chunk_range(blosc2_schunk *schunk, int64_t nchunk, int64_t *offset, int64_t *nbytes) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(offset, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(nbytes, BLOSC2_ERROR_NULL_POINTER);
+  blosc2_frame_s* frame = (blosc2_frame_s*)schunk->frame;
+  if (frame == NULL) {
+    BLOSC_TRACE_ERROR("The super-chunk is not stored in a frame.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  int rc = frame_lock(frame, false);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t range[2];
+  rc = frame_get_chunk_ranges(frame, &nchunk, 1, range);
+  frame_unlock(frame);
+  if (rc >= 0) {
+    *offset = range[0];
+    *nbytes = range[1];
+  }
+  return rc;
+}
+
+
 /* Return a compressed chunk that is part of a super-chunk in the `chunk` parameter.
  * If the super-chunk is backed by a frame that is disk-based, a buffer is allocated for the
  * (compressed) chunk, and hence a free is needed.  You can check if the chunk requires a free
