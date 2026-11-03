@@ -25,6 +25,24 @@ Changes from 3.4.1 to 3.4.2
   chunk**, in the words already used for appending and inserting: with
   `copy=false` the super-chunk owns the chunk only after a successful call;
   after a failed one the caller keeps it and must free it.
+* **Writes to on-disk frames read chunk headers only**: appending, inserting,
+  updating and deleting a chunk read whole chunks (a reference chunk for one
+  flags byte, the replaced chunk for its sizes, twice for an update); they now
+  read the 32-byte chunk headers.  Writing a whole 315 MB array on disk takes
+  20-31% less time on local disks and 38% less on NFS.
+* **Fewer opens on NFS**: opening a frame file with the default backend keeps
+  the handle that read its header as the cached reader, and creating one keeps
+  the creating handle as the cached writer (and reads through a duplicate of
+  it).  Opening costs one OPEN/CLOSE round trip instead of two, creating an
+  array 4 RPCs instead of 9.
+* **Locked slice reads see one state of the frame**: with locking on,
+  `b2nd_get_slice_cbuffer()` and `blosc2_schunk_get_slice_buffer()` hold the
+  shared frame lock from the refresh of the shape (counters) to the last chunk
+  read, and `b2nd_set_slice_cbuffer()` refreshes under its exclusive lock.
+  Before, every chunk access took the lock on its own, so a writer could
+  shrink or rewrite the frame in the middle of a read ("nchunk exceeds the
+  number of chunks", or chunks of different versions).  Unlocked handles are
+  unchanged.
 * **Frame offsets are always compressed with typesize 8**: insert, update,
   delete and reorder now pin it as append did.  Frames differ from before
   only when the `BLOSC_TYPESIZE` environment variable is set (they were
