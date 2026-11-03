@@ -44,6 +44,14 @@ Changes from 3.4.1 to 3.4.2
   flags byte, the replaced chunk for its sizes, twice for an update); they now
   read the 32-byte chunk headers.  Writing a whole 315 MB array on disk takes
   20-31% less time on local disks and 38% less on NFS.
+* **Chunk-sized temporaries are reused**: b2nd slice reads and writes on
+  frames, and the chunk reads of on-disk frames, take their buffers from a
+  per-thread cache instead of a malloc/free per call, whose memory glibc gave
+  back to the kernel each time, so that it was page-faulted in again: 16 slice
+  writes on an on-disk array went from 71 to 38 ms.  The cache holds at most
+  four buffers of 64 KB to 32 MB and 64 MB per thread; it is freed when the
+  thread exits and, for the calling thread, by `blosc2_destroy()`.  Not on
+  Windows.
 * **Fewer opens on NFS**: opening a frame file with the default backend keeps
   the handle that read its header as the cached reader, and creating one keeps
   the creating handle as the cached writer (and reads through a duplicate of
