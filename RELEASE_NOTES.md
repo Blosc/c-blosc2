@@ -6,6 +6,9 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* Open frames through Windows file symlinks even when CRT path metadata reports
+  a zero size; validate and cache the size of the opened target instead.
+
 * **Read-ahead for slices of frames on disk**, off by default: with
   `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the
   `BLOSC_PREFETCH` environment variable), `b2nd_get_slice_cbuffer()`,
