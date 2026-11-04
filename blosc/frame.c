@@ -3567,6 +3567,17 @@ int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_
   if (rc < 0) {
     return rc;
   }
+  // A different handle may have changed the index, including a same-length
+  // reorder flagged by frame_lock().  Refresh before reusing cached offsets.
+  rc = frame_refresh_if_stale(frame, frame_len);
+  if (rc < 0) {
+    return rc;
+  }
+  if (rc > 0) {
+    frame->schunk->nbytes = frame_nbytes;
+    frame->schunk->cbytes = cbytes;
+    frame->schunk->nchunks = frame_nchunks;
+  }
   int64_t lo = INT64_MAX;
   int64_t hi = -1;
   for (int64_t k = 0; k < n; ++k) {
