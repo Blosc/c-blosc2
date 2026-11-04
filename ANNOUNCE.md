@@ -39,6 +39,8 @@ Key highlights include:
 
 Because new APIs were added, the minor version and library SOVERSION have been bumped.
 
+Special thanks to Fabian Isensee for a nice bunch of quality contributions!
+
 For more info, see the release notes in:
 
 https://github.com/Blosc/c-blosc2/blob/main/RELEASE_NOTES.md
