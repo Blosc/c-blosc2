@@ -1,10 +1,12 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.4.1 to 3.4.2
+Changes from 3.4.1 to 3.5.0
 ===========================
 
-#XXX version-specific blurb XXX#
+This minor release introduces new APIs and delivers major performance enhancements,
+particularly for frame slicing, serialization, read-ahead prefetching, and I/O
+handling on local disks and NFS, alongside bug and leak fixes.
 
 * Open frames through Windows file symlinks even when CRT path metadata reports
   a zero size; validate and cache the size of the opened target instead.
@@ -122,6 +124,15 @@ Changes from 3.4.1 to 3.4.2
   decompression skipped blocks (also in a failed orthogonal selection, which
   leaked its buffers too), and `blosc2_set_maskout()` left a freed mask there
   when its allocation failed.
+* **Fixed divide-by-zero on slice operations**: in
+  `blosc2_schunk_get_slice_buffer()`, `blosc2_schunk_set_slice_buffer()`,
+  `frame_get_slice()`, and `frame_set_slice()`, an invalid chunk with
+  `chunksize <= 0` caused a floating-point exception (division by zero).
+  These functions now validate `chunksize > 0` before computing coordinates
+  and safely return `BLOSC2_ERROR_INVALID_PARAM` (#834).
+* **CMake modernization and warning cleanup**: silenced CMake policy CMP0218
+  warnings and configured `CMAKE_POLICY_VERSION_MINIMUM` to suppress compatibility
+  deprecation warnings for bundled third-party subprojects on CMake 3.31+.
 
 Changes from 3.4.0 to 3.4.1
 ===========================

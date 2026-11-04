@@ -1,41 +1,43 @@
-# Announcing C-Blosc2 3.4.1
+# Announcing C-Blosc2 3.5.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This bugfix release brings substantial performance improvements for in-place
-writes to on-disk contiguous frames (especially on NFS), security hardening for
-sparse frames, critical fixes for filter pipelines chaining 3 or more filters
-alongside multithreaded DELTA decoding, and a new example for sparse coordinate
-handling.
+This minor release introduces new APIs and delivers major performance enhancements,
+particularly for frame slicing, serialization, read-ahead prefetching, and I/O
+handling on local disks and NFS, alongside bug and leak fixes.
 
-First, in-place writes to on-disk contiguous frames on POSIX systems are now
-substantially faster.  Operations like appending, inserting, updating, or deleting
-chunks (as well as `b2nd_set_slice`) previously reopened and closed the frame file
-multiple times and truncated on every trailer update, incurring synchronous flush
-penalties on NFS (around ~20 ms per chunk).  Frames now cache a writable file
-descriptor and avoid unnecessary truncations and flushes, reducing chunk writes
-on NFS to ~1 ms and improving local disk writes by ~1.4x.
+Key highlights include:
 
-Second, sparse (directory) frames have been hardened against out-of-bounds heap
-reads: `sframe_get_chunk()` and `frame_decompress_chunk()` now verify that the
-chunk's compressed size (`cbytes`) recorded in the chunk header does not exceed
-the actual size of the chunk file on disk before allocating or decompressing
-(#822).  Thanks to Mar Dominguez (@mardgez).
+- **Read-ahead prefetching for on-disk frames**: With `blosc2_set_prefetch()` (or
+  the `BLOSC_PREFETCH` environment variable), slicing operations can prefetch
+  chunks ahead using background threads. On NFS, cold slice reads of 3D images
+  are 3x–5x faster; on local NVMe, 1.5x–3x faster.
+- **New APIs**:
+  - `blosc2_schunk_to_buffer_alloc()`: serializes an SChunk into a contiguous
+    frame provided by a caller callback without extra copying.
+  - `blosc2_schunk_get_chunk_range()`: returns the byte offset and size of a
+    chunk in an on-disk contiguous frame.
+  - `blosc2_set_prefetch()` / `blosc2_get_prefetch()`: controls background
+    prefetching parameters for frame reads.
+- **1-byte shuffle optimization**: The filter pipeline now skips the shuffle step
+  for 1-byte elements, accelerating uint8/int8 compression by ~2x and decompression
+  by ~3.5x when SHUFFLE is enabled.
+- **Faster b2nd slices and frame copies**:
+  - Slice reads/writes decompress/compress directly into/from caller buffers where
+    contiguous, bypassing chunk scratch copies and reusing chunk temporaries via
+    thread-local caches.
+  - Frame copies and serialization (`blosc2_schunk_copy()`) write chunks and frame
+    metadata in a single pass.
+- **Robustness and Bug Fixes**:
+  - Fixed a divide-by-zero vulnerability during slice operations when `chunksize <= 0` (#834).
+  - Fixed uninitialized chunk reads returning stale memory in `b2nd_uninit()`.
+  - Fixed an issue where chunks stored uncompressed with `use_dict` retained dictionary
+    flags and failed on decompression.
+  - Fixed multiple memory leaks and dangling state on error paths.
+  - Silenced CMake CMP0218 and minimum version deprecation warnings on newer CMake versions.
 
-Third, the filter pipeline has been fixed when chaining 3 or more filters:
-- `pipeline_forward()` now ping-pongs strictly between thread-local scratch
-  buffers, ensuring that caller input data is never overwritten and preserving
-  block 0 integrity as the reference block for DELTA encoding (#820).
-- `pipeline_backward()` now prevents buffer aliasing across chained backward
-  filters and coordinates multithreaded DELTA decoding so worker threads wait
-  until block 0 has finished its entire backward filter pipeline before decoding
-  subsequent blocks.
-
-Fourth, a new example (`examples/sparse_coords.c`) was added to demonstrate
-sparse coordinate handling and selective retrieval.
-
-There are no breaking API or format changes in this release.
+Because new APIs were added, the minor version and library SOVERSION have been bumped.
 
 For more info, see the release notes in:
 
