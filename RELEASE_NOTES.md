@@ -6,6 +6,9 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* Open frames through Windows file symlinks even when CRT path metadata reports
+  a zero size; validate and cache the size of the opened target instead.
+
 * **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
   a contiguous frame on disk is in its file (offset and size), from the frame
   header and the chunk index, so that callers can read or prefetch the chunks
