@@ -1,6 +1,11 @@
 Release notes for C-Blosc2
 ==========================
 
+Changes from 3.5.0 to 3.5.1
+===========================
+
+#XXX version-specific blurb XXX#
+
 Changes from 3.4.1 to 3.5.0
 ===========================
 
