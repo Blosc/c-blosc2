@@ -6,6 +6,9 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* Open frames through Windows file symlinks even when CRT path metadata reports
+  a zero size; validate and cache the size of the opened target instead.
+
 * **New `blosc2_schunk_to_buffer_alloc()`**: serializes a super-chunk into a
   contiguous frame in memory that the caller provides through a callback,
   called once with the exact length (e.g. the final `bytes` object of a
