@@ -59,11 +59,12 @@ before the next one starts.  Reading a slice of a frame on disk is a different j
 page cache yet has to wait for the storage, and on a network file system every such wait is a round trip to the
 server.  `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the `BLOSC_PREFETCH` environment variable) starts
 a separate, process-wide pool of read-ahead threads for that.  When a slice starts (`b2nd_get_slice_cbuffer`,
-`b2nd_get_slice`, `b2nd_get_orthogonal_selection`, `blosc2_schunk_get_slice_buffer`), they read all the chunks it
-needs (that are not cached already) in pieces of at most `piece_size` bytes, in parallel and in the order the slice
-decompresses them, at most `max_ahead` bytes ahead of it; the slice waits for each chunk only right before
-decompressing it.  Of a chunk that a slice of an array covers only in part, only the blocks the slice needs are read
-(after the chunk's header, which says where they are: one round trip more when it is not cached).
+`b2nd_get_slice_cbuffer_into`, `b2nd_get_slice`, `b2nd_get_orthogonal_selection`, `blosc2_schunk_get_slice_buffer`),
+they read all the chunks it needs (that are not cached already) in pieces of at most `piece_size` bytes, in parallel
+and in the order the slice decompresses them, at most `max_ahead` bytes ahead of it; the slice waits for each chunk
+only right before decompressing it.  Of a chunk that a slice of an array covers only in part, only the blocks the
+slice needs are read (after the chunk's header, which says where they are: one round trip more when it is not
+cached).
 
 Read-ahead threads spend most of their time waiting for the storage, but reading is not free: the kernel copies the
 data, and it spends more CPU per byte the more threads read the same file at once.  Which settings to use:

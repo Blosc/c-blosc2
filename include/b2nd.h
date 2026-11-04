@@ -444,6 +444,29 @@ BLOSC_EXPORT int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t
                                         void *buffer, const int64_t *buffershape, int64_t buffersize);
 
 /**
+ * @brief Get a slice from an array into a box of a larger C buffer.
+ *
+ * Like b2nd_get_slice_cbuffer(), but @p buffer may lie inside a larger C-order array of shape @p buffershape:
+ * the slice goes to the box of that array whose first item is at @p buffer, and no other byte of it is read or
+ * written. This decompresses a slice straight into its place in an existing array, e.g. into the interior of a
+ * padded array, into one item of a batch, or into one channel of a multi-channel buffer, without a temporary and
+ * without the extra copy. (b2nd_get_slice_cbuffer() fills the part of its buffer outside the slice with zeros,
+ * so its buffer always starts at the slice.)
+ *
+ * @param array The array from which the slice will be extracted.
+ * @param start The coordinates where the slice will begin (0 <= start <= stop).
+ * @param stop The coordinates where the slice will end (stop <= the array's shape).
+ * @param buffer Where the first item of the slice goes.
+ * @param buffershape The shape of the larger C-order array that @p buffer lies in; at least the slice's shape in
+ * every dimension. Only buffershape[1:] matter for the layout (they give the strides).
+ * @param buffersize The size (in bytes) of the larger array from @p buffer to its end; the slice's box must fit.
+ *
+ * @return An error code. An empty slice writes nothing and succeeds.
+ */
+BLOSC_EXPORT int b2nd_get_slice_cbuffer_into(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
+                                             void *buffer, const int64_t *buffershape, int64_t buffersize);
+
+/**
  * @brief Set a slice in a b2nd array using a C buffer.
  *
  * @param buffer The buffer where the slice data is.
