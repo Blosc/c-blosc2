@@ -6,6 +6,9 @@ Changes from 3.4.1 to 3.4.2
 
 #XXX version-specific blurb XXX#
 
+* Open frames through Windows file symlinks even when CRT path metadata reports
+  a zero size; validate and cache the size of the opened target instead.
+
 * **The documentation of `blosc2_schunk_update_chunk()` states who owns the
   chunk**, in the words already used for appending and inserting: with
   `copy=false` the super-chunk owns the chunk only after a successful call;
