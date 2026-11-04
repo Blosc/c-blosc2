@@ -293,6 +293,12 @@ int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, 
 int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges);
 
 /**
+ * @brief The special value of chunks nchunks[0..n) of a frame: special[k] gets BLOSC2_SPECIAL_ZERO, _UNINIT or
+ * _NAN if the frame codes chunk nchunks[k] in its index instead of storing it, else 0. Reads no chunk data.
+ */
+int frame_get_chunks_special(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, uint8_t *special);
+
+/**
  * @brief Copy the header of chunk @p nchunk into @p header, which holds
  * BLOSC_EXTENDED_HEADER_LENGTH bytes: the same bytes that frame_get_lazychunk()
  * starts with, for a fraction of the cost where nothing else is needed.

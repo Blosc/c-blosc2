@@ -97,6 +97,14 @@ void b2nd_default_parameters() {
 }
 
 
+// A small deterministic pseudo-random generator: a number in [0, n) (0 if n <= 0)
+static int64_t test_lcg(uint64_t *state, int64_t n) B2ND_TEST_UNUSED;
+
+static int64_t test_lcg(uint64_t *state, int64_t n) {
+  *state = *state * 6364136223846793005ULL + 1442695040888963407ULL;
+  return n <= 0 ? 0 : (int64_t) ((*state >> 33) % (uint64_t) n);
+}
+
 #define B2ND_TEST_ASSERT_BUFFER(buffer1, buffer2, buffersize) \
     for (int i = 0; i < (buffersize); ++i) {                     \
         CUTEST_ASSERT("elements are not equals!", (buffer1)[i] == (buffer2)[i]); \

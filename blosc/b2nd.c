@@ -1487,6 +1487,25 @@ static prefetch_batch* prefetch_slice(const b2nd_array_t *array, const int64_t *
 }
 
 
+// The special value (BLOSC2_SPECIAL_ZERO, _NAN, _UNINIT, or 0) of chunks
+// nchunks[0..n) of `sc` into special[], without reading chunk data: frames
+// code special values in their index, other super-chunks hold their chunks in
+// memory.
+static int chunks_special(blosc2_schunk *sc, const int64_t *nchunks, int64_t n, uint8_t *special) {
+  if (sc->frame != NULL) {
+    return frame_get_chunks_special((blosc2_frame_s *) sc->frame, nchunks, n, special);
+  }
+  for (int64_t k = 0; k < n; ++k) {
+    if (nchunks[k] < 0 || nchunks[k] >= sc->nchunks || sc->data[nchunks[k]] == NULL) {
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    const uint8_t *chunk = sc->data[nchunks[k]];
+    special[k] = (uint8_t) chunk_special_in_offset(chunk, sw32_(chunk + BLOSC2_CHUNK_CBYTES));
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 // Setting and getting slices; a read uses the read-ahead batch @p prefetch, or starts its own if that is NULL
 int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const int64_t *stop,
                   const int64_t *shape, b2nd_array_t *array, bool set_slice, prefetch_batch *prefetch) {
@@ -1556,6 +1575,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   bool prefault = false;
+  bool slice_zeroed = false;  // all items of the slice are zeros in the buffer already
   if (!set_slice) {
     bool slice_fills_buffer = true;
     // The get paths below write every item of the slice, so only buffer
@@ -1575,6 +1595,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     }
     else {
       memset(buffer_b, 0, (size_t)buffersize);
+      slice_zeroed = true;
     }
   }
 
@@ -1651,6 +1672,48 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   prefetch_batch *own_prefetch = set_slice || prefetch != NULL ? NULL : prefetch_slice(array, start, stop);
   prefetch = own_prefetch != NULL ? own_prefetch : prefetch;
 
+  // Chunks of zeros (b2nd_zeros(), sparse data) and uninitialized ones read
+  // as zeros without decompression.  Find them from the index first; if they
+  // hold a good part of the slice, zero the slice in one pass and skip them
+  // (zeroing chunk by chunk writes many short rows: an all-zero 384^3 float16
+  // box took 24 ms that way, 1.9 ms in one pass), else zero their boxes only.
+  // Not with a postfilter, which may compute the items of special chunks,
+  // and not for slices smaller than a block, where decompressing is cheap.
+  int64_t *slice_chunks = NULL;  // the slice's chunks in loop order, then...
+  uint8_t *zero_chunk = NULL;  // ...whether each reads as zeros (same allocation)
+  if (!set_slice && dctx->postfilter == NULL && nelems_slice >= array->blocknitems) {
+    slice_chunks = malloc((size_t) update_nchunks * (sizeof(int64_t) + 1));
+    if (slice_chunks == NULL) {
+      rc = BLOSC2_ERROR_MEMORY_ALLOC;
+      goto out;
+    }
+    zero_chunk = (uint8_t *) (slice_chunks + update_nchunks);
+    for (int64_t u = 0; u < update_nchunks; ++u) {
+      int64_t idx[B2ND_MAX_DIM] = {0};
+      blosc2_unidim_to_multidim(ndim, update_shape, u, idx);
+      for (int i = 0; i < ndim; ++i) {
+        idx[i] += update_start[i];
+      }
+      blosc2_multidim_to_unidim(idx, ndim, chunks_in_array_strides, &slice_chunks[u]);
+    }
+    if (chunks_special(array->sc, slice_chunks, update_nchunks, zero_chunk) < 0) {
+      memset(zero_chunk, 0, (size_t) update_nchunks);  // the normal path reports what is wrong
+    }
+    int64_t zero_nitems = 0;
+    for (int64_t u = 0; u < update_nchunks; ++u) {
+      zero_chunk[u] = zero_chunk[u] == BLOSC2_SPECIAL_ZERO || zero_chunk[u] == BLOSC2_SPECIAL_UNINIT;
+      if (zero_chunk[u]) {
+        int64_t cstart[B2ND_MAX_DIM], cstop[B2ND_MAX_DIM], bstart[B2ND_MAX_DIM], bstop[B2ND_MAX_DIM];
+        chunk_box(array, slice_chunks[u], start, stop, cstart, cstop);
+        zero_nitems += chunk_slice_box(ndim, cstart, cstop, start, stop, bstart, bstop);
+      }
+    }
+    if (!slice_zeroed && 4 * zero_nitems >= nelems_slice) {
+      memset(buffer_b, 0, (size_t) slice_nbytes);
+      slice_zeroed = true;
+    }
+  }
+
   for (int64_t update_nchunk = 0; update_nchunk < update_nchunks; ++update_nchunk) {
     int64_t nchunk_ndim[B2ND_MAX_DIM] = {0};
     blosc2_unidim_to_multidim(ndim, update_shape, update_nchunk, nchunk_ndim);
@@ -1675,6 +1738,15 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       chunk_empty |= (chunk_stop[i] <= start[i] || chunk_start[i] >= stop[i]);
     }
     if (chunk_empty) {
+      continue;
+    }
+    if (zero_chunk != NULL && zero_chunk[update_nchunk]) {
+      if (!slice_zeroed) {
+        int64_t box_start[B2ND_MAX_DIM];
+        int64_t box_stop[B2ND_MAX_DIM];
+        chunk_slice_box(ndim, chunk_start, chunk_stop, start, stop, box_start, box_stop);
+        zero_buffer_box(ndim, array->sc->typesize, buffer_b, shape, box_start, box_stop);
+      }
       continue;
     }
     // Decompress each chunk as soon as it has been read ahead, while the later ones are still coming in
@@ -1960,6 +2032,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   out:
+  free(slice_chunks);
   prefetch_batch_free(own_prefetch);
   blosc2_tmp_free(data, data_capacity);
   blosc2_tmp_free(block_data, block_data_capacity);

@@ -3667,19 +3667,19 @@ int get_coffset(blosc2_frame_s* frame, int32_t header_len, int64_t cbytes,
 #define CHUNK_END_LOOKAHEAD 64
 
 /* See frame.h */
-int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges) {
-  if (frame->cframe != NULL || frame->sframe || frame->urlpath == NULL) {
-    BLOSC_TRACE_ERROR("Only contiguous frames on disk have their chunks at a place in a file.");
-    return BLOSC2_ERROR_INVALID_PARAM;
-  }
-  int32_t header_len;
+/* Read the index entries that a request for chunks nchunks[0..n) of `frame` needs: from the smallest of them, *lo,
+   up to `lookahead` chunks after the largest (within the frame), *span_end, into a new array *off (to free(); NULL if
+   n <= 0).  A negative entry is a special value coded in the offset (see special_offset()).  Refreshes a stale frame
+   first, checks that the chunks exist, and also gives the frame's header length, cbytes and chunksize. */
+static int frame_read_index_span(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t lookahead,
+                                 int64_t **off, int64_t *lo, int64_t *span_end, int32_t *header_len,
+                                 int64_t *cbytes, int32_t *chunksize) {
+  *off = NULL;
   int64_t frame_len;
   int64_t frame_nbytes;
-  int64_t cbytes;
   int32_t blocksize;
-  int32_t chunksize;
   int64_t frame_nchunks;
-  int rc = get_header_info(frame, &header_len, &frame_len, &frame_nbytes, &cbytes, &blocksize, &chunksize,
+  int rc = get_header_info(frame, header_len, &frame_len, &frame_nbytes, cbytes, &blocksize, chunksize,
                            &frame_nchunks, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
                            frame->schunk->storage->io);
   if (rc < 0) {
@@ -3693,38 +3693,82 @@ int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_
   }
   if (rc > 0) {
     frame->schunk->nbytes = frame_nbytes;
-    frame->schunk->cbytes = cbytes;
+    frame->schunk->cbytes = *cbytes;
     frame->schunk->nchunks = frame_nchunks;
   }
-  int64_t lo = INT64_MAX;
   int64_t hi = -1;
+  *lo = INT64_MAX;
   for (int64_t k = 0; k < n; ++k) {
     if (nchunks[k] < 0 || nchunks[k] >= frame_nchunks) {
       BLOSC_TRACE_ERROR("nchunk ('%" PRId64 "') exceeds the number of chunks ('%" PRId64 "').",
                         nchunks[k], frame_nchunks);
       return BLOSC2_ERROR_INVALID_PARAM;
     }
-    lo = nchunks[k] < lo ? nchunks[k] : lo;
+    *lo = nchunks[k] < *lo ? nchunks[k] : *lo;
     hi = nchunks[k] > hi ? nchunks[k] : hi;
   }
   if (n <= 0) {
     return BLOSC2_ERROR_SUCCESS;
   }
   int32_t off_cbytes;
-  uint8_t *coffsets = get_coffsets(frame, header_len, cbytes, frame_nchunks, &off_cbytes);
+  uint8_t *coffsets = get_coffsets(frame, *header_len, *cbytes, frame_nchunks, &off_cbytes);
   if (coffsets == NULL) {
     return BLOSC2_ERROR_DATA;
   }
-  // The offsets of the chunks asked for and of the few chunks after the last one, all in one go: in a frame written
-  // chunk after chunk, a chunk ends where the next chunk with bytes in the file starts (special values have none)
-  int64_t span_end = hi + 1 + CHUNK_END_LOOKAHEAD;
-  span_end = span_end < frame_nchunks ? span_end : frame_nchunks;
-  int64_t *off = malloc((span_end - lo) * sizeof(int64_t));
-  if (off == NULL) {
+  *span_end = hi + 1 + lookahead < frame_nchunks ? hi + 1 + lookahead : frame_nchunks;
+  *off = malloc((size_t) (*span_end - *lo) * sizeof(int64_t));
+  if (*off == NULL) {
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
-  rc = blosc2_getitem(coffsets, off_cbytes, (int32_t) lo, (int32_t) (span_end - lo), off,
-                      (int32_t) ((span_end - lo) * sizeof(int64_t)));
+  rc = blosc2_getitem(coffsets, off_cbytes, (int32_t) *lo, (int32_t) (*span_end - *lo), *off,
+                      (int32_t) ((*span_end - *lo) * sizeof(int64_t)));
+  if (rc < 0) {
+    free(*off);
+    *off = NULL;
+    return rc;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_get_chunks_special(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, uint8_t *special) {
+  int64_t *off;
+  int64_t lo;
+  int64_t span_end;
+  int32_t header_len;
+  int64_t cbytes;
+  int32_t chunksize;
+  int rc = frame_read_index_span(frame, nchunks, n, 0, &off, &lo, &span_end, &header_len, &cbytes, &chunksize);
+  if (rc < 0 || off == NULL) {
+    return rc;
+  }
+  for (int64_t k = 0; k < n; ++k) {
+    int64_t offset = off[nchunks[k] - lo];
+    special[k] = offset < 0 ? (uint8_t) (((uint64_t) offset >> (8 * 7)) & BLOSC2_SPECIAL_MASK) : 0;
+  }
+  free(off);
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges) {
+  if (frame->cframe != NULL || frame->sframe || frame->urlpath == NULL) {
+    BLOSC_TRACE_ERROR("Only contiguous frames on disk have their chunks at a place in a file.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  // The offsets of the chunks asked for and of the few chunks after the last one, all in one go: in a frame written
+  // chunk after chunk, a chunk ends where the next chunk with bytes in the file starts (special values have none)
+  int64_t *off;
+  int64_t lo;
+  int64_t span_end;
+  int32_t header_len;
+  int64_t cbytes;
+  int32_t chunksize;
+  int rc = frame_read_index_span(frame, nchunks, n, CHUNK_END_LOOKAHEAD, &off, &lo, &span_end, &header_len,
+                                 &cbytes, &chunksize);
+  if (rc < 0 || off == NULL) {
+    return rc;
+  }
   for (int64_t k = 0; rc >= 0 && k < n; ++k) {
     int64_t start = off[nchunks[k] - lo];
     ranges[2 * k] = frame->file_offset + header_len + (start > 0 ? start : 0);
