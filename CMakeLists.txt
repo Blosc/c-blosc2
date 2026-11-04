@@ -78,6 +78,7 @@ if(NOT WIN32)
 endif()
 
 cmake_minimum_required(VERSION 3.16.3)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
 endif()
