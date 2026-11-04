@@ -7300,6 +7300,9 @@ void blosc2_multidim_to_unidim(const int64_t *index, int8_t ndim, const int64_t 
 
 int64_t blosc2_get_slice_nchunks(blosc2_schunk* schunk, int64_t *start, int64_t *stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(chunks_idx, BLOSC2_ERROR_NULL_POINTER);
   if (blosc2_meta_exists(schunk, "b2nd") < 0) {
     // Try with a caterva metalayer; we are meant to be backward compatible with it
     if (blosc2_meta_exists(schunk, "caterva") < 0) {

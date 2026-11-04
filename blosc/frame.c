@@ -3971,9 +3971,14 @@ static int get_chunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, boo
   } else {
     // The chunk is in memory and just one pointer away
     *chunk = frame->cframe + header_len + offset;
-    rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, NULL);
+    int32_t chunk_blocksize = 0;
+    rc = blosc2_cbuffer_sizes(*chunk, NULL, &chunk_cbytes, &chunk_blocksize);
     if (rc < 0) {
       return rc;
+    }
+    if (chunk_blocksize <= 0) {
+      BLOSC_TRACE_ERROR("Invalid blocksize %d in chunk header.", chunk_blocksize);
+      return BLOSC2_ERROR_INVALID_HEADER;
     }
     if (chunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
         offset > INT64_MAX - chunk_cbytes ||
@@ -4331,10 +4336,15 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       BLOSC_TRACE_ERROR("Cannot read the header for chunk in the (contiguous) frame.");
       rc = BLOSC2_ERROR_READ_BUFFER;
     } else {
-      rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, NULL);
+      int32_t chunk_blocksize = 0;
+      rc = blosc2_cbuffer_sizes(*chunk, NULL, &lazychunk_cbytes, &chunk_blocksize);
       if (rc < 0) {
         BLOSC_TRACE_ERROR("Cannot read the chunk header.");
         rc = BLOSC2_ERROR_READ_BUFFER;
+      }
+      else if (chunk_blocksize <= 0) {
+        BLOSC_TRACE_ERROR("Invalid blocksize %d in chunk header.", chunk_blocksize);
+        rc = BLOSC2_ERROR_INVALID_HEADER;
       }
       else if (lazychunk_cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
                chunk_header_offset > INT64_MAX - lazychunk_cbytes ||

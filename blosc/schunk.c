@@ -1936,6 +1936,10 @@ static int masked_slice_read(blosc2_schunk *schunk, uint8_t *chunk, int32_t cbyt
 
 static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer,
                                             prefetch_batch *prefetch) {
+  if (schunk->chunksize <= 0 || schunk->typesize <= 0) {
+    BLOSC_TRACE_ERROR("schunk must have a positive chunksize and typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
@@ -1974,7 +1978,14 @@ static int schunk_get_slice_buffer_unlocked(blosc2_schunk *schunk, int64_t start
     }
 
     if (nchunk == (schunk->nchunks - 1) && schunk->nbytes % schunk->chunksize != 0) {
-      chunksize = schunk->nbytes % schunk->chunksize;
+      chunksize = (int32_t) (schunk->nbytes % schunk->chunksize);
+    }
+    if (chunksize <= 0) {
+      BLOSC_TRACE_ERROR("Corrupted chunksize %d.", chunksize);
+      if (needs_free) {
+        free(chunk);
+      }
+      return BLOSC2_ERROR_DATA;
     }
 
     if (chunk_start == 0 && chunk_stop == chunksize) {
@@ -2059,6 +2070,24 @@ static prefetch_batch* prefetch_items(blosc2_schunk *schunk, int64_t start, int6
 
 
 int blosc2_schunk_get_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
+  if (start < 0 || stop < start) {
+    BLOSC_TRACE_ERROR("Invalid slice bounds (start=%" PRId64 ", stop=%" PRId64 ").", start, stop);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (stop == start) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (schunk->typesize <= 0) {
+    BLOSC_TRACE_ERROR("schunk must have a positive typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->chunksize <= 0) {
+    BLOSC_TRACE_ERROR("blosc2_schunk_get_slice_buffer does not support variable-length chunks yet.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   // With locking on, hold the shared frame lock from the refresh to the last chunk read, as
   // b2nd_get_slice_cbuffer() does: with a lock per chunk access, a writer could change the
   // frame between two chunks of the slice, or between reading a lazy chunk and its blocks.
@@ -2438,6 +2467,24 @@ cleanup:
 
 
 int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
+  if (start < 0 || stop < start) {
+    BLOSC_TRACE_ERROR("Invalid slice bounds (start=%" PRId64 ", stop=%" PRId64 ").", start, stop);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (stop == start) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  if (schunk->typesize <= 0) {
+    BLOSC_TRACE_ERROR("schunk must have a positive typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->chunksize <= 0) {
+    BLOSC_TRACE_ERROR("blosc2_schunk_set_slice_buffer does not support variable-length chunks yet.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
   int64_t nchunk_start = byte_start / schunk->chunksize;
@@ -2455,10 +2502,19 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   int64_t nbytes_written = 0;
   int32_t nbytes;
   uint8_t *data = malloc(schunk->chunksize);
+  if (data == NULL) {
+    BLOSC_TRACE_ERROR("Cannot allocate temporary buffer.");
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
   int64_t nchunks;
   int32_t chunksize = schunk->chunksize;
 
   while (nbytes_written < ((stop - start) * schunk->typesize)) {
+    if (chunksize <= 0) {
+      BLOSC_TRACE_ERROR("Corrupted chunksize %d.", chunksize);
+      free(data);
+      return BLOSC2_ERROR_DATA;
+    }
     if (chunk_start == 0 &&
         (chunk_stop == schunk->chunksize || chunk_stop == schunk->nbytes % schunk->chunksize)) {
       if (chunk_stop == schunk->nbytes % schunk->chunksize) {
@@ -2526,9 +2582,22 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
 
 int64_t schunk_get_slice_nchunks(blosc2_schunk *schunk, int64_t start, int64_t stop, int64_t **chunks_idx) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
-  if (schunk->nchunks == 0){
+  BLOSC_ERROR_NULL(chunks_idx, BLOSC2_ERROR_NULL_POINTER);
+  if (start < 0 || stop < start) {
+    BLOSC_TRACE_ERROR("Invalid slice bounds (start=%" PRId64 ", stop=%" PRId64 ").", start, stop);
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->nchunks == 0 || stop == start) {
     *chunks_idx = NULL;
     return 0;
+  }
+  if (schunk->typesize <= 0) {
+    BLOSC_TRACE_ERROR("schunk must have a positive typesize.");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  if (schunk->chunksize <= 0) {
+    BLOSC_TRACE_ERROR("schunk_get_slice_nchunks does not support variable-length chunks yet.");
+    return BLOSC2_ERROR_INVALID_PARAM;
   }
   int64_t byte_start = start * schunk->typesize;
   int64_t byte_stop = stop * schunk->typesize;
