@@ -2112,9 +2112,15 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
       goto failed;
     }
 
+    int64_t file_size = (int64_t) path_stat.st_size;
     if (!sframe) {
-      int64_t file_size = (int64_t) path_stat.st_size;
-      if (offset > file_size || frame_len > file_size - offset) {
+      /* Windows CRT stat can report zero for a symlink even though opening it
+         follows a nonempty target. The header was readable, so obtain the
+         target's size from the open I/O handle in that case. */
+      if (file_size == 0) {
+        file_size = io_cb->size(fp);
+      }
+      if (file_size < 0 || offset > file_size || frame_len > file_size - offset) {
         BLOSC_TRACE_ERROR("Frame length exceeds file boundary in file '%s'.", urlpath);
         goto failed;
       }
@@ -2134,7 +2140,7 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     frame->len = frame_len;
     frame->sframe = sframe;
     frame->file_offset = offset;
-    frame->file_end = sframe ? 0 : (int64_t)path_stat.st_size;
+    frame->file_end = sframe ? 0 : file_size;
 
     // Now, the trailer length
     if (io_cb->is_allocation_necessary)
