@@ -1506,9 +1506,13 @@ static int chunks_special(blosc2_schunk *sc, const int64_t *nchunks, int64_t n, 
 }
 
 
-// Setting and getting slices; a read uses the read-ahead batch @p prefetch, or starts its own if that is NULL
+// Setting and getting slices: read (set_slice false) or write the slice [start, stop) of `array` from/to `buffer`, a
+// C-order array of shape `shape` (at least the slice's shape) whose first item is the slice's first item.  A read
+// fills the rest of the buffer with zeros, unless `slice_only`: then nothing outside the slice is written.  A read
+// uses the read-ahead batch @p prefetch, or starts its own if that is NULL.
 int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const int64_t *stop,
-                  const int64_t *shape, b2nd_array_t *array, bool set_slice, prefetch_batch *prefetch) {
+                  const int64_t *shape, b2nd_array_t *array, bool set_slice, bool slice_only,
+                  prefetch_batch *prefetch) {
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
@@ -1535,7 +1539,9 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       }
 
     } else {
-      memset(buffer_b, 0, (size_t)buffersize);
+      // The item is the whole slice: zero it first (an uninitialized chunk
+      // decompresses to nothing), with slice_only nothing else
+      memset(buffer_b, 0, slice_only ? (size_t)array->sc->typesize : (size_t)buffersize);
       if (blosc2_schunk_decompress_chunk(array->sc, 0, buffer_b, array->sc->typesize) < 0) {
         BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
       }
@@ -1544,7 +1550,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   }
 
   if (array->nitems == 0) {
-    if (!set_slice) {
+    if (!set_slice && !slice_only) {
       memset(buffer_b, 0, (size_t)buffersize);
     }
     return BLOSC2_ERROR_SUCCESS;
@@ -1574,9 +1580,25 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
   }
 
+  int64_t buffer_strides[B2ND_MAX_DIM];
+  buffer_strides[ndim - 1] = 1;
+  for (int i = ndim - 2; i >= 0; --i) {
+    buffer_strides[i] = buffer_strides[i + 1] * shape[i + 1];
+  }
+
   bool prefault = false;
   bool slice_zeroed = false;  // all items of the slice are zeros in the buffer already
-  if (!set_slice) {
+  if (!set_slice && slice_only) {
+    // Only the slice's box gets written, but a fresh buffer still wants its
+    // pages faulted in before several threads decompress into it (see
+    // buffer_wants_prefault()).  That maps pages and changes no byte.
+    int64_t last = 0;
+    for (int i = 0; i < ndim; ++i) {
+      last += (stop[i] - start[i] - 1) * buffer_strides[i];
+    }
+    prefault = buffer_wants_prefault(buffer_b, (last + 1) * array->sc->typesize, array->sc->dctx->nthreads);
+  }
+  else if (!set_slice) {
     bool slice_fills_buffer = true;
     // The get paths below write every item of the slice, so only buffer
     // bytes outside of it need to be pre-initialized to be defined and
@@ -1631,12 +1653,6 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
   int64_t blockshape[B2ND_MAX_DIM];
   for (int i = 0; i < ndim; ++i) {
     blockshape[i] = array->blockshape[i];
-  }
-
-  int64_t buffer_strides[B2ND_MAX_DIM];
-  buffer_strides[ndim - 1] = 1;
-  for (int i = ndim - 2; i >= 0; --i) {
-    buffer_strides[i] = buffer_strides[i + 1] * shape[i + 1];
   }
 
   bool blocks_in_c_order = chunk_blocks_in_c_order(array);
@@ -1709,7 +1725,18 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       }
     }
     if (!slice_zeroed && 4 * zero_nitems >= nelems_slice) {
-      memset(buffer_b, 0, (size_t) slice_nbytes);
+      if (slice_only) {
+        // Just the slice's box of the larger buffer
+        int64_t zstart[B2ND_MAX_DIM] = {0};
+        int64_t zstop[B2ND_MAX_DIM];
+        for (int i = 0; i < ndim; ++i) {
+          zstop[i] = stop[i] - start[i];
+        }
+        zero_buffer_box(ndim, array->sc->typesize, buffer_b, shape, zstart, zstop);
+      }
+      else {
+        memset(buffer_b, 0, (size_t) slice_nbytes);
+      }
       slice_zeroed = true;
     }
   }
@@ -2055,12 +2082,12 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 // SWMR's transient errors.
 static int locked_get_set_slice(void *buffer, int64_t buffersize, const int64_t *start,
                                 const int64_t *stop, const int64_t *shape, b2nd_array_t *array,
-                                bool set_slice, prefetch_batch *prefetch) {
+                                bool set_slice, bool slice_only, prefetch_batch *prefetch) {
   blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
   BLOSC_ERROR(frame_lock(frame, set_slice));
   int rc = refresh_if_stale(array);
   if (rc >= 0) {
-    rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice, prefetch);
+    rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice, slice_only, prefetch);
   }
   frame_unlock(frame);
   BLOSC_ERROR(rc);
@@ -2078,7 +2105,52 @@ int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t *start, cons
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
 
   return locked_get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *) array,
-                              false, NULL);
+                              false, false, NULL);
+}
+
+
+int b2nd_get_slice_cbuffer_into(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
+                                void *buffer, const int64_t *buffershape, int64_t buffersize) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(start, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffershape, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
+
+  // The slice must lie inside the array (an empty one writes nothing), and
+  // its box inside the buffer: the bytes from `buffer` to the slice's last
+  // item, with the strides of `buffershape`, must be within `buffersize`.
+  // get_set_slice() checks that buffershape holds the slice.
+  bool empty = false;
+  for (int i = 0; i < array->ndim; ++i) {
+    if (start[i] < 0 || stop[i] < start[i] || stop[i] > array->shape[i]) {
+      BLOSC_TRACE_ERROR("The slice must lie inside the array");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    empty |= stop[i] == start[i];
+  }
+  if (empty) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int64_t last_offset = 0;
+  int64_t stride = 1;
+  int64_t term;
+  for (int i = array->ndim - 1; i >= 0; --i) {
+    if (!blosc2_checked_mul_i64_nonneg(stop[i] - start[i] - 1, stride, &term) ||
+        !blosc2_checked_add_i64_nonneg(last_offset, term, &last_offset) ||
+        (i > 0 && !blosc2_checked_mul_i64_nonneg(stride, buffershape[i], &stride))) {
+      BLOSC_TRACE_ERROR("Buffer shape overflows");
+      return BLOSC2_ERROR_INVALID_PARAM;
+    }
+  }
+  int64_t needed;
+  if (!blosc2_checked_mul_i64_nonneg(last_offset + 1, array->sc->typesize, &needed) || buffersize < needed) {
+    BLOSC_TRACE_ERROR("The buffer is too small for the slice");
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  return locked_get_set_slice(buffer, buffersize, start, stop, buffershape, (b2nd_array_t *) array,
+                              false, true, NULL);
 }
 
 
@@ -2090,7 +2162,7 @@ int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffershape, int64
   BLOSC_ERROR_NULL(stop, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
-  return locked_get_set_slice((void *) buffer, buffersize, start, stop, buffershape, array, true, NULL);
+  return locked_get_set_slice((void *) buffer, buffersize, start, stop, buffershape, array, true, false, NULL);
 }
 
 
@@ -2184,7 +2256,7 @@ static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2n
       BLOSC_ERROR(BLOSC2_ERROR_MEMORY_ALLOC);
     }
     int g_rc = locked_get_set_slice(buffer, (int64_t) buffersize, src_start, src_stop, chunk_shape,
-                                    (b2nd_array_t *) src, false, prefetch);
+                                    (b2nd_array_t *) src, false, false, prefetch);
     if (g_rc < 0) {
       free(buffer);
       b2nd_free(*array);

@@ -83,6 +83,7 @@ Slicing
 
 .. doxygenfunction:: b2nd_get_slice
 .. doxygenfunction:: b2nd_get_slice_cbuffer
+.. doxygenfunction:: b2nd_get_slice_cbuffer_into
 .. doxygenfunction:: b2nd_get_sparse_cbuffer
 .. doxygenfunction:: b2nd_set_slice_cbuffer
 .. doxygenfunction:: b2nd_get_orthogonal_selection
