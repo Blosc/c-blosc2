@@ -2657,7 +2657,8 @@ BLOSC_EXPORT int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name);
  * @param content The content to be added.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
- * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used. Their prefilter, if any, is not applied (the content
+ * is not chunk data).
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
@@ -2673,7 +2674,8 @@ BLOSC_EXPORT int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name,
  * @param content The new content of the variable-length metalayer.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
- * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used. Their prefilter, if any, is not applied (the content
+ * is not chunk data).
  *
  * @return If successful, the index of the variable-length metalayer. Else, return a negative value.
  */
@@ -2695,6 +2697,8 @@ BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
  * @note For disk-based super-chunks, this checks whether another handle has
  * rewritten the frame and, if so, re-reads the cached metalayers first, so
  * updates made through other handles (or processes) become visible.
+ *
+ * @note The postfilter of the super-chunk is not applied (the content is not chunk data).
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */

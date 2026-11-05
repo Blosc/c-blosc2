@@ -2887,6 +2887,23 @@ int vlmetalayer_flush(blosc2_schunk* schunk) {
   return rc;
 }
 
+/* The content of a variable-length metalayer is not chunk data, so it is
+   compressed without the prefilter that `cparams` (often the super-chunk's own)
+   may carry, and decompressed without the super-chunk's postfilter. */
+static blosc2_context* vlmeta_create_cctx(const blosc2_cparams *cparams) {
+  blosc2_cparams vlmeta_cparams = (cparams != NULL) ? *cparams : BLOSC2_CPARAMS_DEFAULTS;
+  vlmeta_cparams.prefilter = NULL;
+  vlmeta_cparams.preparams = NULL;
+  return blosc2_create_cctx(vlmeta_cparams);
+}
+
+static blosc2_context* vlmeta_create_dctx(const blosc2_dparams *dparams) {
+  blosc2_dparams vlmeta_dparams = *dparams;
+  vlmeta_dparams.postfilter = NULL;
+  vlmeta_dparams.postparams = NULL;
+  return blosc2_create_dctx(vlmeta_dparams);
+}
+
 /* Add content into a new variable-length metalayer.
  *
  * If successful, return the index of the new variable-length metalayer.  Else, return a negative value.
@@ -2937,12 +2954,7 @@ int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name, uint8_t *content,
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
 
-  blosc2_context *cctx;
-  if (cparams != NULL) {
-    cctx = blosc2_create_cctx(*cparams);
-  } else {
-    cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  }
+  blosc2_context *cctx = vlmeta_create_cctx(cparams);
   if (cctx == NULL) {
     free(content_buf);
     free(vlmetalayer->name);
@@ -3023,7 +3035,7 @@ int blosc2_vlmeta_get(blosc2_schunk *schunk, const char *name, uint8_t **content
       return BLOSC2_ERROR_MEMORY_ALLOC;
     }
   }
-  blosc2_context *dctx = blosc2_create_dctx(*schunk->storage->dparams);
+  blosc2_context *dctx = vlmeta_create_dctx(schunk->storage->dparams);
   if (dctx == NULL) {
     if (*content != NULL) {
       free(*content);
@@ -3080,12 +3092,7 @@ int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name, uint8_t *conte
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
 
-  blosc2_context *cctx;
-  if (cparams != NULL) {
-    cctx = blosc2_create_cctx(*cparams);
-  } else {
-    cctx = blosc2_create_cctx(BLOSC2_CPARAMS_DEFAULTS);
-  }
+  blosc2_context *cctx = vlmeta_create_cctx(cparams);
   if (cctx == NULL) {
     free(content_buf);
     BLOSC_TRACE_ERROR("Error while creating the compression context");

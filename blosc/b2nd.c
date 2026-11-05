@@ -2492,8 +2492,10 @@ int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array
     // Copy data
     BLOSC_ERROR(b2nd_get_slice(&params_meta, array, src, start, stop));
 
-    // Copy vlmetayers
-    if (schunk_copy_vlmetalayers(src->sc, (*array)->sc, (*array)->sc->storage->cparams) < 0) {
+    // Copy vlmetalayers, with default cparams like blosc2_schunk_copy(): the
+    // filters and codec of the new array are for its chunks, and lossy ones
+    // would change the content
+    if (schunk_copy_vlmetalayers(src->sc, (*array)->sc, NULL) < 0) {
       b2nd_free(*array);
       *array = NULL;
       BLOSC_ERROR(BLOSC2_ERROR_FAILURE);
