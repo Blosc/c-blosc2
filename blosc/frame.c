@@ -95,9 +95,32 @@
    POSIX-only anyway, and there the blosc2_pthread_* macros are pthread_*.
    No atomics needed: the counter is only touched when a handle is actually
    opened or closed, or once more when a frame is first refused one (see
-   read_fp_nocache) -- never per read. */
+   read_fp_nocache) -- never per read.  A fork() while another thread holds it
+   would leave it locked in the child, so it is held across fork() (the child
+   keeps the cached descriptors, so the count stays right). */
 static pthread_mutex_t reader_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int reader_cache_count = 0;
+static pthread_once_t reader_cache_atfork_once = PTHREAD_ONCE_INIT;
+
+static void reader_cache_atfork_prepare(void) {
+  pthread_mutex_lock(&reader_cache_mutex);
+}
+
+static void reader_cache_atfork_parent(void) {
+  pthread_mutex_unlock(&reader_cache_mutex);
+}
+
+static void reader_cache_atfork_child(void) {
+  /* Locked in the prepare handler; a new one for this process (as in prefetch.c) */
+  pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  reader_cache_mutex = mutex;
+}
+
+static void reader_cache_register_atfork(void) {
+  if (pthread_atfork(reader_cache_atfork_prepare, reader_cache_atfork_parent, reader_cache_atfork_child) != 0) {
+    BLOSC_TRACE_WARNING("pthread_atfork() failed: a fork()ed child may find the reader cache locked");
+  }
+}
 
 static int reader_cache_max(void) {
   static int cached_max = -1;
@@ -129,6 +152,7 @@ static int reader_cache_max(void) {
 /* Claim a slot for one more cached handle, or report that the cache is full */
 static bool reader_cache_claim(void) {
   bool claimed = false;
+  pthread_once(&reader_cache_atfork_once, reader_cache_register_atfork);
   blosc2_pthread_mutex_lock(&reader_cache_mutex);
   if (reader_cache_count < reader_cache_max()) {
     reader_cache_count++;

@@ -193,12 +193,12 @@ static char *test_parent_threads(void) {
   cbytes = blosc2_compress_ctx(cctx, src, sizeof(src), cdata, sizeof(cdata));
   mu_assert("ERROR: cannot compress", cbytes > 0);
   mu_assert("ERROR: cannot decompress", check_decompress(dctx, cdata, cbytes) == 0);
-  mu_assert("ERROR: the decompression threads did not start", dctx->thread_pool != NULL);
+  mu_assert("ERROR: the decompression threads did not start", dctx->threads_started == NTHREADS);
   // The global context with NTHREADS threads, and a pool with 3 threads
   mu_assert("ERROR: global roundtrip failed", check_roundtrip(NULL, NULL) == 0);
   blosc2_context *c3 = new_cctx(3);
   mu_assert("ERROR: 3-thread roundtrip failed", c3 != NULL && check_roundtrip(c3, NULL) == 0);
-  mu_assert("ERROR: the 3 threads did not start", c3->thread_pool != NULL);
+  mu_assert("ERROR: the 3 threads did not start", c3->threads_started == 3);
   blosc2_free_ctx(c3);
   return EXIT_SUCCESS;
 }
