@@ -855,6 +855,7 @@ int frame_free(blosc2_frame_s* frame) {
   if (frame->urlpath != NULL) {
     free(frame->urlpath);
   }
+  free(frame->holes);
 
   free(frame);
 
@@ -1458,6 +1459,11 @@ static int frame_refresh_if_stale(blosc2_frame_s *frame, int64_t frame_len_on_di
   frame->force_refresh = false;
   frame->len = frame_len_on_disk;
   frame->file_end = 0;  // another handle wrote the file; its size is unknown again
+  if (frame->nholes > 0) {
+    // Nor do we know its free space any more (only an unlocked writer gets here inside frame_begin_updates())
+    frame->nholes = 0;
+    frame->holes_lost = true;
+  }
   frame->trailer_len = trailer_len;
 
   // The header metalayers and trailer vlmetalayers were cached at open time;
@@ -5880,6 +5886,80 @@ int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst
 }
 
 
+/* Remember the hole [offset, offset + len) in the payload of a frame inside frame_begin_updates(). */
+static void holes_add(blosc2_frame_s* frame, int64_t offset, int64_t len) {
+  if (len <= 0) {
+    return;
+  }
+  if (frame->nholes == frame->holes_cap) {
+    int64_t cap = frame->holes_cap > 0 ? 2 * frame->holes_cap : 64;
+    int64_t* holes = realloc(frame->holes, (size_t)cap * 2 * sizeof(int64_t));
+    if (holes == NULL) {
+      frame->holes_lost = true;  // the frame stays valid, just with some dead space
+      return;
+    }
+    frame->holes = holes;
+    frame->holes_cap = cap;
+  }
+  frame->holes[2 * frame->nholes] = offset;
+  frame->holes[2 * frame->nholes + 1] = len;
+  frame->nholes++;
+}
+
+
+/* The free run made of [offset, offset + len) and the known holes next to it on either side, which are taken
+   out of the list. */
+static void holes_take_run(blosc2_frame_s* frame, int64_t offset, int64_t len, int64_t* run_start,
+                           int64_t* run_len) {
+  int64_t start = offset;
+  int64_t end = offset + len;
+  for (int64_t i = 0; i < frame->nholes;) {
+    int64_t hole_start = frame->holes[2 * i];
+    int64_t hole_end = hole_start + frame->holes[2 * i + 1];
+    if (hole_end == start || hole_start == end) {
+      start = (hole_end == start) ? hole_start : start;
+      end = (hole_start == end) ? hole_end : end;
+      frame->nholes--;
+      frame->holes[2 * i] = frame->holes[2 * frame->nholes];
+      frame->holes[2 * i + 1] = frame->holes[2 * frame->nholes + 1];
+      i = 0;  // the longer run may touch a hole seen already
+      continue;
+    }
+    i++;
+  }
+  *run_start = start;
+  *run_len = end - start;
+}
+
+
+/* Where a chunk update inside frame_begin_updates() puts a chunk of new_len bytes (0 for a chunk stored in
+   its offset) that replaces one stored at [old_offset, old_offset + old_len) (old_offset < 0: stored
+   nowhere), in a payload that ends at *payload_end (updated).  Nothing else moves: the chunk goes into the
+   free run made of its old place and the holes around it when it fits there (a sequential overwrite slides
+   one hole along the payload that way), else to the end of the payload; the space left over becomes a
+   hole.  A free run at the end of the payload just grows or shrinks the payload. */
+static int64_t holes_place(blosc2_frame_s* frame, int64_t old_offset, int64_t old_len, int64_t new_len,
+                           int64_t* payload_end) {
+  int64_t start = *payload_end;
+  int64_t len = 0;
+  if (old_offset >= 0) {
+    holes_take_run(frame, old_offset, old_len, &start, &len);
+  }
+  if (start + len == *payload_end) {
+    *payload_end = start + new_len;
+    return start;
+  }
+  if (new_len <= len) {
+    holes_add(frame, start + new_len, len - new_len);
+    return start;
+  }
+  holes_add(frame, start, len);
+  int64_t offset = *payload_end;
+  *payload_end += new_len;
+  return offset;
+}
+
+
 void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk,
                          int32_t cbytes_old) {
   uint8_t *chunk_ = (uint8_t *) chunk;
@@ -5960,6 +6040,8 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   bool old_chunk_is_regular = (!frame->sframe && old_offset >= 0);
   bool new_chunk_is_regular = true;
   int64_t new_chunk_offset = cbytes;
+  // Inside frame_begin_updates(), a resized chunk leaves a hole instead of moving the payload behind it
+  bool defer = !frame->sframe && frame->updates_depth > 0;
   if (frame->sframe) {
     if (offsets[nchunk] < 0) {
       sframe_chunk_id = -1;
@@ -5995,7 +6077,18 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
     chunk_cbytes = 0;   // Special chunks are encoded in offsets and have no stored payload.
     new_chunk_is_regular = false;
   }
-  if (!frame->sframe) {
+  if (defer) {
+    if (old_chunk_is_regular || new_chunk_is_regular) {
+      int64_t payload_end = cbytes;
+      new_chunk_offset = holes_place(frame, old_chunk_is_regular ? old_offset : -1, cbytes_old, chunk_cbytes,
+                                     &payload_end);
+      delta_cbytes = payload_end - cbytes;
+      if (new_chunk_is_regular) {
+        offsets[nchunk] = new_chunk_offset;
+      }
+    }
+  }
+  else if (!frame->sframe) {
     if (old_chunk_is_regular) {
       delta_cbytes = (int64_t)chunk_cbytes - cbytes_old;
       for (int64_t i = 0; i < nchunks; ++i) {
@@ -6048,7 +6141,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       }
       frame->cframe = framep;
     }
-    if (!frame->sframe && old_chunk_is_regular) {
+    if (!frame->sframe && old_chunk_is_regular && !defer) {
       int64_t tail_src_offset = old_offset + cbytes_old;
       int64_t tail_dst_offset = old_offset + chunk_cbytes;
       int64_t tail_nbytes = cbytes - tail_src_offset;
@@ -6095,7 +6188,7 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
         BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
         goto failed;
       }
-      if (old_chunk_is_regular) {
+      if (old_chunk_is_regular && !defer) {
         int64_t tail_src_offset = old_offset + cbytes_old;
         int64_t tail_dst_offset = old_offset + chunk_cbytes;
         int64_t tail_nbytes = cbytes - tail_src_offset;
@@ -6148,6 +6241,10 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   free(off_chunk);
   off_chunk = NULL;
 
+  if (defer) {
+    // The header describes the payload as it lies, holes included
+    schunk->cbytes = new_cbytes;
+  }
   frame->len = new_frame_len;
   rc = frame_update_header(frame, schunk, false);
   if (rc < 0) {
@@ -6178,6 +6275,223 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
   free(offsets);
   free(off_chunk);
   return NULL;
+}
+
+
+static int compare_holes(const void* a, const void* b) {
+  int64_t x = *(const int64_t*)a;
+  int64_t y = *(const int64_t*)b;
+  return (x > y) - (x < y);
+}
+
+
+/* Close the holes that updates inside frame_begin_updates() left in the payload of a contiguous frame: the
+   stretches between them move towards the start, each once, and the chunks keep their order in the payload.
+   Only the known holes are closed (the space of deleted chunks stays, as without frame_begin_updates()).  An
+   I/O error while moving leaves a torn frame, as one in the tail move of a single update does. */
+static int frame_compact(blosc2_frame_s* frame, blosc2_schunk* schunk) {
+  int32_t header_len;
+  int64_t frame_len;
+  int64_t nbytes;
+  int64_t cbytes;
+  int32_t blocksize;
+  int32_t chunksize;
+  int64_t nchunks;
+  int rc = get_header_info(frame, &header_len, &frame_len, &nbytes, &cbytes, &blocksize, &chunksize,
+                           &nchunks, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+                           frame->schunk->storage->io);
+  if (rc < 0) {
+    return rc;
+  }
+  int64_t nholes = frame->nholes;
+  int64_t* holes = frame->holes;  // (offset, length) pairs
+  qsort(holes, (size_t)nholes, 2 * sizeof(int64_t), compare_holes);
+  for (int64_t k = 0; k < nholes; k++) {
+    int64_t next = (k + 1 < nholes) ? holes[2 * (k + 1)] : cbytes;
+    if (holes[2 * k] < 0 || holes[2 * k + 1] <= 0 || holes[2 * k] + holes[2 * k + 1] > next) {
+      BLOSC_TRACE_ERROR("Inconsistent holes in the payload of the frame.");
+      return BLOSC2_ERROR_DATA;
+    }
+  }
+  if (nchunks == 0) {
+    return BLOSC2_ERROR_SUCCESS;  // all chunks got deleted: no offsets to rewrite, the payload stays
+  }
+
+  int32_t off_nbytes;
+  if (!blosc2_nchunks_to_offsets_nbytes(nchunks, &off_nbytes)) {
+    BLOSC_TRACE_ERROR("Too many chunks for offsets representation.");
+    return BLOSC2_ERROR_DATA;
+  }
+  int64_t* offsets = malloc((size_t)off_nbytes);
+  int64_t* shifts = malloc((size_t)(nholes + 1) * sizeof(int64_t));  // shifts[k]: length of the first k holes
+  uint8_t* off_chunk = NULL;
+  blosc2_io_cb* io_cb = NULL;
+  void* fp = NULL;
+  if (offsets == NULL || shifts == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto out;
+  }
+  shifts[0] = 0;
+  for (int64_t k = 0; k < nholes; k++) {
+    shifts[k + 1] = shifts[k] + holes[2 * k + 1];
+  }
+  int32_t coffsets_cbytes = 0;
+  uint8_t* coffsets = get_coffsets(frame, header_len, cbytes, nchunks, &coffsets_cbytes);
+  if (coffsets == NULL) {
+    BLOSC_TRACE_ERROR("Cannot get the offsets for the frame.");
+    rc = BLOSC2_ERROR_DATA;
+    goto out;
+  }
+  blosc2_dparams off_dparams = BLOSC2_DPARAMS_DEFAULTS;
+  blosc2_context* dctx = blosc2_create_dctx(off_dparams);
+  if (dctx == NULL) {
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto out;
+  }
+  rc = blosc2_decompress_ctx(dctx, coffsets, coffsets_cbytes, offsets, off_nbytes);
+  blosc2_free_ctx(dctx);
+  if (rc < 0) {
+    BLOSC_TRACE_ERROR("Cannot decompress the offsets chunk.");
+    goto out;
+  }
+
+  // A stored chunk moves by the length of the holes before it
+  for (int64_t i = 0; i < nchunks; i++) {
+    if (offsets[i] < 0) {
+      continue;  // stored in its offset
+    }
+    int64_t lo = 0;
+    int64_t hi = nholes;  // the holes [0, lo) start before the chunk, [hi, nholes) after it
+    while (lo < hi) {
+      int64_t mid = lo + (hi - lo) / 2;
+      if (holes[2 * mid] < offsets[i]) {
+        lo = mid + 1;
+      }
+      else {
+        hi = mid;
+      }
+    }
+    if ((lo > 0 && offsets[i] < holes[2 * (lo - 1)] + holes[2 * (lo - 1) + 1]) ||
+        (lo < nholes && offsets[i] == holes[2 * lo])) {
+      BLOSC_TRACE_ERROR("Chunk %" PRId64 " lies in a hole of the frame.", i);
+      rc = BLOSC2_ERROR_DATA;
+      goto out;
+    }
+    offsets[i] -= shifts[lo];
+  }
+
+  if (frame->cframe == NULL) {
+    io_cb = blosc2_get_io_cb(frame->schunk->storage->io->id);
+    if (io_cb == NULL) {
+      rc = BLOSC2_ERROR_PLUGIN_IO;
+      goto out;
+    }
+    fp = frame_writer_acquire(frame, io_cb);
+    if (fp == NULL) {
+      BLOSC_TRACE_ERROR("Error opening file in: %s", frame->urlpath);
+      rc = BLOSC2_ERROR_FILE_OPEN;
+      goto out;
+    }
+  }
+  // The stretch behind each hole moves down by the length of all holes up to it
+  for (int64_t k = 0; k < nholes; k++) {
+    int64_t shift = shifts[k + 1];
+    int64_t src = holes[2 * k] + holes[2 * k + 1];
+    int64_t len = ((k + 1 < nholes) ? holes[2 * (k + 1)] : cbytes) - src;
+    if (len == 0) {
+      continue;
+    }
+    if (frame->cframe != NULL) {
+      memmove(frame->cframe + header_len + src - shift, frame->cframe + header_len + src, (size_t)len);
+    }
+    else {
+      rc = frame_move_range(io_cb, fp, frame->file_offset + header_len + src,
+                            frame->file_offset + header_len + src - shift, len, 0);
+      if (rc < 0) {
+        BLOSC_TRACE_ERROR("Cannot move chunks in the frame to close its holes.");
+        frame->file_end = 0;
+        goto out;
+      }
+    }
+  }
+  int64_t new_cbytes = cbytes - shifts[nholes];
+
+  int32_t off_cbytes = compress_offsets(offsets, off_nbytes, off_nbytes + BLOSC2_MAX_OVERHEAD, &off_chunk);
+  if (off_cbytes < 0) {
+    rc = off_cbytes;
+    goto out;
+  }
+  if (frame->cframe != NULL) {
+    // The payload got shorter: the offsets fit into the frame
+    memcpy(frame->cframe + header_len + new_cbytes, off_chunk, (size_t)off_cbytes);
+  }
+  else {
+    int64_t wbytes = io_cb->write(off_chunk, 1, off_cbytes, frame->file_offset + header_len + new_cbytes, fp);
+    if (wbytes != off_cbytes) {
+      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+      frame->file_end = 0;
+      rc = BLOSC2_ERROR_FILE_WRITE;
+      goto out;
+    }
+  }
+  if (frame->coffsets != NULL) {
+    if (frame->coffsets_needs_free) {
+      free(frame->coffsets);
+    }
+    frame->coffsets = NULL;
+  }
+  schunk->cbytes = new_cbytes;
+  frame->len = header_len + new_cbytes + off_cbytes + frame->trailer_len;
+  rc = frame_update_header(frame, schunk, false);
+  if (rc >= 0) {
+    rc = frame_update_trailer(frame, schunk);  // cuts the file too
+  }
+
+  out:
+  if (fp != NULL) {
+    frame_writer_release(frame, io_cb, fp);
+  }
+  free(off_chunk);
+  free(offsets);
+  free(shifts);
+  return rc < 0 ? rc : BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_begin_updates(blosc2_frame_s* frame) {
+  if (frame == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int rc = frame_lock(frame, true);
+  if (rc < 0) {
+    return rc;
+  }
+  if (!frame->sframe && frame->updates_depth++ == 0) {
+    frame->nholes = 0;
+    frame->holes_lost = false;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int frame_end_updates(blosc2_frame_s* frame, blosc2_schunk* schunk) {
+  if (frame == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  int rc = BLOSC2_ERROR_SUCCESS;
+  if (!frame->sframe && frame->updates_depth > 0 && --frame->updates_depth == 0) {
+    if (frame->holes_lost) {
+      // Valid, just larger: the holes stay as dead space, like the space of deleted chunks
+      BLOSC_TRACE_WARNING("Lost track of the free space in the frame; it stays.");
+    }
+    else if (frame->nholes > 0) {
+      rc = frame_compact(frame, schunk);
+    }
+    frame->nholes = 0;
+    frame->holes_lost = false;
+  }
+  int unlock_rc = frame_unlock(frame);
+  return rc < 0 ? rc : unlock_rc;
 }
 
 

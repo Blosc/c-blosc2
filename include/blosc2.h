@@ -2087,6 +2087,51 @@ BLOSC_EXPORT int blosc2_schunk_lock(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_unlock(blosc2_schunk *schunk);
 
 /**
+ * @brief Start a sequence of chunk updates of a super-chunk.
+ *
+ * A contiguous frame keeps its chunks back to back, so an update that changes
+ * the compressed size of a chunk moves everything stored behind it: updating
+ * all n chunks one by one moves ~n^2/2 chunks.  Between
+ * blosc2_schunk_begin_updates() and blosc2_schunk_end_updates(), such an
+ * update moves nothing else.  The chunk goes into its old place when it fits
+ * there (together with the free space right before and after it), else to the
+ * end of the frame, and the space left over stays free until
+ * blosc2_schunk_end_updates() closes all of it in one pass, in which every
+ * chunk moves at most once.  The frame is valid at every point in between,
+ * just larger, and `cbytes` includes the free space until the end.
+ *
+ * Writing functions that update several chunks (b2nd_set_slice_cbuffer(),
+ * b2nd_set_orthogonal_selection(), b2nd_resize(),
+ * blosc2_schunk_set_slice_buffer()) do this by themselves; use it to bracket
+ * a sequence of such calls or of blosc2_schunk_update_chunk() calls.
+ *
+ * It also takes the exclusive frame lock, as blosc2_schunk_lock() does, until
+ * blosc2_schunk_end_updates().  Brackets nest.  For super-chunks that are not
+ * contiguous frames this is just the lock (a no-op without locking).  A frame
+ * whose bracket is never closed stays valid; its free space just stays, like
+ * the space of deleted chunks.
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code otherwise (then nothing has started).
+ */
+BLOSC_EXPORT int blosc2_schunk_begin_updates(blosc2_schunk *schunk);
+
+/**
+ * @brief End a sequence of chunk updates started with blosc2_schunk_begin_updates().
+ *
+ * The outermost call closes the free space that the updates left in a
+ * contiguous frame (moving each chunk at most once; a frame on disk is cut to
+ * its new length) and releases the lock.
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code otherwise.  The lock is released
+ * either way.
+ */
+BLOSC_EXPORT int blosc2_schunk_end_updates(blosc2_schunk *schunk);
+
+/**
  * @brief Re-sync the cached counters (nchunks, nbytes, cbytes) and
  * metalayers of a disk-based super-chunk when another handle — possibly in
  * another process — has changed it.

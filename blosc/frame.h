@@ -90,6 +90,11 @@ typedef struct {
   uint64_t write_fp_dev;    //!< Device of cached write_fp (POSIX)
   uint64_t write_fp_ino;    //!< Inode of cached write_fp (POSIX)
   int64_t file_end;         //!< Size of the frame file as we last left it; <= 0 if unknown
+  int32_t updates_depth;    //!< Depth of frame_begin_updates(); while > 0, resized chunks leave holes
+  int64_t* holes;           //!< The holes left so far, as (offset, length) pairs
+  int64_t nholes;           //!< Number of holes
+  int64_t holes_cap;        //!< Capacity of `holes`, in pairs
+  bool holes_lost;          //!< Some hole is missing from `holes` (out of memory, or a refresh)
 } blosc2_frame_s;
 
 
@@ -203,6 +208,28 @@ int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, b
  * @return BLOSC2_ERROR_SUCCESS on success, or a negative error code on failure.
  */
 int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst_pos, int64_t length, int64_t cap);
+
+/**
+ * @brief Start a sequence of chunk updates of a frame (see blosc2_schunk_begin_updates()).
+ *
+ * Takes the exclusive frame lock (a no-op without locking).  Until the matching
+ * frame_end_updates(), an update that changes the size of a chunk of a contiguous
+ * frame does not move the rest of the payload: the chunk goes into its old place,
+ * together with the free space right before and after it, when it fits there, else
+ * to the end of the payload, and the space left over stays a hole.  Calls nest.
+ *
+ * @return 0 on success, a negative error code otherwise (nothing has started then).
+ */
+int frame_begin_updates(blosc2_frame_s* frame);
+
+/**
+ * @brief End a frame_begin_updates().  The outermost call closes the holes of the
+ * payload in one pass, in which every chunk moves at most once, and releases the lock.
+ *
+ * @return 0 on success, a negative error code if the holes could not be closed (the
+ * lock is released anyway).
+ */
+int frame_end_updates(blosc2_frame_s* frame, blosc2_schunk* schunk);
 
 /**
  * @brief Get an open "rb" handle for the frame file (regular frames only; sframe
