@@ -14,6 +14,7 @@
 #endif
 
 #include "b2nd.h"
+#include "b2nd-private.h"
 #include "prefetch.h"
 #include "context.h"
 #include "frame.h"
@@ -1145,37 +1146,6 @@ static int64_t chunk_slice_box(int8_t ndim, const int64_t *chunk_start, const in
 }
 
 
-// Zero the box [box_start, box_stop) of a C-order buffer of shape `shape`.
-static void zero_buffer_box(int8_t ndim, int32_t typesize, uint8_t *buffer, const int64_t *shape,
-                            const int64_t *box_start, const int64_t *box_stop) {
-  int64_t box_shape[B2ND_MAX_DIM] = {0};
-  int64_t nrows = 1;
-  for (int i = 0; i < ndim; ++i) {
-    box_shape[i] = box_stop[i] - box_start[i];
-    if (box_shape[i] <= 0) {
-      return;
-    }
-    if (i < ndim - 1) {
-      nrows *= box_shape[i];
-    }
-  }
-  int64_t idx[B2ND_MAX_DIM] = {0};
-  for (int64_t row = 0; row < nrows; ++row) {
-    int64_t off = 0;
-    for (int i = 0; i < ndim; ++i) {
-      off = off * shape[i] + box_start[i] + idx[i];
-    }
-    memset(buffer + off * typesize, 0, (size_t) (box_shape[ndim - 1] * typesize));
-    for (int i = ndim - 2; i >= 0; --i) {
-      if (++idx[i] < box_shape[i]) {
-        break;
-      }
-      idx[i] = 0;
-    }
-  }
-}
-
-
 // Whether a get_slice buffer should be prefaulted with prefault_range() before
 // many threads write to it at once.  With transparent huge pages, threads
 // writing neighbouring blocks of a fresh buffer fault on the same huge page
@@ -1265,7 +1235,7 @@ static int slice_scatter_postfilter(blosc2_postfilter_params *params) {
   }
   if (params->ctx->special_type == BLOSC2_SPECIAL_UNINIT) {
     // Nothing was decoded into the input; hand out zeros rather than stale memory
-    zero_buffer_box(ndim, typesize, c->buffer, c->buffershape, overlap.dst_start, overlap.dst_stop);
+    b2nd_zero_box(ndim, typesize, c->buffer, c->buffershape, overlap.dst_start, overlap.dst_stop);
     return 0;
   }
   return b2nd_copy_buffer2(ndim, typesize, params->input, c->blockshape, overlap.src_start,
@@ -1725,18 +1695,13 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
       }
     }
     if (!slice_zeroed && 4 * zero_nitems >= nelems_slice) {
-      if (slice_only) {
-        // Just the slice's box of the larger buffer
-        int64_t zstart[B2ND_MAX_DIM] = {0};
-        int64_t zstop[B2ND_MAX_DIM];
-        for (int i = 0; i < ndim; ++i) {
-          zstop[i] = stop[i] - start[i];
-        }
-        zero_buffer_box(ndim, array->sc->typesize, buffer_b, shape, zstart, zstop);
+      // The slice's box of the buffer (the whole buffer unless slice_only; one memset() then)
+      int64_t zstart[B2ND_MAX_DIM] = {0};
+      int64_t zstop[B2ND_MAX_DIM];
+      for (int i = 0; i < ndim; ++i) {
+        zstop[i] = stop[i] - start[i];
       }
-      else {
-        memset(buffer_b, 0, (size_t) slice_nbytes);
-      }
+      b2nd_zero_box(ndim, array->sc->typesize, buffer_b, shape, zstart, zstop);
       slice_zeroed = true;
     }
   }
@@ -1772,7 +1737,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
         int64_t box_start[B2ND_MAX_DIM];
         int64_t box_stop[B2ND_MAX_DIM];
         chunk_slice_box(ndim, chunk_start, chunk_stop, start, stop, box_start, box_stop);
-        zero_buffer_box(ndim, array->sc->typesize, buffer_b, shape, box_start, box_stop);
+        b2nd_zero_box(ndim, array->sc->typesize, buffer_b, shape, box_start, box_stop);
       }
       continue;
     }
@@ -1985,7 +1950,7 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
           }
           if (err == 0) {
             // Missing chunk: nothing was decoded
-            zero_buffer_box(ndim, array->sc->typesize, buffer_b, shape, box_start, box_stop);
+            b2nd_zero_box(ndim, array->sc->typesize, buffer_b, shape, box_start, box_stop);
           }
           scattered = err == 0 || !scatter_unsupported(dctx);
         }
