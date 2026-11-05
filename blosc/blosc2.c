@@ -131,9 +131,8 @@ struct blosc_shared_pool {
   int32_t active_jobs;
   blosc2_pthread_t *threads;
   struct thread_context *thread_contexts;
-  blosc2_pthread_mutex_t mutex;
+  blosc2_pthread_mutex_t mutex;  /* guards shutdown, active_jobs and the job queue */
   blosc2_pthread_cond_t work_cv;
-  blosc2_pthread_cond_t idle_cv;
   struct blosc_job_queue_entry *job_queue_head;
   struct blosc_job_queue_entry *job_queue_tail;
   struct blosc_shared_pool *next;
@@ -154,6 +153,7 @@ static int parallel_blosc(blosc2_context* context);
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
+/* guards shared_pools and the context_refs and next fields of each pool */
 static blosc2_pthread_mutex_t pool_registry_mutex;
 static struct blosc_shared_pool *shared_pools = NULL;
 /* Incremented each time the pool registry is torn down: by blosc2_destroy(),
@@ -5495,9 +5495,6 @@ static void* shared_pool_worker(void* arg) {
 
     blosc2_pthread_mutex_lock(&pool->mutex);
     pool->active_jobs--;
-    if (pool->active_jobs == 0 && pool->context_refs == 0 && pool->job_queue_head == NULL) {
-      blosc2_pthread_cond_broadcast(&pool->idle_cv);
-    }
     blosc2_pthread_mutex_unlock(&pool->mutex);
   }
 
@@ -5530,7 +5527,6 @@ static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_
   pool->nthreads = nthreads;
   blosc2_pthread_mutex_init(&pool->mutex, NULL);
   blosc2_pthread_cond_init(&pool->work_cv, NULL);
-  blosc2_pthread_cond_init(&pool->idle_cv, NULL);
   pool->threads = (blosc2_pthread_t*)my_malloc(nthreads * sizeof(blosc2_pthread_t));
   if (pool->threads == NULL) { rc = BLOSC2_ERROR_MEMORY_ALLOC; goto error; }
   pool->thread_contexts = (struct thread_context*)my_malloc((size_t)nthreads * sizeof(struct thread_context));
@@ -5594,7 +5590,6 @@ error:
   if (pool->threads != NULL) {
     my_free(pool->threads);
   }
-  blosc2_pthread_cond_destroy(&pool->idle_cv);
   blosc2_pthread_cond_destroy(&pool->work_cv);
   blosc2_pthread_mutex_destroy(&pool->mutex);
   my_free(pool);
@@ -5617,7 +5612,6 @@ static void destroy_shared_pool(struct blosc_shared_pool *pool) {
 #endif
   my_free(pool->threads);
   my_free(pool->thread_contexts);
-  blosc2_pthread_cond_destroy(&pool->idle_cv);
   blosc2_pthread_cond_destroy(&pool->work_cv);
   blosc2_pthread_mutex_destroy(&pool->mutex);
   my_free(pool);
