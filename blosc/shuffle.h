@@ -24,13 +24,21 @@
 #include <stdint.h>
 
 /**
-  Internal bitunshuffle routine that accepts a format version.
-  We don't have to expose this parameter to users, since the public API is new to blosc2, and its
+  Internal bitshuffle routine that accepts a scratch buffer `tmp` of at least `blocksize` bytes.
+  With NULL, it allocates a temporary one (as blosc2_bitshuffle() does).
+ */
+BLOSC_NO_EXPORT int32_t
+    bitshuffle(const int32_t bytesoftype, const int32_t blocksize,
+               const void* src, void* dest, void* tmp);
+
+/**
+  Internal bitunshuffle routine that accepts a scratch buffer (see bitshuffle()) and a format version.
+  We don't have to expose these parameters to users, since the public API is new to blosc2, and its
   behavior can be independent of the storage format.
  */
 BLOSC_NO_EXPORT int32_t
     bitunshuffle(const int32_t bytesoftype, const int32_t blocksize,
-                 const void* src, void* dest,
+                 const void* src, void* dest, void* tmp,
                  const uint8_t format_version);
 
 #endif /* BLOSC_SHUFFLE_H */

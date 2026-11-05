@@ -26,10 +26,10 @@ extern const bool is_bshuf_AVX512;
 
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                                const size_t elem_size);
+                                const size_t elem_size, void* tmp_buf);
 
 BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                                  const size_t elem_size);
+                                  const size_t elem_size, void* tmp_buf);
 
 #endif /* BLOSC_BITSHUFFLE_AVX512_H */

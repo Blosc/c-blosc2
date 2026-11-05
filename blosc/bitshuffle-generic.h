@@ -42,8 +42,6 @@
             return count;                 \
          } while (0)
 
-#define CHECK_ERR_FREE(count, buf) if (count < 0) { free(buf); return count; }
-
 /* ---- Worker code not requiring special instruction sets. ----
  *
  * The following code does not use any x86 specific vectorized instructions
@@ -138,7 +136,7 @@ bshuf_trans_byte_bitrow_scal(const void* in, void* out, const size_t size,
  *  out : output buffer, must be of size * elem_size bytes
  *  size : number of elements in input
  *  elem_size : element size of typed data
- *  tmp_buffer : temporary buffer with the same `size` than `in` and `out`
+ *  tmp_buf : scratch buffer of size * elem_size bytes
  *
  * Returns
  * -------
@@ -148,7 +146,7 @@ bshuf_trans_byte_bitrow_scal(const void* in, void* out, const size_t size,
 
 BLOSC_NO_EXPORT int64_t
 bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
-                          const size_t elem_size);
+                          const size_t elem_size, void* tmp_buf);
 
 /* Unshuffle bitshuffled data.
  *
@@ -163,7 +161,7 @@ bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
  *  out : output buffer, must be of size * elem_size bytes
  *  size : number of elements in input
  *  elem_size : element size of typed data
- *  tmp_buffer : temporary buffer with the same `size` than `in` and `out`
+ *  tmp_buf : scratch buffer of size * elem_size bytes
  *
  * Returns
  * -------
@@ -173,6 +171,6 @@ bshuf_trans_bit_elem_scal(const void* in, void* out, const size_t size,
 
 BLOSC_NO_EXPORT int64_t
 bshuf_untrans_bit_elem_scal(const void* in, void* out, const size_t size,
-                            const size_t elem_size);
+                            const size_t elem_size, void* tmp_buf);
 
 #endif /* BLOSC_BITSHUFFLE_GENERIC_H */

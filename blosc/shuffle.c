@@ -48,6 +48,7 @@
 #include "bitshuffle-generic.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // __builtin_cpu_supports() fixed in GCC 8: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85100
@@ -64,9 +65,10 @@
 typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
 typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
 // For bitshuffle, everything is done in terms of size_t and int64_t (return value)
-// and although this is not strictly necessary for Blosc, it does not hurt either
-typedef int64_t(* bitshuffle_func)(const void*, void*, const size_t, const size_t);
-typedef int64_t(* bitunshuffle_func)(const void*, void*, const size_t, const size_t);
+// and although this is not strictly necessary for Blosc, it does not hurt either.
+// The last argument is a scratch buffer of size * elem_size bytes.
+typedef int64_t(* bitshuffle_func)(const void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitunshuffle_func)(const void*, void*, const size_t, const size_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -464,11 +466,28 @@ blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
   return blocksize;
 }
 
+/*  Run a bit(un)shuffle routine on `size` elements with the scratch buffer
+    `tmp`, or with a temporary one when the caller has none. */
+static int64_t run_bitshuffle(bitshuffle_func routine, const void* src, void* dest,
+                              const size_t size, const size_t typesize, void* tmp) {
+  if (size == 0) {
+    return 0;  /* fewer than 8 elements: only leftovers */
+  }
+  void* scratch = (tmp != NULL) ? tmp : malloc(size * typesize);
+  if (scratch == NULL) {
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  int64_t ret = routine(src, dest, size, typesize, scratch);
+  if (scratch != tmp) {
+    free(scratch);
+  }
+  return ret;
+}
+
 /*  Bit-shuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
-int32_t
-blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
-                  const void* src, void* dest) {
+int32_t bitshuffle(const int32_t typesize, const int32_t blocksize,
+                   const void* src, void* dest, void* tmp) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
   size_t size = blocksize / typesize;
@@ -479,7 +498,7 @@ blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
 
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
-  int ret = (int) (host_implementation.bitshuffle)(src, dest, size, typesize);
+  int ret = (int) run_bitshuffle(host_implementation.bitshuffle, src, dest, size, typesize, tmp);
   if (ret < 0) {
     // Some error in bitshuffle (should not happen)
     BLOSC_TRACE_ERROR("the impossible happened: the bitshuffle filter failed!");
@@ -493,10 +512,17 @@ blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
   return blocksize;
 }
 
+/* Stub public API that redirects to internal implementation. */
+int32_t
+blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
+                  const void* src, void* dest) {
+  return bitshuffle(typesize, blocksize, src, dest, NULL);
+}
+
 /*  Bit-unshuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
 int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
-                     const void* src, void* dest,
+                     const void* src, void* dest, void* tmp,
                      const uint8_t format_version) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
@@ -507,8 +533,8 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
     if ((size % 8) == 0) {
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
-      int ret = (int) (host_implementation.bitunshuffle)
-          ((const void *) src, (void *) dest, blocksize / typesize, typesize);
+      int ret = (int) run_bitshuffle(host_implementation.bitunshuffle,
+                                     src, dest, size, typesize, tmp);
       if (ret < 0) {
         // Some error in bitshuffle (should not happen)
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
@@ -526,7 +552,7 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
-    int ret = (int) (host_implementation.bitunshuffle)(src, dest, size, typesize);
+    int ret = (int) run_bitshuffle(host_implementation.bitunshuffle, src, dest, size, typesize, tmp);
     if (ret < 0) {
       BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
       return ret;
@@ -544,5 +570,5 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
 int32_t
 blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize,
                     const void * src, void* dest) {
-  return bitunshuffle(typesize, blocksize, src, dest, BLOSC2_VERSION_FORMAT);
+  return bitunshuffle(typesize, blocksize, src, dest, NULL, BLOSC2_VERSION_FORMAT);
 }

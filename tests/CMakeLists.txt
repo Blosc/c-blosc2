@@ -63,6 +63,13 @@ foreach(source ${SOURCES})
         continue()
     endif()
 
+    if(COMPILER_SUPPORT_AVX512)
+        # Define a symbol so tests for the AVX512 bitshuffle will be compiled in (they check the CPU at run time).
+        set_property(
+                SOURCE ${source}
+                APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX512_ENABLED)
+    endif()
+
     if(COMPILER_SUPPORT_NEON)
          # Define a symbol so tests for NEON shuffle/unshuffle will be compiled in.
          set_property(
