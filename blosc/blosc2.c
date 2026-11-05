@@ -1555,7 +1555,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           if (_src != _dest) {
             memcpy(_dest, _src, (size_t)bsize);
           }
-          if (offset != 0 && thread_context != context->serial_context) {
+          if (offset != 0 && !thread_context->serial) {
             delta_wait_dref(context);
           }
           delta_decoder(offset == 0 ? _dest : dest, offset, bsize, typesize, _dest);
@@ -2263,6 +2263,7 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->parent_context = context;
   thread_context->owner_pool = NULL;
   thread_context->tid = tid;
+  thread_context->serial = false;
 
   int32_t blocksize = context != NULL ? context->blocksize : 0;
   int32_t typesize = context != NULL ? context->typesize : 0;
@@ -2293,6 +2294,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
   BLOSC_ERROR_NULL(thread_context, NULL);
   int rc = init_thread_context(thread_context, context, tid);
   if (rc < 0) {
+    my_free(thread_context);
     return NULL;
   }
   return thread_context;
@@ -2370,15 +2372,78 @@ static int check_nthreads(blosc2_context* context, bool start_backend) {
   return context->nthreads;
 }
 
-static int ensure_serial_context(blosc2_context* context) {
+/* Make the temporaries of `thread_context` big enough for the blocks of
+   `context`.  They only grow: the serial thread_context of an OS thread serves
+   contexts with different block sizes and typesizes, so the check is on bytes
+   (one block plus 4 * typesize per region), not on the block size alone. */
+static int fit_thread_context(struct thread_context* thread_context, blosc2_context* context) {
+  int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  if ((size_t)4 * ebsize <= thread_context->tmp_nbytes) {
+    return 0;
+  }
+  my_free(thread_context->tmp);
+  thread_context->tmp = my_malloc((size_t)4 * ebsize);
+  if (thread_context->tmp == NULL) {
+    thread_context->tmp_nbytes = 0;
+    thread_context->tmp_blocksize = 0;
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  thread_context->tmp_nbytes = (size_t)4 * ebsize;
+  thread_context->tmp2 = thread_context->tmp + ebsize;
+  thread_context->tmp3 = thread_context->tmp2 + ebsize;
+  thread_context->tmp4 = thread_context->tmp3 + ebsize;
+  thread_context->tmp_blocksize = context->blocksize;
+  return 0;
+}
+
+/* Defined next to the per-thread tmp cache below */
+static struct thread_context* serial_context_take_tls(blosc2_context* context);
+static void serial_context_put(struct thread_context* thread_context);
+
+/* The thread_context for serial work (serial jobs, getitem, single blocks),
+   sized for `context`; give it back with serial_context_put().  This is the
+   calling OS thread's one, unless that is in use (a serial job started from a
+   prefilter, postfilter or codec of another one), it would grow too large for
+   keeping it per thread, or the platform has no per-thread cache.  Then it is
+   the context's own one, handled as before the per-thread one existed: rebuilt
+   when the block size changes, kept until the context is freed, and used for
+   all serial work of that context from then on. */
+static struct thread_context* serial_context_get(blosc2_context* context) {
+  struct thread_context* thread_context = NULL;
   if (context->serial_context == NULL) {
-    context->serial_context = create_thread_context(context, 0);
+    thread_context = serial_context_take_tls(context);
   }
-  else if (context->blocksize != context->serial_context->tmp_blocksize) {
-    free_thread_context(context->serial_context);
-    context->serial_context = create_thread_context(context, 0);
+  if (thread_context == NULL) {
+    if (context->serial_context != NULL &&
+        context->serial_context->tmp_blocksize != context->blocksize) {
+      free_thread_context(context->serial_context);
+      context->serial_context = NULL;
+    }
+    if (context->serial_context == NULL) {
+      context->serial_context = create_thread_context(context, 0);
+      if (context->serial_context == NULL) {
+        return NULL;
+      }
+    }
+    else if (fit_thread_context(context->serial_context, context) < 0) {
+      return NULL;
+    }
+    thread_context = context->serial_context;
   }
-  return context->serial_context != NULL ? 0 : BLOSC2_ERROR_THREAD_CREATE;
+  thread_context->parent_context = context;
+  thread_context->tid = 0;
+  thread_context->serial = true;
+  return thread_context;
+}
+
+static int run_serial_job(blosc2_context* context) {
+  struct thread_context* thread_context = serial_context_get(context);
+  if (thread_context == NULL) {
+    return BLOSC2_ERROR_THREAD_CREATE;
+  }
+  int ntbytes = serial_blosc(thread_context);
+  serial_context_put(thread_context);
+  return ntbytes;
 }
 
 /* Do the compression or decompression of the buffer depending on the
@@ -2402,19 +2467,13 @@ static int do_job(blosc2_context* context) {
   /* Run serially with one thread, with fewer than two full blocks of source
      data, or if thread configuration/backend setup fails. */
   if (context->nthreads == 1 || (context->sourcesize / context->blocksize) <= 1 || rc < 0) {
-    if (ensure_serial_context(context) < 0) {
-      return BLOSC2_ERROR_THREAD_CREATE;
-    }
-    ntbytes = serial_blosc(context->serial_context);
+    ntbytes = run_serial_job(context);
   }
   else {
     rc = check_nthreads(context, true);
     if (rc < 0) {
       /* Backend startup failed; run serially and retry on the next parallel job. */
-      if (ensure_serial_context(context) < 0) {
-        return BLOSC2_ERROR_THREAD_CREATE;
-      }
-      ntbytes = serial_blosc(context->serial_context);
+      ntbytes = run_serial_job(context);
     }
     else {
       ntbytes = parallel_blosc(context);
@@ -4286,25 +4345,18 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
     return BLOSC2_ERROR_MEMORY_ALLOC;
   }
 
-  /* Ensure we have a serial thread context sized for this blocksize. */
-  if (context->serial_context == NULL) {
-    context->serial_context = create_thread_context(context, 0);
-  }
-  else if (context->blocksize != context->serial_context->tmp_blocksize) {
-    free_thread_context(context->serial_context);
-    context->serial_context = create_thread_context(context, 0);
-  }
-  if (context->serial_context == NULL) {
+  struct thread_context* scontext = serial_context_get(context);
+  if (scontext == NULL) {
     free(buf);
     return BLOSC2_ERROR_THREAD_CREATE;
   }
 
   bool memcpyed = (context->header_flags & (uint8_t)BLOSC_MEMCPYED) != 0;
   int32_t src_offset = sw32_(context->bstarts + nblock);
-  int cbytes = blosc_d(context->serial_context, bsize, 0, memcpyed,
+  int cbytes = blosc_d(scontext, bsize, 0, memcpyed,
                        context->src, context->srcsize, src_offset, nblock,
-                       buf, 0,
-                       context->serial_context->tmp, context->serial_context->tmp2);
+                       buf, 0, scontext->tmp, scontext->tmp2);
+  serial_context_put(scontext);
   if (cbytes < 0) {
     free(buf);
     return cbytes;
@@ -4384,15 +4436,12 @@ int blosc2_vldecompress_block_into_ctx(blosc2_context* context, const void* src,
   /* Never size scratch from a different block (or max compressed lazy span). */
   context->blocksize = size;
   context->blocknbytes[nblock] = size;
-  if (context->serial_context != NULL && context->serial_context->tmp_blocksize != size) {
-    free_thread_context(context->serial_context);
-    context->serial_context = NULL;
-  }
-  if (context->serial_context == NULL) context->serial_context = create_thread_context(context, 0);
-  if (context->serial_context == NULL) return BLOSC2_ERROR_MEMORY_ALLOC;
-  rc = blosc_d(context->serial_context, size, 0, false, context->src, context->srcsize,
+  struct thread_context* scontext = serial_context_get(context);
+  if (scontext == NULL) return BLOSC2_ERROR_MEMORY_ALLOC;
+  rc = blosc_d(scontext, size, 0, false, context->src, context->srcsize,
                sw32_(context->bstarts + nblock), nblock, dest, 0,
-               context->serial_context->tmp, context->serial_context->tmp2);
+               scontext->tmp, scontext->tmp2);
+  serial_context_put(scontext);
   if (rc < 0) return rc;
   return rc == size ? rc : BLOSC2_ERROR_DATA;
 }
@@ -4499,7 +4548,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   uint8_t* _src = (uint8_t*)(src);  /* current pos for source buffer */
   uint8_t* _dest = (uint8_t*)(dest);
   int32_t ntbytes = 0;              /* the number of uncompressed bytes */
-  int32_t bsize, bsize2, ebsize, leftoverblock;
+  int32_t bsize, bsize2, leftoverblock;
   int32_t startb, stopb;
   int32_t stop;
   int32_t nitems_bytes;
@@ -4631,19 +4680,8 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     return nitems_bytes;
   }
 
-  ebsize = header->blocksize + header->typesize * (signed)sizeof(int32_t);
-  struct thread_context* scontext = context->serial_context;
-  /* Resize the temporaries in serial context if needed */
-  if (header->blocksize > scontext->tmp_blocksize) {
-    my_free(scontext->tmp);
-    scontext->tmp_nbytes = (size_t)4 * ebsize;
-    scontext->tmp = my_malloc(scontext->tmp_nbytes);
-    BLOSC_ERROR_NULL(scontext->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
-    scontext->tmp2 = scontext->tmp + ebsize;
-    scontext->tmp3 = scontext->tmp2 + ebsize;
-    scontext->tmp4 = scontext->tmp3 + ebsize;
-    scontext->tmp_blocksize = (int32_t)header->blocksize;
-  }
+  struct thread_context* scontext = serial_context_get(context);
+  BLOSC_ERROR_NULL(scontext, BLOSC2_ERROR_THREAD_CREATE);
 
   for (j = 0; j < context->nblocks; j++) {
     bsize = header->blocksize;
@@ -4689,7 +4727,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
     int32_t src_offset = memcpyed ?
       context->header_overhead + j * header->blocksize : sw32_(bstarts + j);
 
-    int32_t cbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
+    int32_t cbytes = blosc_d(scontext, bsize, leftoverblock, memcpyed,
                              src, srcsize, src_offset, j,
                              tmp2, 0, scontext->tmp, scontext->tmp3);
     if (cbytes < 0) {
@@ -4706,6 +4744,7 @@ int _blosc_getitem(blosc2_context* context, blosc_header* header, const void* sr
   }
 
   scontext->zfp_cell_nitems = 0;
+  serial_context_put(scontext);
 
   if (ntbytes >= 0 && ntbytes != nitems_bytes) {
     // A partial decode must not look like a success: callers that only test for
@@ -4775,10 +4814,6 @@ static int getitem_with_header(blosc2_context* context, blosc_header* header,
     return result;
   }
 
-  if (context->serial_context == NULL) {
-    context->serial_context = create_thread_context(context, 0);
-  }
-  BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
   /* Call the actual getitem function */
   return _blosc_getitem(context, header, src, srcsize, start, nitems, dest, destsize);
 }
@@ -4916,32 +4951,16 @@ int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
     return bsize;
   }
 
-  if (context->serial_context == NULL) {
-    context->serial_context = create_thread_context(context, 0);
-  }
-  BLOSC_ERROR_NULL(context->serial_context, BLOSC2_ERROR_THREAD_CREATE);
-  context->serial_context->parent_context = context;
-
-  int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
-  if (context->blocksize > context->serial_context->tmp_blocksize) {
-    my_free(context->serial_context->tmp);
-    context->serial_context->tmp_nbytes = (size_t)4 * ebsize;
-    context->serial_context->tmp = my_malloc(context->serial_context->tmp_nbytes);
-    BLOSC_ERROR_NULL(context->serial_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
-    context->serial_context->tmp2 = context->serial_context->tmp + ebsize;
-    context->serial_context->tmp3 = context->serial_context->tmp2 + ebsize;
-    context->serial_context->tmp4 = context->serial_context->tmp3 + ebsize;
-    context->serial_context->tmp_blocksize = context->blocksize;
-  }
+  struct thread_context* scontext = serial_context_get(context);
+  BLOSC_ERROR_NULL(scontext, BLOSC2_ERROR_THREAD_CREATE);
 
   int32_t* bstarts = (int32_t*)((uint8_t*)src + context->header_overhead);
   int32_t src_offset = memcpyed ?
       context->header_overhead + nblock * context->blocksize : sw32_(bstarts + nblock);
-  int nbytes = blosc_d(context->serial_context, bsize, leftoverblock, memcpyed,
+  int nbytes = blosc_d(scontext, bsize, leftoverblock, memcpyed,
                        src, srcsize, src_offset, nblock,
-                       (uint8_t*)dest, 0,
-                       context->serial_context->tmp,
-                       context->serial_context->tmp3);
+                       (uint8_t*)dest, 0, scontext->tmp, scontext->tmp3);
+  serial_context_put(scontext);
   if (nbytes < 0) {
     return nbytes;
   }
@@ -6292,6 +6311,8 @@ int blosc2_free_resources(void) {
   /* Return if Blosc is not initialized */
   if (!g_initlib) return BLOSC2_ERROR_FAILURE;
 
+  /* The calling thread's temporaries (other threads free theirs at exit) */
+  blosc2_tmp_cache_clear();
   return release_thread_backend(g_global_context);
 }
 
@@ -6300,10 +6321,18 @@ int blosc2_free_resources(void) {
 #define BLOSC2_TMP_CACHE_MIN (64 * 1024)
 #define BLOSC2_TMP_CACHE_MAX (64 * 1024 * 1024)
 
+/* At most this much (temporaries plus codec state) of a serial thread_context
+   is kept per thread */
+#define BLOSC2_SERIAL_TLS_MAX (16 * 1024 * 1024)
+
 #if !defined(_WIN32)
 typedef struct {
   void *ptr[BLOSC2_TMP_CACHE_SLOTS];
   size_t size[BLOSC2_TMP_CACHE_SLOTS];
+  /* The thread_context for serial work on this thread, lent to one context at
+     a time (see serial_context_get()) */
+  struct thread_context *serial;
+  bool serial_busy;
 } tmp_cache_t;
 
 static pthread_key_t tmp_cache_key;
@@ -6314,6 +6343,9 @@ static void tmp_cache_release(void *arg) {
   tmp_cache_t *cache = arg;
   for (int i = 0; i < BLOSC2_TMP_CACHE_SLOTS; ++i) {
     free(cache->ptr[i]);
+  }
+  if (cache->serial != NULL) {
+    free_thread_context(cache->serial);
   }
   free(cache);
 }
@@ -6338,6 +6370,85 @@ static tmp_cache_t *tmp_cache_get(bool create) {
   return cache;
 }
 #endif
+
+#if !defined(_WIN32)
+/* Bytes held by a thread_context: temporaries and codec state */
+static size_t thread_context_nbytes(const struct thread_context* thread_context) {
+  size_t nbytes = thread_context->tmp_nbytes;
+#if defined(HAVE_ZSTD)
+  if (thread_context->zstd_cctx != NULL) {
+    nbytes += ZSTD_sizeof_CCtx(thread_context->zstd_cctx);
+  }
+  if (thread_context->zstd_dctx != NULL) {
+    nbytes += ZSTD_sizeof_DCtx(thread_context->zstd_dctx);
+  }
+#endif
+  if (thread_context->lz4_cstream != NULL) {
+    nbytes += sizeof(LZ4_stream_t);
+  }
+  if (thread_context->lz4hc_cstream != NULL) {
+    nbytes += sizeof(LZ4_streamHC_t);
+  }
+  return nbytes;
+}
+#endif
+
+/* Serial work needs a thread_context: 4 block-sized temporaries plus codec
+   state (ZSTD contexts, LZ4 streams).  One per blosc2_context made every
+   handle used with nthreads == 1 hold it until the handle was freed (~0.6 MB
+   for 128 KB blocks and ZSTD), so the calling OS thread keeps one and lends it
+   to whichever context works serially on it, like the shared pool keeps one per
+   worker.  NULL means: use the context's own one. */
+static struct thread_context* serial_context_take_tls(blosc2_context* context) {
+#if !defined(_WIN32)
+  int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
+  if ((size_t)4 * ebsize > BLOSC2_SERIAL_TLS_MAX) {
+    return NULL;
+  }
+  tmp_cache_t *cache = tmp_cache_get(true);
+  if (cache == NULL || cache->serial_busy) {
+    return NULL;
+  }
+  if (cache->serial == NULL) {
+    cache->serial = create_thread_context(context, 0);
+    if (cache->serial == NULL) {
+      return NULL;
+    }
+  }
+  else if (fit_thread_context(cache->serial, context) < 0) {
+    return NULL;
+  }
+  cache->serial_busy = true;
+  return cache->serial;
+#else
+  BLOSC_UNUSED_PARAM(context);
+  return NULL;
+#endif
+}
+
+static void serial_context_put(struct thread_context* thread_context) {
+#if !defined(_WIN32)
+  tmp_cache_t *cache = tmp_cache_get(false);
+  if (cache != NULL && cache->serial == thread_context) {
+    blosc2_context* context = thread_context->parent_context;
+    if (context->serial_context == NULL &&
+        thread_context_nbytes(thread_context) > BLOSC2_SERIAL_TLS_MAX) {
+      /* Grown too large to keep per thread (e.g. ZSTD compression state for
+         large blocks at high levels): the context that needed it keeps it, as
+         if it had always been its own, and the thread starts a new one */
+      thread_context->tmp_blocksize = context->blocksize;
+      context->serial_context = thread_context;
+      cache->serial = NULL;
+    }
+    else {
+      thread_context->parent_context = NULL;
+    }
+    cache->serial_busy = false;
+  }
+#else
+  BLOSC_UNUSED_PARAM(thread_context);
+#endif
+}
 
 void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity) {
   *capacity = nbytes;
@@ -6416,6 +6527,10 @@ void blosc2_tmp_cache_clear(void) {
       free(cache->ptr[i]);
       cache->ptr[i] = NULL;
       cache->size[i] = 0;
+    }
+    if (cache->serial != NULL && !cache->serial_busy) {
+      free_thread_context(cache->serial);
+      cache->serial = NULL;
     }
   }
 #endif
