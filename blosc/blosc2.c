@@ -156,10 +156,64 @@ static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
 static blosc2_pthread_mutex_t pool_registry_mutex;
 static struct blosc_shared_pool *shared_pools = NULL;
-/* Incremented each time blosc2_destroy() tears down the pool registry.
- * Contexts store the epoch at attach time; a mismatch means the pool they
- * hold a pointer to has already been freed. */
+/* Incremented each time the pool registry is torn down: by blosc2_destroy(),
+ * and in the child of a fork() (see atfork_child()).  Contexts store the epoch
+ * at attach time; a mismatch means the pool they hold a pointer to has already
+ * been freed, or has no threads in this process. */
 static volatile int32_t g_destroy_count = 0;
+
+#if !defined(_WIN32)
+/* Threads do not survive fork(): a child must neither use its parent's pools
+ * nor join their workers or destroy what they wait on (that hangs or crashes),
+ * so it starts with an empty registry and a new epoch (atfork_child()).  The
+ * prepare handler holds the global and the registry lock across fork(), so a
+ * fork waits for a global operation or registry change in another thread. */
+static pthread_once_t atfork_once = PTHREAD_ONCE_INIT;
+static bool atfork_locked = false;
+/* The parent's pools: never used or freed in the child, only kept reachable
+ * so that leak checkers do not report them */
+static struct blosc_shared_pool *forked_pools = NULL;
+
+static void atfork_prepare(void) {
+  if (!g_initlib) {
+    return;
+  }
+  blosc2_pthread_mutex_lock(&global_comp_mutex);
+  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  atfork_locked = true;
+}
+
+static void atfork_parent(void) {
+  if (!atfork_locked) {
+    return;
+  }
+  atfork_locked = false;
+  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+  blosc2_pthread_mutex_unlock(&global_comp_mutex);
+}
+
+static void atfork_child(void) {
+  if (!atfork_locked) {
+    return;
+  }
+  atfork_locked = false;
+  struct blosc_shared_pool **tail = &shared_pools;
+  while (*tail != NULL) {
+    tail = &(*tail)->next;
+  }
+  *tail = forked_pools;
+  forked_pools = shared_pools;
+  shared_pools = NULL;
+  g_destroy_count++;
+  /* Locked in atfork_prepare(); new ones for this process (as in prefetch.c) */
+  blosc2_pthread_mutex_init(&pool_registry_mutex, NULL);
+  blosc2_pthread_mutex_init(&global_comp_mutex, NULL);
+}
+
+static void register_atfork(void) {
+  pthread_atfork(atfork_prepare, atfork_parent, atfork_child);
+}
+#endif  /* !_WIN32 */
 
 
 /* non-threadsafe function should be called before any other Blosc function in
@@ -2336,7 +2390,8 @@ static int check_nthreads(blosc2_context* context, bool start_backend) {
   }
 
   /* Detect a pool that was torn down by blosc2_destroy() while this context
-   * was still alive.  The epoch mismatch tells us the pool pointer is dangling;
+   * was still alive, or that belongs to the parent of a forked process.  The
+   * epoch mismatch tells us the pool pointer is dangling or has no threads;
    * clear it so the re-attach logic below creates a fresh one. */
   if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL &&
       context->pool_epoch != g_destroy_count) {
@@ -5741,8 +5796,9 @@ static int release_thread_backend(blosc2_context *context) {
     bool destroy_pool = false;
 
     if (context->pool_epoch != g_destroy_count) {
-      /* blosc2_destroy() already freed this pool and tore down pool_registry_mutex.
-       * Just clear the dangling pointer; nothing else to do. */
+      /* blosc2_destroy() already freed this pool and tore down pool_registry_mutex,
+       * or the pool is the parent's after a fork().  Just clear the pointer;
+       * nothing else to do. */
       context->thread_pool = NULL;
       context->threads_started = 0;
       context->thread_backend = BLOSC_BACKEND_SERIAL;
@@ -6303,6 +6359,9 @@ void blosc2_init(void) {
   g_global_context->nthreads = g_nthreads;
   g_global_context->new_nthreads = g_nthreads;
   blosc2_pthread_mutex_init(&g_global_context->nchunk_mutex, NULL);
+#if !defined(_WIN32)
+  pthread_once(&atfork_once, register_atfork);
+#endif
   g_initlib = 1;
 }
 
