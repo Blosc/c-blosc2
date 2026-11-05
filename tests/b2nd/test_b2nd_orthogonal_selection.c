@@ -11,7 +11,7 @@
 #include "test_common.h"
 
 
-static int check_get_and_set_orthogonal_selection(void) {
+static int check_get_and_set_orthogonal_selection(bool contiguous, char *urlpath) {
   const int8_t ndim = 3;
   const int64_t shape[] = {10, 10, 10};
   const int32_t chunkshape[] = {10, 10, 10};
@@ -35,6 +35,9 @@ static int check_get_and_set_orthogonal_selection(void) {
   blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
   storage.cparams = &cparams;
   storage.dparams = &dparams;
+  storage.contiguous = contiguous;
+  storage.urlpath = urlpath;
+  blosc2_remove_urlpath(urlpath);
 
   b2nd_context_t *ctx = b2nd_create_ctx(&storage, ndim, shape, chunkshape, blockshape,
                                         NULL, 0, NULL, 0);
@@ -87,8 +90,26 @@ static int check_get_and_set_orthogonal_selection(void) {
     CUTEST_ASSERT("Orthogonal set selection mismatch", roundtrip[i] == replacement[i]);
   }
 
+  // Items outside the selection keep their values
+  int32_t expected_all[1000];
+  memcpy(expected_all, src, sizeof(src));
+  for (int64_t i = 0; i < set_selection_size[0]; ++i) {
+    for (int64_t j = 0; j < set_selection_size[1]; ++j) {
+      for (int64_t k = 0; k < set_selection_size[2]; ++k) {
+        int64_t flat = (set_selection[0][i] * shape[1] + set_selection[1][j]) * shape[2] + set_selection[2][k];
+        expected_all[flat] = replacement[(i * set_selection_size[1] + j) * set_selection_size[2] + k];
+      }
+    }
+  }
+  int32_t all[1000];
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(array, all, nitems * (int64_t)sizeof(int32_t)));
+  for (int64_t i = 0; i < nitems; ++i) {
+    CUTEST_ASSERT("Orthogonal set changed other items", all[i] == expected_all[i]);
+  }
+
   b2nd_free(array);
   b2nd_free_ctx(ctx);
+  blosc2_remove_urlpath(urlpath);
   return 0;
 }
 
@@ -98,8 +119,15 @@ CUTEST_TEST_SETUP(orthogonal_selection) {
 }
 
 CUTEST_TEST_TEST(orthogonal_selection) {
-  CUTEST_ASSERT("Orthogonal selection regression check failed",
-                check_get_and_set_orthogonal_selection() == 0);
+  // In memory (plain super-chunk and frame) and on disk (contiguous and sparse frame)
+  CUTEST_ASSERT("Orthogonal selection regression check failed (memory)",
+                check_get_and_set_orthogonal_selection(false, NULL) == 0);
+  CUTEST_ASSERT("Orthogonal selection regression check failed (cframe)",
+                check_get_and_set_orthogonal_selection(true, NULL) == 0);
+  CUTEST_ASSERT("Orthogonal selection regression check failed (disk cframe)",
+                check_get_and_set_orthogonal_selection(true, "test_orthogonal_selection.b2nd") == 0);
+  CUTEST_ASSERT("Orthogonal selection regression check failed (disk sframe)",
+                check_get_and_set_orthogonal_selection(false, "test_orthogonal_selection_s.b2nd") == 0);
   return 0;
 }
 

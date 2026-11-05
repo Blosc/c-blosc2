@@ -33,6 +33,10 @@ short).
 
 .. doxygenfunction:: blosc2_schunk_append_buffer
 
+.. doxygenfunction:: blosc2_schunk_insert_buffer
+
+.. doxygenfunction:: blosc2_schunk_update_buffer
+
 .. doxygenfunction:: blosc2_schunk_get_slice_buffer
 .. doxygenfunction:: blosc2_schunk_get_sparse_buffer
 .. doxygenfunction:: blosc2_schunk_set_slice_buffer
