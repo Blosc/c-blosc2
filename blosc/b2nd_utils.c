@@ -12,243 +12,81 @@
 
 #include <stdint.h>
 
-// copyNdim where N = {2-8} - specializations of copy loops to be used by b2nd_copy_buffer
-// since we don't have c++ templates, substitute manual specializations for up to known B2ND_MAX_DIM (8)
-// it's not pretty, but it substantially reduces overhead vs. the generic method
-void copy8dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[7] * itemsize;
-  int64_t copy_start[7] = {0};
-  do {
-    do {
-      do {
-        do {
-          do {
-            do {
-              do {
-                int64_t src_copy_start = 0;
-                int64_t dst_copy_start = 0;
-                for (int j = 0; j < 7; ++j) {
-                  src_copy_start += copy_start[j] * src_strides[j];
-                  dst_copy_start += copy_start[j] * dst_strides[j];
-                }
-                memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-                ++copy_start[6];
-              } while (copy_start[6] < copy_shape[6]);
-              ++copy_start[5];
-              copy_start[6] = 0;
-            } while (copy_start[5] < copy_shape[5]);
-            ++copy_start[4];
-            copy_start[5] = 0;
-          } while (copy_start[4] < copy_shape[4]);
-          ++copy_start[3];
-          copy_start[4] = 0;
-        } while (copy_start[3] < copy_shape[3]);
-        ++copy_start[2];
-        copy_start[3] = 0;
-      } while (copy_start[2] < copy_shape[2]);
-      ++copy_start[1];
-      copy_start[2] = 0;
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy7dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[6] * itemsize;
-  int64_t copy_start[6] = {0};
-  do {
-    do {
-      do {
-        do {
-          do {
-            do {
-              int64_t src_copy_start = 0;
-              int64_t dst_copy_start = 0;
-              for (int j = 0; j < 6; ++j) {
-                src_copy_start += copy_start[j] * src_strides[j];
-                dst_copy_start += copy_start[j] * dst_strides[j];
-              }
-              memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-              ++copy_start[5];
-            } while (copy_start[5] < copy_shape[5]);
-            ++copy_start[4];
-            copy_start[5] = 0;
-          } while (copy_start[4] < copy_shape[4]);
-          ++copy_start[3];
-          copy_start[4] = 0;
-        } while (copy_start[3] < copy_shape[3]);
-        ++copy_start[2];
-        copy_start[3] = 0;
-      } while (copy_start[2] < copy_shape[2]);
-      ++copy_start[1];
-      copy_start[2] = 0;
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy6dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[5] * itemsize;
-  int64_t copy_start[5] = {0};
-  do {
-    do {
-      do {
-        do {
-          do {
-            int64_t src_copy_start = 0;
-            int64_t dst_copy_start = 0;
-            for (int j = 0; j < 5; ++j) {
-              src_copy_start += copy_start[j] * src_strides[j];
-              dst_copy_start += copy_start[j] * dst_strides[j];
-            }
-            memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-            ++copy_start[4];
-          } while (copy_start[4] < copy_shape[4]);
-          ++copy_start[3];
-          copy_start[4] = 0;
-        } while (copy_start[3] < copy_shape[3]);
-        ++copy_start[2];
-        copy_start[3] = 0;
-      } while (copy_start[2] < copy_shape[2]);
-      ++copy_start[1];
-      copy_start[2] = 0;
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy5dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[4] * itemsize;
-  int64_t copy_start[4] = {0};
-  do {
-    do {
-      do {
-        do {
-          int64_t src_copy_start = 0;
-          int64_t dst_copy_start = 0;
-          for (int j = 0; j < 4; ++j) {
-            src_copy_start += copy_start[j] * src_strides[j];
-            dst_copy_start += copy_start[j] * dst_strides[j];
-          }
-          memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-          ++copy_start[3];
-        } while (copy_start[3] < copy_shape[3]);
-        ++copy_start[2];
-        copy_start[3] = 0;
-      } while (copy_start[2] < copy_shape[2]);
-      ++copy_start[1];
-      copy_start[2] = 0;
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy4dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[3] * itemsize;
-  int64_t copy_start[3] = {0};
-  do {
-    do {
-      do {
-        int64_t src_copy_start = 0;
-        int64_t dst_copy_start = 0;
-        for (int j = 0; j < 3; ++j) {
-          src_copy_start += copy_start[j] * src_strides[j];
-          dst_copy_start += copy_start[j] * dst_strides[j];
-        }
-        memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-        ++copy_start[2];
-      } while (copy_start[2] < copy_shape[2]);
-      ++copy_start[1];
-      copy_start[2] = 0;
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy3dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[2] * itemsize;
-  int64_t copy_start[2] = {0};
-  do {
-    do {
-      int64_t src_copy_start = 0;
-      int64_t dst_copy_start = 0;
-      for (int j = 0; j < 2; ++j) {
-        src_copy_start += copy_start[j] * src_strides[j];
-        dst_copy_start += copy_start[j] * dst_strides[j];
-      }
-      memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-      ++copy_start[1];
-    } while (copy_start[1] < copy_shape[1]);
-    ++copy_start[0];
-    copy_start[1] = 0;
-  } while (copy_start[0] < copy_shape[0]);
-}
-
-void copy2dim(const int32_t itemsize,
-              const int64_t *copy_shape,
-              const uint8_t *bsrc, const int64_t *src_strides,
-              uint8_t *bdst, const int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[1] * itemsize;
-  int64_t copy_start = 0;
-  do {
-    int64_t src_copy_start = copy_start * src_strides[0];
-    int64_t dst_copy_start = copy_start * dst_strides[0];
-    memcpy(&bdst[dst_copy_start * itemsize], &bsrc[src_copy_start * itemsize], copy_nbytes);
-    ++copy_start;
-  } while (copy_start < copy_shape[0]);
-}
-
-
-void copy_ndim_fallback(const int8_t ndim,
-                        const int32_t itemsize,
-                        int64_t *copy_shape,
-                        const uint8_t *bsrc, int64_t *src_strides,
-                        uint8_t *bdst, int64_t *dst_strides) {
-  int64_t copy_nbytes = copy_shape[ndim - 1] * itemsize;
-  int64_t number_of_copies = 1;
-  for (int i = 0; i < ndim - 1; ++i) {
-    number_of_copies *= copy_shape[i];
+// Copies `nrows` rows of `row_nbytes` bytes each; consecutive rows are `src_stride` and `dst_stride` bytes apart.
+// Rows of up to 64 bytes (e.g. 16 float32 or 32 int16 items: the rows of 16^3 float32 and 32x64x32 int16 blocks)
+// are copied with fixed-size moves: a memcpy() call per row costs more than such a copy itself.  Two moves of n
+// bytes, the second one ending at the end of the row, cover any length from n to 2 * n (they may overlap).
+// Longer rows go to memcpy(), which is as fast or faster for them.
+static inline void copy_rows(uint8_t *dst, int64_t dst_stride, const uint8_t *src, int64_t src_stride,
+                             int64_t nrows, int64_t row_nbytes) {
+#define COPY_ROWS(stmt)                     \
+  for (int64_t r = 0; r < nrows; ++r) {     \
+    stmt;                                   \
+    dst += dst_stride;                      \
+    src += src_stride;                      \
   }
-  for (int ncopy = 0; ncopy < number_of_copies; ++ncopy) {
-    // Compute the start of the copy
-    int64_t copy_start[B2ND_MAX_DIM] = {0};
-    blosc2_unidim_to_multidim((int8_t) (ndim - 1), copy_shape, ncopy, copy_start);
+#define MOVE_2X(n)                                                     \
+  memcpy(dst, src, n);                                                 \
+  memcpy(dst + row_nbytes - (n), src + row_nbytes - (n), n)
 
-    // Translate this index to the src buffer
-    int64_t src_copy_start;
-    blosc2_multidim_to_unidim(copy_start, (int8_t) (ndim - 1), src_strides, &src_copy_start);
+  if (row_nbytes > 64) {
+    COPY_ROWS(memcpy(dst, src, (size_t) row_nbytes))
+  } else if (row_nbytes > 32) {
+    COPY_ROWS(MOVE_2X(32))
+  } else if (row_nbytes == 32) {
+    COPY_ROWS(memcpy(dst, src, 32))
+  } else if (row_nbytes > 16) {
+    COPY_ROWS(MOVE_2X(16))
+  } else if (row_nbytes == 16) {
+    COPY_ROWS(memcpy(dst, src, 16))
+  } else if (row_nbytes > 8) {
+    COPY_ROWS(MOVE_2X(8))
+  } else if (row_nbytes == 8) {
+    COPY_ROWS(memcpy(dst, src, 8))
+  } else if (row_nbytes > 4) {
+    COPY_ROWS(MOVE_2X(4))
+  } else if (row_nbytes == 4) {
+    COPY_ROWS(memcpy(dst, src, 4))
+  } else if (row_nbytes > 2) {
+    COPY_ROWS(MOVE_2X(2))
+  } else if (row_nbytes == 2) {
+    COPY_ROWS(memcpy(dst, src, 2))
+  } else {
+    COPY_ROWS(*dst = *src)
+  }
+#undef MOVE_2X
+#undef COPY_ROWS
+}
 
-    // Translate this index to the dst buffer
-    int64_t dst_copy_start;
-    blosc2_multidim_to_unidim(copy_start, (int8_t) (ndim - 1), dst_strides, &dst_copy_start);
 
-    // Perform the copy
-    memcpy(&bdst[dst_copy_start * itemsize],
-           &bsrc[src_copy_start * itemsize],
-           copy_nbytes);
+// Copies a box of `ndim` >= 2 dimensions (all of `copy_shape` > 0; strides in items): the two innermost
+// dimensions go to copy_rows(), the outer ones are walked once per plane of rows.
+static void copy_box(int8_t ndim, int32_t itemsize, const int64_t *copy_shape,
+                     const uint8_t *bsrc, const int64_t *src_strides,
+                     uint8_t *bdst, const int64_t *dst_strides) {
+  const int64_t row_nbytes = copy_shape[ndim - 1] * itemsize;
+  const int64_t nrows = copy_shape[ndim - 2];
+  const int64_t src_row_stride = src_strides[ndim - 2] * itemsize;
+  const int64_t dst_row_stride = dst_strides[ndim - 2] * itemsize;
+  const int nouter = ndim - 2;
+  int64_t index[B2ND_MAX_DIM] = {0};
+  for (;;) {
+    int64_t src_offset = 0;
+    int64_t dst_offset = 0;
+    for (int i = 0; i < nouter; ++i) {
+      src_offset += index[i] * src_strides[i];
+      dst_offset += index[i] * dst_strides[i];
+    }
+    copy_rows(bdst + dst_offset * itemsize, dst_row_stride, bsrc + src_offset * itemsize, src_row_stride,
+              nrows, row_nbytes);
+    int i = nouter - 1;
+    while (i >= 0 && ++index[i] == copy_shape[i]) {
+      index[i] = 0;
+      --i;
+    }
+    if (i < 0) {
+      break;
+    }
   }
 }
 
@@ -291,35 +129,10 @@ int b2nd_copy_buffer2(int8_t ndim,
   uint8_t *bdst = (uint8_t *) dst;
   bdst = &bdst[dst_start_n * itemsize];
 
-  switch (ndim) {
-    case 1:
-      memcpy(&bdst[0], &bsrc[0], copy_shape[0] * itemsize);
-      break;
-    case 2:
-      copy2dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 3:
-      copy3dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 4:
-      copy4dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 5:
-      copy5dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 6:
-      copy6dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 7:
-      copy7dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    case 8:
-      copy8dim(itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
-    default:
-      // guard against potential future increase to B2ND_MAX_DIM
-      copy_ndim_fallback(ndim, itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
-      break;
+  if (ndim == 1) {
+    memcpy(bdst, bsrc, copy_shape[0] * itemsize);
+  } else {
+    copy_box(ndim, itemsize, copy_shape, bsrc, src_strides, bdst, dst_strides);
   }
 
   return BLOSC2_ERROR_SUCCESS;
