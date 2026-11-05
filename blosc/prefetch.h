@@ -15,19 +15,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* How much of a frame file's end is asked for at open: the trailer and, unless the frame has a huge number of chunks,
-   the chunk index right before it */
-#define PREFETCH_TAIL_NBYTES (64 * 1024)
-
 typedef struct prefetch_batch prefetch_batch;
 
 /* Whether read-ahead is on and applies to @p frame (a contiguous frame on disk; not on Windows): callers can skip
    working out what to read ahead otherwise */
 bool prefetch_applies(const blosc2_frame_s *frame);
 
-/* If read-ahead is on, ask the kernel to start reading [offset, offset + nbytes) of the file behind @p fp (a handle of
-   the default filesystem or the mmap I/O) in the background */
-void prefetch_hint(const blosc2_io *io, void *fp, int64_t offset, int64_t nbytes);
+/* Ask the kernel to start reading, in the background, what opening the frame at @p offset of the file behind @p fp (a
+   handle of the default filesystem or the mmap I/O; @p file_size bytes) reads next: its header at the start and its
+   trailer and chunk index at the end, also with read-ahead off; with read-ahead on, a small frame whole */
+void prefetch_open_hint(const blosc2_io *io, void *fp, int64_t offset, int64_t file_size);
 
 /* Start reading the parts of chunks nchunks[0..n) of a contiguous frame on disk that are not in the page cache, with
    the read-ahead threads, in this order.  @p maskouts is NULL (whole chunks), or one pointer per chunk: NULL to read
