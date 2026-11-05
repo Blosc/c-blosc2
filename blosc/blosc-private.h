@@ -302,12 +302,15 @@ extern int g_ntuners;
    blosc2_tmp_malloc() returns memory for at least `nbytes` (malloc'ed, so it
    may be released with plain free()) and its real size in *capacity;
    blosc2_tmp_free() keeps it for reuse or frees it.  At most
-   BLOSC2_TMP_CACHE_MAX bytes stay cached per thread, released at thread exit
-   or by blosc2_destroy() for the calling thread. */
+   BLOSC2_TMP_CACHE_MAX bytes stay cached per thread.  The cache also holds the
+   thread's thread_context for serial work (see serial_context_get()).  Both
+   are released at thread exit, or by blosc2_free_resources() and
+   blosc2_destroy() for the calling thread. */
 void *blosc2_tmp_malloc(size_t nbytes, size_t *capacity);
 void blosc2_tmp_free(void *ptr, size_t capacity);
 void blosc2_tmp_cache_clear(void);
-/* Bytes currently held by the calling thread's cache (for tests). */
+/* Bytes currently held by the calling thread's cache, without its serial
+   thread_context (for tests). */
 size_t blosc2_tmp_cache_nbytes(void);
 
 

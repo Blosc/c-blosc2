@@ -140,6 +140,7 @@ struct thread_context {
   blosc2_context* parent_context;
   struct blosc_shared_pool* owner_pool;
   int tid;
+  bool serial;  /* decodes the blocks of a chunk in order (serial jobs, getitem) */
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
