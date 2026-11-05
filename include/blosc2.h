@@ -802,10 +802,13 @@ BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
  * @p piece_size bytes, in the order the slice decompresses them and at most @p max_ahead bytes ahead of it, and each
  * chunk is decompressed as soon as its bytes are in.  Of a chunk that a slice (#b2nd_get_slice_cbuffer,
  * #b2nd_get_slice) covers only in part, only the blocks it needs are read, after the chunk's header (which says where
- * they are; one round trip more when it is not cached).  Opening such a frame also asks for its trailer while reading its header.  The data goes to the page cache
- * (memory-mapped reads stay zero-copy); pages that are cached already are not read again (asked with cachestat() on
- * Linux >= 6.5, else mincore()).  On Linux the kernel answers that only for files the process owns or may write to
- * (before 6.5: only files it owns); other files are read again even when cached, which is correct but costs a copy.
+ * they are; one round trip more when it is not cached).  The data goes to the page cache (memory-mapped reads stay
+ * zero-copy); pages that are cached already are not read again (asked with cachestat() on Linux >= 6.5, else
+ * mincore()).  On Linux the kernel answers that only for files the process owns or may write to (before 6.5: only
+ * files it owns); other files are read again even when cached, which is correct but costs a copy.
+ *
+ * Opening a frame file asks for its start and its end (header, trailer and chunk index) at once, also with read-ahead
+ * off; with read-ahead on, a file of up to 1 MiB (from the frame's offset on) is asked for whole.
  *
  * Reads that are not cached get faster on any storage, most on high-latency ones; 4 threads and the default piece
  * size give most of the speed.  The threads mostly wait for the storage, but the kernel spends CPU on every byte they
