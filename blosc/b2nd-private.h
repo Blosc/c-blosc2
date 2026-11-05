@@ -35,6 +35,20 @@
  * @return The number of chunks needed to get the slice. If some problem is
  * detected, a negative code is returned instead.
  */
-int64_t b2nd_get_slice_nchunks(b2nd_array_t *array, const int64_t *start, const int64_t *stop, int64_t **chunks_idx);
+int64_t b2nd_get_slice_nchunks(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
+                               int64_t **chunks_idx);
+
+/**
+ * @brief Zero a box of a C-order buffer, in as few and as long runs of bytes as its layout allows.
+ *
+ * @param ndim The number of dimensions of the buffer.
+ * @param itemsize The size of an item in bytes.
+ * @param dst The buffer.
+ * @param dst_pad_shape The shape of the buffer.
+ * @param box_start The coordinates where the box begins.
+ * @param box_stop The coordinates where the box ends (exclusive); nothing is zeroed if the box is empty.
+ */
+void b2nd_zero_box(int8_t ndim, int32_t itemsize, void *dst, const int64_t *dst_pad_shape,
+                   const int64_t *box_start, const int64_t *box_stop);
 
 #endif /* BLOSC_B2ND_PRIVATE_H */
