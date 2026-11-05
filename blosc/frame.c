@@ -2099,11 +2099,9 @@ blosc2_frame_s* frame_from_file_offset(const char* urlpath, const blosc2_io *io,
     }
 
     if (!sframe) {
-      // The trailer and the chunk index are at the end of the file and the header is at its start: ask for the
-      // end now, so that both arrive in one round trip instead of one after the other (with read-ahead on)
-      int64_t file_size = (int64_t) path_stat.st_size;
-      int64_t tail_start = file_size - PREFETCH_TAIL_NBYTES > offset ? file_size - PREFETCH_TAIL_NBYTES : offset;
-      prefetch_hint(io, fp, tail_start, file_size - tail_start);
+      // The header is at the start of the file and the trailer and the chunk index at its end: ask for both now, so
+      // that they arrive in one round trip instead of one after the other
+      prefetch_open_hint(io, fp, offset, (int64_t) path_stat.st_size);
     }
 
     if (io_cb->is_allocation_necessary)
