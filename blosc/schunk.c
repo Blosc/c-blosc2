@@ -256,10 +256,11 @@ blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage) {
 
 
 /* A new, empty super-chunk with `storage` and the metalayers of `schunk`: the
-   first part of blosc2_schunk_copy().  Sets *chunks_as_is to whether the chunks of
-   `schunk` can go into it as they are (else they have to be recompressed). */
+   first part of schunk_copy_impl().  Sets *chunks_as_is to whether the chunks of
+   `schunk` can go into it as they are (else they have to be recompressed).
+   `apply_filters` as in schunk_copy_impl(). */
 static blosc2_schunk* schunk_copy_skeleton(blosc2_schunk *schunk, const blosc2_storage *dest_storage,
-                                           bool *chunks_as_is) {
+                                           bool apply_filters, bool *chunks_as_is) {
   // A copy, so that the defaults below do not end up in the caller's storage: a
   // pointer to the local cparams left there would dangle after the return
   blosc2_storage storage_ = *dest_storage;
@@ -296,8 +297,7 @@ static blosc2_schunk* schunk_copy_skeleton(blosc2_schunk *schunk, const blosc2_s
       cparams.use_dict != schunk->cctx->use_dict ||
       cparams.blocksize != schunk->cctx->blocksize ||
       // In case of prefilters or postfilters, force their execution.
-      schunk->cctx->prefilter != NULL ||
-      schunk->dctx->postfilter != NULL) {
+      (apply_filters && (schunk->cctx->prefilter != NULL || schunk->dctx->postfilter != NULL))) {
     cparams_equal = false;
   }
   for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
@@ -355,14 +355,16 @@ int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, b
 }
 
 
-/* Create a copy of a super-chunk */
-blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
+/* A copy of a super-chunk.  With `apply_filters`, a prefilter or postfilter of
+   `schunk` forces decompressing and recompressing the chunks, so that the copy
+   holds the data as read; serializing passes false to keep the chunks as stored. */
+static blosc2_schunk* schunk_copy_impl(blosc2_schunk *schunk, blosc2_storage *storage, bool apply_filters) {
   if (schunk == NULL) {
     BLOSC_TRACE_ERROR("Can not copy a NULL `schunk`.");
     return NULL;
   }
   bool chunks_as_is;
-  blosc2_schunk *new_schunk = schunk_copy_skeleton(schunk, storage, &chunks_as_is);
+  blosc2_schunk *new_schunk = schunk_copy_skeleton(schunk, storage, apply_filters, &chunks_as_is);
   if (new_schunk == NULL) {
     return NULL;
   }
@@ -427,6 +429,12 @@ blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage
 error:
   blosc2_schunk_free(new_schunk);
   return NULL;
+}
+
+
+/* Create a copy of a super-chunk */
+blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage) {
+  return schunk_copy_impl(schunk, storage, true);
 }
 
 
@@ -558,7 +566,7 @@ int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** dest, bool* nee
   else {
     // Copy to a contiguous storage
     blosc2_storage frame_storage = {.contiguous=true};
-    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
+    blosc2_schunk* schunk_copy = schunk_copy_impl(schunk, &frame_storage, false);
     if (schunk_copy == NULL) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
       return BLOSC2_ERROR_SCHUNK_COPY;
@@ -589,7 +597,7 @@ int64_t blosc2_schunk_to_buffer_alloc(blosc2_schunk* schunk,
     blosc2_storage frame_storage = BLOSC2_STORAGE_DEFAULTS;
     frame_storage.contiguous = true;
     bool chunks_as_is;
-    blosc2_schunk* skeleton = schunk_copy_skeleton(schunk, &frame_storage, &chunks_as_is);
+    blosc2_schunk* skeleton = schunk_copy_skeleton(schunk, &frame_storage, false, &chunks_as_is);
     if (skeleton == NULL) {
       BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
       return BLOSC2_ERROR_SCHUNK_COPY;
@@ -720,7 +728,7 @@ int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath) {
 
   // Copy to a contiguous file
   blosc2_storage frame_storage = {.contiguous=true, .urlpath=(char*)urlpath};
-  blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
+  blosc2_schunk* schunk_copy = schunk_copy_impl(schunk, &frame_storage, false);
   if (schunk_copy == NULL) {
     BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
     return BLOSC2_ERROR_SCHUNK_COPY;
@@ -751,7 +759,7 @@ int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char* urlpath) {
 
     // Copy to a contiguous file
     blosc2_storage frame_storage = {.contiguous=true, .urlpath=NULL};
-    blosc2_schunk* schunk_copy = blosc2_schunk_copy(schunk, &frame_storage);
+    blosc2_schunk* schunk_copy = schunk_copy_impl(schunk, &frame_storage, false);
     if (schunk_copy == NULL) {
         BLOSC_TRACE_ERROR("Error during the conversion of schunk to buffer.");
         return BLOSC2_ERROR_SCHUNK_COPY;
