@@ -3075,8 +3075,32 @@ int compare_selection(const void *a, const void *b) {
 }
 
 
+// The dimension whose consecutive selected items copy_block_buffer_data() batches into one memcpy() for a block:
+// the innermost one, or further out where the dimensions inside it merge into it.  A dimension merges into the one
+// outside it when the block's selection in it is the block's whole extent in order, at consecutive buffer positions
+// that fill the buffer's extent too: then its items follow on contiguously in both the block and the buffer (e.g.
+// the channels of a channels-last image, which then merge with the pixels of a block row).
+static int8_t block_selection_batch_dim(const b2nd_array_t *array, const int64_t *buffershape,
+                                        const int64_t *block_selection_size, b2nd_selection_t **block_selection) {
+  for (int8_t dim = (int8_t) (array->ndim - 1); dim > 0; --dim) {
+    int64_t n = block_selection_size[dim];
+    if (n != array->blockshape[dim] || n != buffershape[dim]) {
+      return dim;
+    }
+    const b2nd_selection_t *sel = block_selection[dim];
+    for (int64_t j = 1; j < n; ++j) {
+      if (sel[j].value != sel[j - 1].value + 1 || sel[j].index != sel[j - 1].index + 1) {
+        return dim;
+      }
+    }
+  }
+  return 0;
+}
+
+
 int copy_block_buffer_data(b2nd_array_t *array,
                            int8_t ndim,
+                           int8_t batch_dim,
                            int64_t *block_selection_size,
                            b2nd_selection_t **chunk_selection,
                            b2nd_selection_t **p_block_selection_0,
@@ -3089,81 +3113,47 @@ int copy_block_buffer_data(b2nd_array_t *array,
   p_block_selection_0[ndim] = chunk_selection[ndim];
   p_block_selection_1[ndim] = chunk_selection[ndim];
   while (p_block_selection_1[ndim] - p_block_selection_0[ndim] < block_selection_size[ndim]) {
-    if (ndim == array->ndim - 1) {
-      // --- leaf: batch consecutive innermost-dimension elements ---------
+    if (ndim == batch_dim) {
+      // --- leaf: batch consecutive elements of batch_dim, each with the dimensions merged into it (see
+      // block_selection_batch_dim()), into one memcpy() ---
 
-      // Compute start position of the first element in the batch.
-      int64_t index_in_block_n[B2ND_MAX_DIM];
-      for (int i = 0; i < array->ndim; ++i) {
-        index_in_block_n[i] = p_block_selection_1[i]->value % array->chunkshape[i] % array->blockshape[i];
+      // The merged dimensions start where the block's selection starts.
+      for (int i = ndim + 1; i < array->ndim; ++i) {
+        p_block_selection_1[i] = chunk_selection[i];
       }
-      int64_t start_block = 0;
-      for (int i = 0; i < array->ndim; ++i) {
-        start_block += index_in_block_n[i] * array->item_block_strides[i];
-      }
-
-      int64_t index_in_buffer_n[B2ND_MAX_DIM];
-      for (int i = 0; i < array->ndim; ++i) {
-        index_in_buffer_n[i] = p_block_selection_1[i]->index;
-      }
-      int64_t start_buffer = 0;
-      for (int i = 0; i < array->ndim; ++i) {
-        start_buffer += index_in_buffer_n[i] * bufferstrides[i];
-      }
-
-      int64_t count = 1;
       int32_t typesize = array->sc->typesize;
-      p_block_selection_1[ndim]++;
-
-      while (p_block_selection_1[ndim] - p_block_selection_0[ndim] < block_selection_size[ndim]) {
-        b2nd_selection_t *prev = p_block_selection_1[ndim] - 1;
-        b2nd_selection_t *curr = p_block_selection_1[ndim];
-
-        // Check if this element is adjacent to the previous one in both
-        // the block buffer (value) and the output buffer (index).
-        if (curr->value == prev->value + 1 && curr->index == prev->index + 1) {
-          count++;
-        } else {
-          // Flush the current batch.
-          if (get) {
-            memcpy(&buffer[start_buffer * typesize], &block[start_block * typesize], (size_t)(count * typesize));
-          } else {
-            memcpy(&block[start_block * typesize], &buffer[start_buffer * typesize], (size_t)(count * typesize));
-          }
-
-          // Recompute start position for the new batch.
-          // Only the innermost dimension advances here; outer dimensions
-          // must keep using their current recursive selection pointers.
-          for (int i = 0; i < array->ndim; ++i) {
-            if (i == ndim) {
-              index_in_block_n[i] = curr->value % array->chunkshape[i] % array->blockshape[i];
-              index_in_buffer_n[i] = curr->index;
-            } else {
-              index_in_block_n[i] = p_block_selection_1[i]->value % array->chunkshape[i] % array->blockshape[i];
-              index_in_buffer_n[i] = p_block_selection_1[i]->index;
-            }
-          }
-          start_block = 0;
-          for (int i = 0; i < array->ndim; ++i) {
-            start_block += index_in_block_n[i] * array->item_block_strides[i];
-          }
-          start_buffer = 0;
-          for (int i = 0; i < array->ndim; ++i) {
-            start_buffer += index_in_buffer_n[i] * bufferstrides[i];
-          }
-          count = 1;
+      // Bytes of one element of batch_dim with the dimensions merged into it
+      size_t batch_nbytes = (size_t) (array->item_block_strides[ndim] * typesize);
+      b2nd_selection_t *first = p_block_selection_1[ndim];
+      b2nd_selection_t *end = p_block_selection_0[ndim] + block_selection_size[ndim];
+      while (first < end) {
+        // Extend the batch while the next element is adjacent to the previous one in both the block buffer (value)
+        // and the output buffer (index).
+        b2nd_selection_t *last = first + 1;
+        while (last < end && last->value == last[-1].value + 1 && last->index == last[-1].index + 1) {
+          last++;
         }
-        p_block_selection_1[ndim]++;
-      }
 
-      // Flush the last batch.
-      if (get) {
-        memcpy(&buffer[start_buffer * typesize], &block[start_block * typesize], (size_t)(count * typesize));
-      } else {
-        memcpy(&block[start_block * typesize], &buffer[start_buffer * typesize], (size_t)(count * typesize));
+        // Start positions of the batch; outer dimensions keep using their current recursive selection pointers.
+        p_block_selection_1[ndim] = first;
+        int64_t start_block = 0;
+        int64_t start_buffer = 0;
+        for (int i = 0; i < array->ndim; ++i) {
+          start_block += p_block_selection_1[i]->value % array->chunkshape[i] % array->blockshape[i] *
+                         array->item_block_strides[i];
+          start_buffer += p_block_selection_1[i]->index * bufferstrides[i];
+        }
+        size_t nbytes = (size_t) (last - first) * batch_nbytes;
+        if (get) {
+          memcpy(&buffer[start_buffer * typesize], &block[start_block * typesize], nbytes);
+        } else {
+          memcpy(&block[start_block * typesize], &buffer[start_buffer * typesize], nbytes);
+        }
+        first = last;
       }
+      p_block_selection_1[ndim] = end;
     } else {
-      BLOSC_ERROR(copy_block_buffer_data(array, (int8_t) (ndim + 1), block_selection_size,
+      BLOSC_ERROR(copy_block_buffer_data(array, (int8_t) (ndim + 1), batch_dim, block_selection_size,
                                          chunk_selection,
                                          p_block_selection_0, p_block_selection_1, block,
                                          buffer, buffershape, bufferstrides, get)
@@ -3217,8 +3207,10 @@ int iter_block_copy(b2nd_array_t *array, int8_t ndim,
         block_selection_size[i] = chunk_selection_1[i] - chunk_selection_0[i];
       }
 
+      int8_t batch_dim = block_selection_batch_dim(array, buffershape, block_selection_size, chunk_selection_0);
       BLOSC_ERROR(copy_block_buffer_data(array,
                                          (int8_t) 0,
+                                         batch_dim,
                                          block_selection_size,
                                          chunk_selection_0,
                                          p_block_selection_0,
