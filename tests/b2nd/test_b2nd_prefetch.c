@@ -12,13 +12,15 @@
    b2nd_get_slice(), b2nd_get_orthogonal_selection(), blosc2_schunk_get_slice_buffer()): with the default and the mmap
    I/O; with chunks that are special values; with blocks stored in order, out of order (several compression threads)
    and as plain copies (clevel 0), as slices read only the blocks they need of the chunks they cover in part; with a
-   read-ahead budget smaller than a chunk; with small and large pieces; on an empty array; and after fork(). */
+   read-ahead budget smaller than a chunk; with small and large pieces; on an empty array; after fork(); and with
+   several threads of a process reading at once (their slices share the process's read-ahead pool). */
 
 #include "test_common.h"
 #include "blosc2/blosc2-stdio.h"
 
 #if !defined(_WIN32)
 #include <fcntl.h>
+#include <pthread.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -213,6 +215,47 @@ static int check_reads(bool mmap_io, result_t expected[][NWAYS]) {
 }
 
 
+#if !defined(_WIN32)
+#define NREADERS 6
+
+typedef struct {
+  bool mmap_io;
+  result_t (*expected)[NWAYS];
+  int rc;
+} reader_t;
+
+
+static void* concurrent_reader(void *arg) {
+  reader_t *reader = arg;
+  reader->rc = check_reads(reader->mmap_io, reader->expected);
+  return NULL;
+}
+
+
+/* NREADERS threads read the slices at the same time, cold and warm, each with its own handle */
+static int check_concurrent_reads(bool mmap_io, result_t expected[][NWAYS]) {
+  pthread_t threads[NREADERS];
+  reader_t readers[NREADERS];
+  int nstarted = 0;
+  while (nstarted < NREADERS) {
+    readers[nstarted].mmap_io = mmap_io;
+    readers[nstarted].expected = expected;
+    readers[nstarted].rc = 1;
+    if (pthread_create(&threads[nstarted], NULL, concurrent_reader, &readers[nstarted]) != 0) {
+      break;
+    }
+    nstarted++;
+  }
+  int rc = nstarted == NREADERS ? 0 : 1;
+  for (int i = 0; i < nstarted; ++i) {
+    pthread_join(threads[i], NULL);
+    rc |= readers[i].rc;
+  }
+  return rc;
+}
+#endif
+
+
 /* An array on disk with an empty axis (chunk shape 0 there): nothing to read ahead, and no division by zero */
 static int check_empty(void) {
   const char *urlpath = "test_b2nd_prefetch_empty.b2nd";
@@ -303,6 +346,8 @@ CUTEST_TEST_TEST(prefetch) {
   int status;
   CUTEST_ASSERT("Cannot fork", pid > 0 && waitpid(pid, &status, 0) == pid);
   CUTEST_ASSERT("Slices differ with read-ahead in a forked child", WIFEXITED(status) && WEXITSTATUS(status) == 0);
+  CUTEST_ASSERT("Slices differ with read-ahead in threads reading at once",
+                check_concurrent_reads(mmap_io, expected) == 0);
 #endif
   free_slices(expected);
 

@@ -58,13 +58,13 @@ The threads above compress and decompress: they split the blocks of one chunk be
 before the next one starts.  Reading a slice of a frame on disk is a different job.  Each block that is not in the
 page cache yet has to wait for the storage, and on a network file system every such wait is a round trip to the
 server.  `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the `BLOSC_PREFETCH` environment variable) starts
-a separate, process-wide pool of read-ahead threads for that.  When a slice starts (`b2nd_get_slice_cbuffer`,
-`b2nd_get_slice_cbuffer_into`, `b2nd_get_slice`, `b2nd_get_orthogonal_selection`, `blosc2_schunk_get_slice_buffer`),
-they read all the chunks it needs (that are not cached already) in pieces of at most `piece_size` bytes, in parallel
-and in the order the slice decompresses them, at most `max_ahead` bytes ahead of it; the slice waits for each chunk
-only right before decompressing it.  Of a chunk that a slice of an array covers only in part, only the blocks the
-slice needs are read (after the chunk's header, which says where they are: one round trip more when it is not
-cached).
+separate read-ahead threads for that.  When a slice starts (`b2nd_get_slice_cbuffer`, `b2nd_get_slice_cbuffer_into`,
+`b2nd_get_slice`, `b2nd_get_orthogonal_selection`, `blosc2_schunk_get_slice_buffer`), up to `nthreads` of them read
+all the chunks it needs (that are not cached already) in pieces of at most `piece_size` bytes, in parallel and in the
+order the slice decompresses them, at most `max_ahead` bytes ahead of it; the slice waits for each chunk only right
+before decompressing it.  Of a chunk
+that a slice of an array covers only in part, only the blocks the slice needs are read (after the chunk's header,
+which says where they are: one round trip more when it is not cached).
 
 Read-ahead threads spend most of their time waiting for the storage, but reading is not free: the kernel copies the
 data, and it spends more CPU per byte the more threads read the same file at once.  Which settings to use:
@@ -74,10 +74,16 @@ data, and it spends more CPU per byte the more threads read the same file at onc
   on NVMe disks 1.5-3x.
 * Less CPU on local disks: fewer threads (1-2) or larger pieces (4-8 MiB).  On one NVMe system that kept the speed at
   up to 40% less CPU; on another it cost 10-30% of the speed.
-* Many reader processes at once: the processes already read in parallel.  When the CPU is the limit (tens of
-  processes reading data that is not cached on one node), the kernel time read-ahead adds can make it slower than
-  without; fewer threads per process (1-2), or none, are better there.
+* Many reader processes or threads at once: they already read in parallel.  When they keep all cores busy, the
+  kernel time read-ahead adds can cost more than it saves, and fewer threads (1-2) or none can be better.  In our
+  tests on NFS (3D images, 24 to 96 reader processes on 64 hardware threads), 4 threads were the fastest setting or
+  within 10% of it.
 
-The two kinds of threads are independent: a program that runs many reader processes can keep one decompression thread
-per process (`nthreads=1`) and still use read-ahead threads in each.  Read-ahead is off by default and has no effect on
-Windows.
+How many read-ahead threads run: up to `nthreads` for each slice being read, per process.  A process that reads with
+one thread has `nthreads` of them; one whose 8 threads read at the same time, up to 8 x `nthreads` (at most 256 in
+all); 8 processes that read with one thread each, `nthreads` each.  The decompression threads above do not count: a
+read with 8 decompression threads and `nthreads` = 4 has 4 read-ahead threads, which fetch the next chunks while the 8
+decompress the current one.  So the two kinds are independent: a program that runs many reader processes or threads
+can keep one decompression thread each (`nthreads=1`) and still read ahead in each.  Read-ahead threads run until
+`blosc2_destroy()`, each keeping a buffer of up to `piece_size` bytes.  Read-ahead is off by default and has no effect
+on Windows.

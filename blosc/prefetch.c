@@ -165,22 +165,28 @@ struct prefetch_batch {
   int64_t *end_piece;  // per chunk: the pieces below this one hold all of it
   int64_t cursor;      // where prefetch_batch_wait() looks for its chunk first
   int64_t max_ahead;
+  int nthreads;        // at most this many pieces are read at once (the read-ahead threads per slice)
+  int inflight;        // pieces handed to a thread and not read yet
   bool waiting;        // the slice waits for piece `ndone`
   pthread_cond_t progress;
   prefetch_batch *next_batch;  // in the pool's FIFO
 };
 
-/* One pool per process, guarded by its mutex.  Threads do not survive fork(): the child starts over with an empty
-   pool (pool_atfork_child()). */
+/* One pool per process, guarded by its mutex.  Every slice being read (a batch) gets up to `nthreads` threads of it
+   at once: the pool grows to `nthreads` threads per batch in its FIFO (at most BLOSC2_PREFETCH_MAX_NTHREADS), and no
+   batch has more than its `nthreads` pieces in flight.  So N threads of a process that read at the same time get the
+   read-ahead of N processes, and a slice does not wait behind the pieces of slices that started before it.  Threads
+   do not survive fork(): the child starts over with an empty pool (pool_atfork_child()). */
 static struct {
   pthread_mutex_t mutex;
   pthread_cond_t work;  // a batch has pieces to hand out, or stop
   prefetch_batch *batches;
+  int nbatches;         // in `batches`
   pthread_t *threads;
   int nthreads;
   bool stop;
   bool atfork_registered;
-} pool = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, NULL, 0, false, false};
+} pool = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, 0, NULL, 0, false, false};
 
 
 static void pool_atfork_prepare(void) {
@@ -200,6 +206,7 @@ static void pool_atfork_child(void) {
   pool.mutex = mutex;
   pool.work = work;
   pool.batches = NULL;
+  pool.nbatches = 0;
   pool.threads = NULL;
   pool.nthreads = 0;
 }
@@ -230,7 +237,7 @@ static void* pool_worker(void *arg) {
   pthread_mutex_lock(&pool.mutex);
   while (!pool.stop) {
     prefetch_batch *batch = pool.batches;
-    while (batch != NULL && batch->next >= batch->limit) {
+    while (batch != NULL && (batch->next >= batch->limit || batch->inflight >= batch->nthreads)) {
       batch = batch->next_batch;
     }
     if (batch == NULL) {
@@ -239,6 +246,7 @@ static void* pool_worker(void *arg) {
     }
     // The batch is not freed before all the pieces handed out have finished (prefetch_batch_free())
     int64_t i = batch->next++;
+    batch->inflight++;
     pthread_mutex_unlock(&pool.mutex);
     if (batch->pieces[i].nbytes > scratch_nbytes) {
       free(scratch);
@@ -249,6 +257,7 @@ static void* pool_worker(void *arg) {
       read_piece(batch->fd, scratch, batch->pieces[i].offset, batch->pieces[i].nbytes, true);
     }
     pthread_mutex_lock(&pool.mutex);
+    batch->inflight--;
     batch->pieces[i].done = true;
     if (i == batch->ndone && batch->waiting) {
       pthread_cond_signal(&batch->progress);
@@ -429,7 +438,7 @@ static void raise_limit(prefetch_batch *batch, int64_t from, int64_t need) {
   while (limit < batch->npieces && batch->pieces[limit].cum_nbytes - base <= batch->max_ahead) {
     limit++;
   }
-  for (int64_t i = batch->limit; i < limit && i < batch->limit + pool.nthreads; ++i) {
+  for (int64_t i = batch->limit; i < limit && i < batch->limit + batch->nthreads; ++i) {
     pthread_cond_signal(&pool.work);
   }
   batch->limit = limit;
@@ -479,6 +488,10 @@ static void add_piece(prefetch_batch *batch, piece_t *piece) {
 static prefetch_batch* batch_start(const cache_query *query, int fd, const int64_t *nchunks, int64_t n,
                                    const int64_t *ranges, const int64_t *first_range) {
   int64_t piece_size = g_piece_size;
+  int nthreads = g_nthreads;
+  if (nthreads <= 0) {
+    return NULL;
+  }
   int64_t capacity = 0;
   for (int64_t r = 0; r < first_range[n]; ++r) {
     capacity += ranges[2 * r + 1] / CHECK_NBYTES + ranges[2 * r + 1] / piece_size + 3;  // windows per range
@@ -495,6 +508,7 @@ static prefetch_batch* batch_start(const cache_query *query, int fd, const int64
   batch->pieces = (piece_t *) (batch->end_piece + n);
   batch->nchunks = n;
   batch->max_ahead = g_max_ahead;
+  batch->nthreads = nthreads;
 
   // Pieces never cross a multiple of the piece size nor a gap in the file, and cached parts (asked about in windows
   // that do not cross a multiple of CHECK_NBYTES either) are left out
@@ -533,7 +547,8 @@ static prefetch_batch* batch_start(const cache_query *query, int fd, const int64
   }
   pthread_cond_init(&batch->progress, NULL);
   pthread_mutex_lock(&pool.mutex);
-  if (!pool_ensure(g_nthreads)) {
+  int64_t want = (int64_t) nthreads * (pool.nbatches + 1);
+  if (!pool_ensure(want < BLOSC2_PREFETCH_MAX_NTHREADS ? (int) want : BLOSC2_PREFETCH_MAX_NTHREADS)) {
     pthread_mutex_unlock(&pool.mutex);
     pthread_cond_destroy(&batch->progress);
     close(batch->fd);
@@ -545,6 +560,7 @@ static prefetch_batch* batch_start(const cache_query *query, int fd, const int64
     tail = &(*tail)->next_batch;
   }
   *tail = batch;
+  pool.nbatches++;
   raise_limit(batch, 0, 1);
   pthread_mutex_unlock(&pool.mutex);
   return batch;
@@ -760,6 +776,7 @@ void prefetch_batch_free(prefetch_batch *batch) {
     link = &(*link)->next_batch;
   }
   *link = batch->next_batch;
+  pool.nbatches--;
   pthread_mutex_unlock(&pool.mutex);
   pthread_cond_destroy(&batch->progress);
   close(batch->fd);
