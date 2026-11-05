@@ -798,7 +798,7 @@ BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
  *
  * Without read-ahead, a slice reads the blocks it needs one after the other, each with at most the kernel's read-ahead
  * window per read; on a network file system every such read is a round trip.  With read-ahead, the chunks the slice
- * needs (and that are not in the page cache yet) are read by @p nthreads background threads in pieces of at most
+ * needs (and that are not in the page cache yet) are read by up to @p nthreads background threads in pieces of at most
  * @p piece_size bytes, in the order the slice decompresses them and at most @p max_ahead bytes ahead of it, and each
  * chunk is decompressed as soon as its bytes are in.  Of a chunk that a slice (#b2nd_get_slice_cbuffer,
  * #b2nd_get_slice) covers only in part, only the blocks it needs are read, after the chunk's header (which says where
@@ -812,15 +812,22 @@ BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
  *
  * Reads that are not cached get faster on any storage, most on high-latency ones; 4 threads and the default piece
  * size give most of the speed.  The threads mostly wait for the storage, but the kernel spends CPU on every byte they
- * read; README_THREADED.rst has which settings to use when.  Each thread keeps a buffer as large as the largest piece
- * it has read.
+ * read; README_THREADED.rst has which settings to use when.
+ *
+ * How many threads: each slice being read gets up to @p nthreads read-ahead threads, and slices that threads of the
+ * process read at the same time get theirs each.  So a process runs up to @p nthreads times the number of slices it
+ * reads at once, at most #BLOSC2_PREFETCH_MAX_NTHREADS in all: a program that reads with one thread has @p nthreads
+ * of them, one that reads with 8 threads at once up to 8 x @p nthreads.  Decompression threads (`nthreads` of
+ * #blosc2_dparams) are separate and do not count: they decompress a chunk while the read-ahead threads fetch the next
+ * ones.  Read-ahead threads are started as needed and run until #blosc2_destroy (lowering the number does not stop
+ * them), each keeping a buffer as large as the largest piece it has read.
  *
  * Off by default; the **BLOSC_PREFETCH** environment variable, set to a number of threads, turns it on at
  * #blosc2_init.  The setting and the threads are per process; a child process created with fork() starts its own
  * threads on first use.  Supported on POSIX systems; elsewhere (Windows) this has no effect.
  *
- * @param nthreads Number of read-ahead threads, at most #BLOSC2_PREFETCH_MAX_NTHREADS; 0 turns read-ahead off.
- * Threads are started on first use and run until #blosc2_destroy (lowering the number does not stop them).
+ * @param nthreads Read-ahead threads per slice being read (see above), at most #BLOSC2_PREFETCH_MAX_NTHREADS; 0 turns
+ * read-ahead off.
  * @param max_ahead Most bytes read ahead of the chunk being decompressed (0 for the default,
  * #BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT).
  * @param piece_size Largest read handed to one thread, in bytes (0 for the default,
