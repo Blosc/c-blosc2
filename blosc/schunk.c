@@ -1599,32 +1599,42 @@ int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t nchunk) {
 }
 
 
+/* See blosc-private.h */
+uint8_t *schunk_scratch_malloc(const blosc2_schunk *schunk, int32_t nbytes, size_t *capacity) {
+  if (schunk->frame != NULL) {
+    return blosc2_tmp_malloc((size_t) nbytes, capacity);
+  }
+  *capacity = 0;
+  return malloc((size_t) nbytes);
+}
+
+
 typedef enum {
-  STORE_APPEND,
-  STORE_INSERT,
-  STORE_UPDATE,
-} chunk_store;
+  WRITE_APPEND,
+  WRITE_INSERT,
+  WRITE_UPDATE,
+} chunk_write_op;
 
 
 /* Compress @p src (@p nbytes) with the super-chunk's context and append, insert or update the
-   chunk at @p nchunk.  A frame writes its own copy of the chunk, so it is lent a buffer that this
-   thread reuses for its next chunk: no allocation per chunk, and no fresh pages (a new mmap()
-   per chunk with glibc) to fault in while compressing.  A plain super-chunk keeps the chunk
-   itself, which is a malloc'ed buffer then (shrunk to fit; see scratch_malloc() in b2nd.c). */
+   chunk at @p nchunk (ignored for appends).  A frame writes its own copy of the chunk, so it is
+   lent a buffer that this thread reuses for its next chunk (see schunk_scratch_malloc()): no
+   allocation per chunk, and no fresh pages (with glibc, a chunk-sized malloc is usually a new
+   mmap()) to fault in while compressing.  A plain super-chunk keeps the chunk itself, which is
+   a malloc'ed buffer then, shrunk to fit. */
 static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, const void *src,
-                                     int32_t nbytes, chunk_store store, const char *func_name) {
+                                     int32_t nbytes, chunk_write_op op, const char *func_name) {
   if (nbytes < 0 || nbytes > BLOSC2_MAX_BUFFERSIZE) {
     BLOSC_TRACE_ERROR("nbytes ('%d') is out of range [0, %d] in %s.", nbytes,
                       BLOSC2_MAX_BUFFERSIZE, func_name);
     return BLOSC2_ERROR_INVALID_PARAM;
   }
-  // `nchunk` is checked by the store below, under the frame lock: another handle of the
-  // same file may have changed the number of chunks since this one last looked.
+  // `nchunk` is left to the store below, which checks it under the frame lock (inserts and
+  // appends after refreshing a handle that another one made stale).
   bool in_frame = schunk->frame != NULL;
   int32_t dest_nbytes = nbytes + BLOSC2_MAX_OVERHEAD;
-  size_t capacity = 0;
-  uint8_t *chunk = in_frame ? blosc2_tmp_malloc((size_t) dest_nbytes, &capacity)
-                            : malloc((size_t) dest_nbytes);
+  size_t capacity;
+  uint8_t *chunk = schunk_scratch_malloc(schunk, dest_nbytes, &capacity);
   BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
   // Prefilters read the number of the chunk being compressed
   int64_t old_current_nchunk = schunk->current_nchunk;
@@ -1638,11 +1648,11 @@ static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, cons
   }
   chunk_handover how = in_frame ? CHUNK_LENT : CHUNK_GIVEN;
   int64_t nchunks;
-  switch (store) {
-    case STORE_APPEND:
+  switch (op) {
+    case WRITE_APPEND:
       nchunks = schunk_append_chunk_locked(schunk, chunk, how);
       break;
-    case STORE_INSERT:
+    case WRITE_INSERT:
       nchunks = schunk_insert_chunk_locked(schunk, nchunk, chunk, how);
       break;
     default:
@@ -1663,7 +1673,7 @@ static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, cons
 
 /* Append a data buffer to a super-chunk. */
 int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int32_t nbytes) {
-  return schunk_compress_store(schunk, schunk->nchunks, src, nbytes, STORE_APPEND,
+  return schunk_compress_store(schunk, schunk->nchunks, src, nbytes, WRITE_APPEND,
                                "blosc2_schunk_append_buffer");
 }
 
@@ -1671,7 +1681,7 @@ int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int3
 /* Insert a data buffer as a new chunk in a specified position of a super-chunk. */
 int64_t blosc2_schunk_insert_buffer(blosc2_schunk *schunk, int64_t nchunk, const void *src,
                                     int32_t nbytes) {
-  return schunk_compress_store(schunk, nchunk, src, nbytes, STORE_INSERT,
+  return schunk_compress_store(schunk, nchunk, src, nbytes, WRITE_INSERT,
                                "blosc2_schunk_insert_buffer");
 }
 
@@ -1679,7 +1689,7 @@ int64_t blosc2_schunk_insert_buffer(blosc2_schunk *schunk, int64_t nchunk, const
 /* Replace the chunk at a specified position of a super-chunk with a data buffer. */
 int64_t blosc2_schunk_update_buffer(blosc2_schunk *schunk, int64_t nchunk, const void *src,
                                     int32_t nbytes) {
-  return schunk_compress_store(schunk, nchunk, src, nbytes, STORE_UPDATE,
+  return schunk_compress_store(schunk, nchunk, src, nbytes, WRITE_UPDATE,
                                "blosc2_schunk_update_buffer");
 }
 
@@ -2592,12 +2602,12 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
       if (chunk_stop == schunk->nbytes % schunk->chunksize) {
         chunksize = chunk_stop;
       }
-      nchunks = schunk_compress_store(schunk, nchunk, src_ptr, chunksize, STORE_UPDATE,
+      nchunks = schunk_compress_store(schunk, nchunk, src_ptr, chunksize, WRITE_UPDATE,
                                       "blosc2_schunk_set_slice_buffer");
       if (nchunks != schunk->nchunks) {
         BLOSC_TRACE_ERROR("Cannot update chunk ('%" PRId64 "').", nchunk);
         free(data);
-        return BLOSC2_ERROR_CHUNK_UPDATE;
+        return nchunks < 0 ? (int) nchunks : BLOSC2_ERROR_CHUNK_UPDATE;
       }
     }
     else {
@@ -2608,12 +2618,12 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
         return BLOSC2_ERROR_FAILURE;
       }
       memcpy(&data[chunk_start], src_ptr, chunk_stop - chunk_start);
-      nchunks = schunk_compress_store(schunk, nchunk, data, nbytes, STORE_UPDATE,
+      nchunks = schunk_compress_store(schunk, nchunk, data, nbytes, WRITE_UPDATE,
                                       "blosc2_schunk_set_slice_buffer");
       if (nchunks != schunk->nchunks) {
         BLOSC_TRACE_ERROR("Cannot update chunk ('%" PRId64 "').", nchunk);
         free(data);
-        return BLOSC2_ERROR_CHUNK_UPDATE;
+        return nchunks < 0 ? (int) nchunks : BLOSC2_ERROR_CHUNK_UPDATE;
       }
     }
     nchunk++;

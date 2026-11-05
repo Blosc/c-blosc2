@@ -188,6 +188,14 @@ int schunk_copy_vlmetalayers(blosc2_schunk *schunk, blosc2_schunk *new_schunk, b
    copying it first.  It must not point into the storage of any frame (in memory or mapped). */
 int64_t schunk_update_chunk_lent(blosc2_schunk *schunk, int64_t nchunk, uint8_t *chunk);
 
+/* A chunk-sized temporary for `schunk` (a buffer to compress a chunk into, or the scratch of a
+   slice read or write), released with blosc2_tmp_free(ptr, *capacity).  Frames do not keep the
+   buffers handed to them, so their temporaries cycle through the per-thread cache.  Plain
+   in-memory super-chunks keep each new chunk, and caching their scratch changes how glibc places
+   those chunks (its mmap threshold follows the buffers freed) for the worse; their buffers are
+   plain malloc ones (of no capacity, which blosc2_tmp_free() frees). */
+uint8_t *schunk_scratch_malloc(const blosc2_schunk *schunk, int32_t nbytes, size_t *capacity);
+
 /* Decompress chunk `nchunk` of `schunk`, or `chunk` (`cbytes` long) if it is not NULL,
    with the decompression context of `schunk`, decoding only the blocks that `maskout`
    (`nblocks` items) leaves in and, if `postfilter` is not NULL, running it (with

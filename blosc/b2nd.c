@@ -1286,18 +1286,9 @@ static int slice_gather_prefilter(blosc2_prefilter_params *params) {
 
 
 // A temporary of a slice read or write on `array`, released with
-// blosc2_tmp_free(ptr, *capacity).  Frames do not keep the buffers handed to
-// them, so their slice temporaries cycle through the per-thread cache.  Plain
-// in-memory super-chunks keep each new chunk, and caching their scratch
-// changes how glibc places those chunks (its mmap threshold follows the
-// buffers freed) for the worse; their buffers are plain malloc ones (of no
-// capacity, which blosc2_tmp_free() frees).
+// blosc2_tmp_free(ptr, *capacity) (see schunk_scratch_malloc()).
 static uint8_t *scratch_malloc(const b2nd_array_t *array, int32_t nbytes, size_t *capacity) {
-  if (array->sc->frame != NULL) {
-    return blosc2_tmp_malloc((size_t) nbytes, capacity);
-  }
-  *capacity = 0;
-  return malloc((size_t) nbytes);
+  return schunk_scratch_malloc(array->sc, nbytes, capacity);
 }
 
 
