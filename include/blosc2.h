@@ -2281,6 +2281,44 @@ BLOSC_EXPORT int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t n
 BLOSC_EXPORT int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int32_t nbytes);
 
 /**
+ * @brief Compress a @p src data buffer and insert it as a new chunk at a specific
+ * position in a super-chunk.
+ *
+ * Same as compressing @p src with the super-chunk's context and inserting the
+ * result with blosc2_schunk_insert_chunk(), but frames are written from a
+ * compression buffer that the calling thread reuses, not a new one per chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be inserted.
+ * @param nchunk The position where the chunk will be inserted.
+ * @param src The buffer of data to compress.
+ * @param nbytes The size of the @p src buffer.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_insert_buffer(blosc2_schunk *schunk, int64_t nchunk,
+                                                 const void *src, int32_t nbytes);
+
+/**
+ * @brief Compress a @p src data buffer and replace the chunk at a specific
+ * position in a super-chunk with it.
+ *
+ * Same as compressing @p src with the super-chunk's context and storing the
+ * result with blosc2_schunk_update_chunk(), but frames are written from a
+ * compression buffer that the calling thread reuses, not a new one per chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be updated.
+ * @param nchunk The position of the chunk to update.
+ * @param src The buffer of data to compress.
+ * @param nbytes The size of the @p src buffer.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_update_buffer(blosc2_schunk *schunk, int64_t nchunk,
+                                                 const void *src, int32_t nbytes);
+
+/**
  * @brief Decompress and return the @p nchunk chunk of a super-chunk.
  *
  * If the chunk is uncompressed successfully, it is put in the @p *dest
