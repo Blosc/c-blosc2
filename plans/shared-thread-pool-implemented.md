@@ -41,12 +41,12 @@ list (`shared_pools`) protected by `pool_registry_mutex`.
 nthreads          – number of worker threads
 shutdown          – flag to signal workers to exit
 context_refs      – how many contexts currently reference this pool
+                    (protected by pool_registry_mutex)
 active_jobs       – queue entries in flight (enqueued but not yet completed)
 threads[]         – worker pthread handles
 thread_contexts[] – per-worker scratch (tmp buffers, tid, owner_pool)
-mutex             – protects the job queue and active_jobs
+mutex             – protects shutdown, the job queue and active_jobs
 work_cv           – workers wait here for new work
-idle_cv           – signalled when active_jobs drops to 0
 job_queue_head/tail – singly-linked FIFO of pending job entries
 next              – link to the next pool in the global registry
 ```
@@ -124,8 +124,7 @@ Each worker thread runs an infinite loop:
    `thcontext->tid = logical_tid`.
 5. Call `t_blosc_do_job(thcontext)` — the same work function used by
    the callback backend.
-6. After the job, decrement `pool->active_jobs`; signal `pool->idle_cv`
-   if everything is idle.
+6. After the job, decrement `pool->active_jobs`.
 
 ### Block Assignment
 
