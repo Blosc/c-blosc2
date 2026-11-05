@@ -762,7 +762,9 @@ BLOSC_EXPORT int16_t blosc2_get_nthreads(void);
  * @brief Initialize a pool of threads for compression/decompression. If
  * @p nthreads is 1, then the serial version is chosen and a possible
  * previous existing pool is ended. If this is not called, @p nthreads
- * is set to 1 internally.
+ * is set to 1 internally. The threads are per process; a child process
+ * created with fork() starts its own threads on first use (see
+ * README_THREADED.rst).
  *
  * @param nthreads The number of threads to use.
  *

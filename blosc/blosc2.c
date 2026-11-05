@@ -211,7 +211,9 @@ static void atfork_child(void) {
 }
 
 static void register_atfork(void) {
-  pthread_atfork(atfork_prepare, atfork_parent, atfork_child);
+  if (pthread_atfork(atfork_prepare, atfork_parent, atfork_child) != 0) {
+    BLOSC_TRACE_WARNING("pthread_atfork() failed: a fork()ed child may hang or crash with more than one thread");
+  }
 }
 #endif  /* !_WIN32 */
 
