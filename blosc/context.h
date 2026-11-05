@@ -144,7 +144,7 @@ struct thread_context {
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
-  uint8_t* tmp4;
+  uint8_t* tmp4;  /* lazy chunks: the block read from disk; filters: bitshuffle's scratch */
   int32_t tmp_blocksize;  /* the blocksize for different temporaries */
   size_t tmp_nbytes;   /* keep track of how big the temporary buffers are */
   int32_t zfp_cell_start;  /* cell starter index for ZFP fixed-rate mode */

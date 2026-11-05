@@ -30,14 +30,14 @@ extern const bool is_bshuf_AVX;
 */
 BLOSC_NO_EXPORT int64_t
     bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                             const size_t elem_size);
+                             const size_t elem_size, void* tmp_buf);
 
 /**
  * AVX2-accelerated bitunshuffle routine.
 */
 BLOSC_NO_EXPORT int64_t
     bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                               const size_t elem_size);
+                               const size_t elem_size, void* tmp_buf);
 
 /**
  * AVX2 utils used by AVX512 functions

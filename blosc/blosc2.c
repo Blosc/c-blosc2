@@ -1111,6 +1111,23 @@ static void _cycle_buffers_forward(uint8_t **src, uint8_t **dest, uint8_t **tmp,
   *dest = (prev_src == input) ? *tmp : prev_src;
 }
 
+/* The scratch for bit(un)shuffling a block: tmp4, which otherwise only holds
+   the blocks of lazy chunks for the codec (blosc_d() reads them into it, or
+   points its tmp3 into a memory map).  Moved up to a 16-byte boundary when
+   tmp4, the last region of tmp, has room: misaligned, the SIMD routines are a
+   few % slower.  NULL (bitshuffle() allocates one) if the block does not fit. */
+static uint8_t* bitshuffle_scratch(struct thread_context* thread_context, int32_t bsize) {
+  size_t offset = (size_t)(thread_context->tmp4 - thread_context->tmp);
+  size_t shift = (16 - ((uintptr_t)thread_context->tmp4 & 15)) & 15;
+  if (offset + shift + (size_t)bsize <= thread_context->tmp_nbytes) {
+    return thread_context->tmp4 + shift;
+  }
+  if (offset + (size_t)bsize <= thread_context->tmp_nbytes) {
+    return thread_context->tmp4;
+  }
+  return NULL;
+}
+
 uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t bsize,
                           const uint8_t* src, const int32_t offset,
                           uint8_t* dest, uint8_t* tmp) {
@@ -1185,7 +1202,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
             // elements is a multiple of 8; other blocks are stored unshuffled.
             memcpy(_dest, _src, (size_t)bsize);
           }
-          else if (blosc2_bitshuffle(typesize, bsize, _src, _dest) < 0) {
+          else if (bitshuffle(typesize, bsize, _src, _dest, bitshuffle_scratch(thread_context, bsize)) < 0) {
             return NULL;
           }
           break;
@@ -1603,7 +1620,8 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
           blosc2_unshuffle(shuffle_size(context, i), bsize, _src, _dest);
           break;
         case BLOSC_BITSHUFFLE:
-          if (bitunshuffle(typesize, bsize, _src, _dest, context->src[BLOSC2_CHUNK_VERSION]) < 0) {
+          if (bitunshuffle(typesize, bsize, _src, _dest, bitshuffle_scratch(thread_context, bsize),
+                           context->src[BLOSC2_CHUNK_VERSION]) < 0) {
             return BLOSC2_ERROR_FILTER_PIPELINE;
           }
           break;

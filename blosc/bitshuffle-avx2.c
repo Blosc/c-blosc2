@@ -90,22 +90,17 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
 
 /* Transpose bits within elements. */
 int64_t bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                                 const size_t elem_size) {
+                                 const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
-  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bit_byte_AVX(out, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
-  free(tmp_buf);
 
   return count;
 }
@@ -246,20 +241,16 @@ int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t 
 
 /* Untranspose bits within elements. */
 int64_t bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                                   const size_t elem_size) {
+                                   const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
   count = bshuf_trans_byte_bitrow_AVX(in, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count =  bshuf_shuffle_bit_eightelem_AVX(tmp_buf, out, size, elem_size);
 
-  free(tmp_buf);
   return count;
 }
 
@@ -271,13 +262,13 @@ const bool is_bshuf_AVX = false;
 
 int64_t
 bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                         const size_t elem_size) {
+                         const size_t elem_size, void* tmp_buf) {
   abort();
 }
 
 int64_t
 bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                           const size_t elem_size) {
+                           const size_t elem_size, void* tmp_buf) {
   abort();
 }
 
