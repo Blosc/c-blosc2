@@ -30,9 +30,6 @@
 #if defined(_WIN32)
   #include <memoryapi.h>
   #include <io.h>
-  // See https://github.com/Blosc/python-blosc2/issues/359
-  #define fseek _fseeki64
-  #define ftell _ftelli64
 #else
   #include <fcntl.h>
   #include <sys/mman.h>
@@ -102,6 +99,25 @@ static int64_t stdio_pio(FILE *file, const void *buf, size_t n_bytes, int64_t po
   return (int64_t) done;
 }
 
+/* The size of the file behind @p file, or -1.  From fstat(), not fseek(SEEK_END) + ftell(): on a stream opened for
+   reading, glibc's fseek() fills the stdio buffer with the file's last block, one more read (a server round trip on
+   network file systems) for nothing.  Both backends transfer data through the raw descriptor (stdio_pio) or the
+   mapping, so no stdio buffer holds data that fstat() could miss. */
+static int64_t stdio_file_size(FILE *file) {
+#if defined(_WIN32)
+  struct _stat64 st;
+  int rc = _fstat64(_fileno(file), &st);
+#else
+  struct stat st;
+  int rc = fstat(fileno(file), &st);
+#endif
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot get the file size (error: %s).", strerror(errno));
+    return -1;
+  }
+  return (int64_t) st.st_size;
+}
+
 
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
   BLOSC_UNUSED_PARAM(params);
@@ -158,30 +174,7 @@ int64_t blosc2_stdio_size(void *stream) {
     return -1;
   }
 
-  int64_t current = ftell(my_fp->file);
-  if (current < 0) {
-    BLOSC_TRACE_ERROR("ftell failed while determining current position (error: %s).", strerror(errno));
-    return -1;
-  }
-
-  if (fseek(my_fp->file, 0, SEEK_END) != 0) {
-    BLOSC_TRACE_ERROR("fseek to file end failed while getting size (error: %s).", strerror(errno));
-    fseek(my_fp->file, current, SEEK_SET);
-    return -1;
-  }
-  int64_t size = ftell(my_fp->file);
-  if (size < 0) {
-    BLOSC_TRACE_ERROR("ftell failed while getting file size (error: %s).", strerror(errno));
-    fseek(my_fp->file, current, SEEK_SET);
-    return -1;
-  }
-
-  if (fseek(my_fp->file, current, SEEK_SET) != 0) {
-    BLOSC_TRACE_ERROR("fseek restore failed after getting file size (error: %s).", strerror(errno));
-    return -1;
-  }
-
-  return size;
+  return stdio_file_size(my_fp->file);
 }
 
 int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
@@ -426,16 +419,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     return NULL;
   }
 
-  /* Retrieve the size of the file */
-  if (fseek(mmap_file->file, 0, SEEK_END) != 0) {
-    BLOSC_TRACE_ERROR("Cannot seek to the end of %s (error: %s).", urlpath, strerror(errno));
-    fclose(mmap_file->file);
-    mmap_file->file = NULL;
-    free(mmap_file->urlpath);
-    mmap_file->urlpath = NULL;
-    return NULL;
-  }
-  int64_t file_size_i64 = ftell(mmap_file->file);
+  int64_t file_size_i64 = stdio_file_size(mmap_file->file);
   if (file_size_i64 < 0) {
     BLOSC_TRACE_ERROR("Cannot retrieve file size for %s.", urlpath);
     fclose(mmap_file->file);
@@ -453,14 +437,6 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     return NULL;
   }
   mmap_file->file_size = (size_t)file_size_i64;
-  if (fseek(mmap_file->file, 0, SEEK_SET) != 0) {
-    BLOSC_TRACE_ERROR("Cannot seek to the beginning of %s (error: %s).", urlpath, strerror(errno));
-    fclose(mmap_file->file);
-    mmap_file->file = NULL;
-    free(mmap_file->urlpath);
-    mmap_file->urlpath = NULL;
-    return NULL;
-  }
 
   /* The size of the mapping must be > 0 so we are using a large enough buffer for writing
   (which will be increased later if needed) */
