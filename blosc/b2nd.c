@@ -2079,17 +2079,26 @@ int get_set_slice(void *buffer, int64_t buffersize, const int64_t *start, const 
 // readers -- see the whole slice atomically instead of a chunk-wise interleave
 // with other writers (plans/todo-locking-swmr.md item 2 / python-blosc2's
 // todo/locking-mwmr.md item 2).  A no-op for unlocked handles, which keep
-// SWMR's transient errors.
+// SWMR's transient errors.  A write takes the lock through
+// frame_begin_updates(): chunks that change size leave holes in a contiguous
+// frame while the slice is written, closed in one pass at the end, instead of
+// moving the rest of the frame once per chunk.
 static int locked_get_set_slice(void *buffer, int64_t buffersize, const int64_t *start,
                                 const int64_t *stop, const int64_t *shape, b2nd_array_t *array,
                                 bool set_slice, bool slice_only, prefetch_batch *prefetch) {
   blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
-  BLOSC_ERROR(frame_lock(frame, set_slice));
+  BLOSC_ERROR(set_slice ? frame_begin_updates(frame) : frame_lock(frame, false));
   int rc = refresh_if_stale(array);
   if (rc >= 0) {
     rc = get_set_slice(buffer, buffersize, start, stop, shape, array, set_slice, slice_only, prefetch);
   }
-  frame_unlock(frame);
+  if (set_slice) {
+    int end_rc = frame_end_updates(frame, array->sc);
+    rc = (rc < 0) ? rc : end_rc;
+  }
+  else {
+    frame_unlock(frame);
+  }
   BLOSC_ERROR(rc);
 
   return BLOSC2_ERROR_SUCCESS;
@@ -2939,15 +2948,17 @@ int b2nd_resize(b2nd_array_t *array, const int64_t *new_shape,
   // A resize is a sequence (metalayer update + chunk inserts/deletes); hold
   // the exclusive frame lock across it so locked handles see it atomically.
   // For unlocked handles this is a no-op and the data-first/shape-last
-  // ordering in extend_shape/shrink_shape keeps readers safe.
+  // ordering in extend_shape/shrink_shape keeps readers safe.  The updated
+  // boundary chunks leave holes until the end (see locked_get_set_slice()).
   blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
-  BLOSC_ERROR(frame_lock(frame, true));
+  BLOSC_ERROR(frame_begin_updates(frame));
   int rc = shrink_shape(array, shrunk_shape, start);
   if (rc >= 0) {
     rc = extend_shape(array, new_shape, start);
   }
-  frame_unlock(frame);
+  int end_rc = frame_end_updates(frame, array->sc);
   BLOSC_ERROR(rc);
+  BLOSC_ERROR(end_rc);
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -3620,7 +3631,16 @@ int b2nd_get_orthogonal_selection(const b2nd_array_t *array, int64_t **selection
 
 int b2nd_set_orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, const void *buffer,
                                   int64_t *buffershape, int64_t buffersize) {
-  return orthogonal_selection(array, selection, selection_size, (void*)buffer, buffershape, buffersize, false);
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  // One exclusive lock and one compaction for all the chunks written (see locked_get_set_slice())
+  blosc2_frame_s *frame = (blosc2_frame_s *) array->sc->frame;
+  BLOSC_ERROR(frame_begin_updates(frame));
+  int rc = orthogonal_selection(array, selection, selection_size, (void*)buffer, buffershape, buffersize, false);
+  int end_rc = frame_end_updates(frame, array->sc);
+  BLOSC_ERROR(rc);
+  BLOSC_ERROR(end_rc);
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 

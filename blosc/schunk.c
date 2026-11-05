@@ -888,6 +888,18 @@ int blosc2_schunk_unlock(blosc2_schunk *schunk) {
 }
 
 
+int blosc2_schunk_begin_updates(blosc2_schunk *schunk) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  return frame_begin_updates((blosc2_frame_s*)schunk->frame);
+}
+
+
+int blosc2_schunk_end_updates(blosc2_schunk *schunk) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  return frame_end_updates((blosc2_frame_s*)schunk->frame, schunk);
+}
+
+
 /* Re-sync the cached counters (nchunks, nbytes, cbytes) and metalayers of a
    disk-based super-chunk when another handle changed it behind our back.
    A no-op for in-memory super-chunks. */
@@ -2466,7 +2478,7 @@ cleanup:
 }
 
 
-int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+static int schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(buffer, BLOSC2_ERROR_NULL_POINTER);
   if (start < 0 || stop < start) {
@@ -2577,6 +2589,16 @@ int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t
   free(data);
 
   return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_schunk_set_slice_buffer(blosc2_schunk *schunk, int64_t start, int64_t stop, void *buffer) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  // One exclusive lock and one compaction for all the chunks written (see blosc2_schunk_begin_updates())
+  BLOSC_ERROR(blosc2_schunk_begin_updates(schunk));
+  int rc = schunk_set_slice_buffer(schunk, start, stop, buffer);
+  int end_rc = blosc2_schunk_end_updates(schunk);
+  return rc < 0 ? rc : end_rc;
 }
 
 
