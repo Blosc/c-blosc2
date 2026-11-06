@@ -137,6 +137,9 @@ struct blosc_job_queue_entry {
   struct blosc_job_queue_entry *next;
 };
 
+/* How many thread pools that no context uses are kept for reuse */
+#define BLOSC2_UNUSED_POOLS_MAX 2
+
 struct blosc_shared_pool {
   int16_t nthreads;
   int16_t shutdown;
@@ -5705,6 +5708,39 @@ static void destroy_shared_pool(struct blosc_shared_pool *pool) {
   my_free(pool);
 }
 
+/* Destroy a list of pools linked by their `next` field */
+static void destroy_shared_pools(struct blosc_shared_pool *pool) {
+  while (pool != NULL) {
+    struct blosc_shared_pool *next = pool->next;
+    destroy_shared_pool(pool);
+    pool = next;
+  }
+}
+
+/* Unlink the pools no context uses, except the first `keep` of them in the
+   registry, and return them as a list for destroy_shared_pools(), which joins
+   their threads (call it after unlocking pool_registry_mutex).  No job can be
+   queued on an unused pool: a context enqueues only while attached, and waits
+   for its jobs before it detaches. */
+static struct blosc_shared_pool *unlink_unused_pools_locked(int keep) {
+  struct blosc_shared_pool *unused = NULL;
+  struct blosc_shared_pool **prev = &shared_pools;
+  while (*prev != NULL) {
+    struct blosc_shared_pool *pool = *prev;
+    if (pool->context_refs == 0) {
+      if (keep == 0) {
+        *prev = pool->next;
+        pool->next = unused;
+        unused = pool;
+        continue;
+      }
+      keep--;
+    }
+    prev = &pool->next;
+  }
+  return unused;
+}
+
 static int attach_shared_pool(blosc2_context *context) {
   struct blosc_shared_pool *pool;
 
@@ -5876,8 +5912,6 @@ static int release_thread_backend(blosc2_context *context) {
 #endif  /* _WIN32 */
   else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
     struct blosc_shared_pool *pool = context->thread_pool;
-    struct blosc_shared_pool **prev;
-    bool destroy_pool = false;
 
     if (context->pool_epoch != g_destroy_count) {
       /* blosc2_destroy() already freed this pool and tore down pool_registry_mutex,
@@ -5889,28 +5923,29 @@ static int release_thread_backend(blosc2_context *context) {
       return 0;
     }
 
+    /* A pool that no context uses any more stays registered for the next
+     * contexts with the same nthreads: contexts that live for one call
+     * (python-blosc2's compress2()/decompress2(), BLOSC_NOLOCK) would otherwise
+     * start and join all of its threads every time.  The most recently
+     * released unused pools are kept, the others destroyed (the pool moves to
+     * the front of the registry); blosc2_free_resources() destroys all. */
+    struct blosc_shared_pool *unused = NULL;
     blosc2_pthread_mutex_lock(&pool_registry_mutex);
     pool->context_refs--;
     if (pool->context_refs == 0) {
-      /* Check pool-internal state under the pool's own mutex */
-      blosc2_pthread_mutex_lock(&pool->mutex);
-      bool idle = (pool->active_jobs == 0 && pool->job_queue_head == NULL);
-      blosc2_pthread_mutex_unlock(&pool->mutex);
-      if (idle) {
-        prev = &shared_pools;
-        while (*prev != NULL && *prev != pool) {
-          prev = &(*prev)->next;
-        }
-        if (*prev == pool) {
-          *prev = pool->next;
-        }
-        destroy_pool = true;
+      struct blosc_shared_pool **prev = &shared_pools;
+      while (*prev != NULL && *prev != pool) {
+        prev = &(*prev)->next;
       }
+      if (*prev == pool) {
+        *prev = pool->next;
+        pool->next = shared_pools;
+        shared_pools = pool;
+      }
+      unused = unlink_unused_pools_locked(BLOSC2_UNUSED_POOLS_MAX);
     }
     blosc2_pthread_mutex_unlock(&pool_registry_mutex);
-    if (destroy_pool) {
-      destroy_shared_pool(pool);
-    }
+    destroy_shared_pools(unused);
     context->thread_pool = NULL;
   }
 
@@ -6452,7 +6487,13 @@ int blosc2_free_resources(void) {
 
   /* The calling thread's temporaries (other threads free theirs at exit) */
   blosc2_tmp_cache_clear();
-  return release_thread_backend(g_global_context);
+  int rc = release_thread_backend(g_global_context);
+  /* The thread pools that no context uses (kept for reuse) */
+  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  struct blosc_shared_pool *unused = unlink_unused_pools_locked(0);
+  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+  destroy_shared_pools(unused);
+  return rc;
 }
 
 
@@ -6705,12 +6746,7 @@ void blosc2_destroy(void) {
   g_destroy_count++;
 
   /* Tear down any remaining shared pools */
-  struct blosc_shared_pool *pool = shared_pools;
-  while (pool != NULL) {
-    struct blosc_shared_pool *next = pool->next;
-    destroy_shared_pool(pool);
-    pool = next;
-  }
+  destroy_shared_pools(shared_pools);
   shared_pools = NULL;
   blosc2_pthread_mutex_destroy(&pool_registry_mutex);
 
