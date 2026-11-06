@@ -202,6 +202,22 @@ int64_t bshuf_trans_byte_bitrow_AVX(const void* in, void* out, const size_t size
 }
 
 
+/* Transpose the 8x8 bit matrix in each 64-bit lane (as TRANS_BIT_8X8). */
+static inline __m256i trans_bit_8x8_AVX(__m256i x) {
+  __m256i t;
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 7)),
+                       _mm256_set1_epi64x(0x00AA00AA00AA00AALL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 7)));
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 14)),
+                       _mm256_set1_epi64x(0x0000CCCC0000CCCCLL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 14)));
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 28)),
+                       _mm256_set1_epi64x(0x00000000F0F0F0F0LL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 28)));
+  return x;
+}
+
+
 /* Shuffle bits within the bytes of eight element blocks. */
 int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t size,
                                         const size_t elem_size) {
@@ -219,7 +235,23 @@ int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t 
   __m256i ymm;
   int32_t bt;
 
-  if (elem_size % 4) {
+  if (elem_size <= 2) {
+    // Each 8-byte word holds the 8 bit rows of 8 one-byte elements, or of
+    // the low or the high bytes of 8 two-byte elements: transposing its
+    // bits gives those bytes.
+    for (ii = 0; ii + 31 < nbyte; ii += 32) {
+      ymm = trans_bit_8x8_AVX(_mm256_loadu_si256((__m256i *) &in_b[ii]));
+      if (elem_size == 2) {
+        // interleave the low bytes (first word) and high bytes (second word)
+        ymm = _mm256_unpacklo_epi8(ymm, _mm256_unpackhi_epi64(ymm, ymm));
+      }
+      _mm256_storeu_si256((__m256i *) &out_b[ii], ymm);
+    }
+    if (ii < nbyte) {
+      bshuf_shuffle_bit_eightelem_SSE(&in_b[ii], &out_b[ii],
+                                      (nbyte - ii) / elem_size, elem_size);
+    }
+  } else if (elem_size % 4) {
     return bshuf_shuffle_bit_eightelem_SSE(in, out, size, elem_size);
   } else {
     for (jj = 0; jj + 31 < 8 * elem_size; jj += 32) {
