@@ -3428,7 +3428,7 @@ static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_select
     for (int64_t j = 0; j < selection_size[i]; ++j) {
       int64_t value = ordered_selection[i][j].value;
       int64_t c = value / array->chunkshape[i];
-      if (value >= 0 && value < array->shape[i] && (naxis_chunks[i] == 0 || axis_chunks[i][naxis_chunks[i] - 1] != c)) {
+      if (naxis_chunks[i] == 0 || axis_chunks[i][naxis_chunks[i] - 1] != c) {
         axis_chunks[i][naxis_chunks[i]++] = c;
       }
     }
@@ -3458,34 +3458,67 @@ static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_select
 }
 
 
+/* Strides of the C-order buffer that an orthogonal selection is copied to or from, after checking that
+   the buffer holds the selection: no axis of buffershape smaller than the selection's, and buffersize
+   reaching the selection's last item.  A larger buffer is fine (the items go to the first
+   selection_size[i] positions of each axis); an empty selection needs none. */
+static int check_selection_buffer_strides(int8_t ndim, int32_t typesize, const int64_t *selection_size,
+                                          const int64_t *buffershape, int64_t buffersize, int64_t *bufferstrides) {
+  bool empty = false;
+  int64_t last = 0;  // buffer offset of the selection's last item
+  int64_t stride = 1;
+  for (int i = ndim - 1; i >= 0; --i) {
+    if (selection_size[i] < 0 || buffershape[i] < selection_size[i]) {
+      BLOSC_TRACE_ERROR("Selection size %" PRId64 " of axis %d is negative or larger than the buffer shape %" PRId64,
+                        selection_size[i], i, buffershape[i]);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+    bufferstrides[i] = stride;
+    if (!blosc2_checked_mul_i64_nonneg(stride, buffershape[i], &stride)) {
+      BLOSC_TRACE_ERROR("Buffer shape overflows");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+    // selection_size[i] <= buffershape[i], so last stays below stride: no overflow
+    if (selection_size[i] == 0) {
+      empty = true;
+    } else {
+      last += (selection_size[i] - 1) * bufferstrides[i];
+    }
+  }
+  int64_t needed;
+  if (!empty && (!blosc2_checked_mul_i64_nonneg(last + 1, typesize, &needed) || buffersize < needed)) {
+    BLOSC_TRACE_ERROR("A buffer of %" PRId64 " bytes is too small for the selection", buffersize);
+    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *selection_size, void *buffer,
                          int64_t *buffershape, int64_t buffersize, bool get) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(selection, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(selection_size, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR_NULL(buffershape, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR(refresh_if_stale(array));
 
   int8_t ndim = array->ndim;
 
   for (int i = 0; i < ndim; ++i) {
     BLOSC_ERROR_NULL(selection[i], BLOSC2_ERROR_NULL_POINTER);
-    // Check that indexes are not larger than array shape
-    for (int j = 0; j < selection_size[i]; ++j) {
-      if (selection[i][j] > array->shape[i]) {
+    // Only [0, shape): negative indexes address memory outside the chunk buffer and the block mask
+    for (int64_t j = 0; j < selection_size[i]; ++j) {
+      if (selection[i][j] < 0 || selection[i][j] >= array->shape[i]) {
+        BLOSC_TRACE_ERROR("Index %" PRId64 " is out of bounds for axis %d with size %" PRId64,
+                          selection[i][j], i, array->shape[i]);
         BLOSC_ERROR(BLOSC2_ERROR_INVALID_INDEX);
       }
     }
   }
 
-  // Check buffer size
-  int64_t sel_size = array->sc->typesize;
-  for (int i = 0; i < ndim; ++i) {
-    sel_size *= selection_size[i];
-  }
-
-  if (sel_size < buffersize) {
-    BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
-  }
+  int64_t bufferstrides[B2ND_MAX_DIM];
+  BLOSC_ERROR(check_selection_buffer_strides(ndim, array->sc->typesize, selection_size, buffershape, buffersize,
+                                             bufferstrides));
 
   // Size of the reusable chunk buffer allocated further down.  Computed here,
   // before any allocation, so the error path has nothing to unwind: the cast
@@ -3525,12 +3558,6 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
       ordered_selection[i][j].value = selection[i][j];
     }
     qsort(ordered_selection[i], selection_size[i], sizeof(b2nd_selection_t), compare_selection);
-  }
-
-  int64_t bufferstrides[B2ND_MAX_DIM];
-  bufferstrides[array->ndim - 1] = 1;
-  for (int i = array->ndim - 2; i >= 0; --i) {
-    bufferstrides[i] = bufferstrides[i + 1] * buffershape[i + 1];
   }
 
   prefetch = get ? prefetch_selection(array, ordered_selection, selection_size) : NULL;

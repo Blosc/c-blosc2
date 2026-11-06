@@ -613,11 +613,13 @@ BLOSC_EXPORT int b2nd_delete(b2nd_array_t *array, int8_t axis,
  * @brief Get an element selection along each dimension of an array independently.
  *
  * @param array The array to get the data from.
- * @param selection The elements along each dimension.
- * @param selection_size The size of the selection along each dimension.
+ * @param selection The elements along each dimension, each in [0, shape) of its dimension
+ *   (BLOSC2_ERROR_INVALID_INDEX otherwise; negative indexes are not counted from the end).
+ * @param selection_size The size of the selection along each dimension (not negative).
  * @param buffer The buffer for getting the data.
- * @param buffershape The shape of the buffer.
- * @param buffersize The buffer size (in bytes).
+ * @param buffershape The shape of the buffer, at least selection_size on every dimension (the items go to
+ *   the first selection_size[i] positions of each dimension).
+ * @param buffersize The buffer size (in bytes), enough for the selection's last item.
  *
  * @return An error code.
  *
@@ -631,11 +633,13 @@ BLOSC_EXPORT int b2nd_get_orthogonal_selection(const b2nd_array_t *array, int64_
  * @brief Set an element selection along each dimension of an array independently.
  *
  * @param array The array to set the data to.
- * @param selection The elements along each dimension.
- * @param selection_size The size of the selection along each dimension.
+ * @param selection The elements along each dimension, each in [0, shape) of its dimension
+ *   (BLOSC2_ERROR_INVALID_INDEX otherwise; negative indexes are not counted from the end).
+ * @param selection_size The size of the selection along each dimension (not negative).
  * @param buffer The buffer with the data for setting.
- * @param buffershape The shape of the buffer.
- * @param buffersize The buffer size (in bytes).
+ * @param buffershape The shape of the buffer, at least selection_size on every dimension (the items are
+ *   read from the first selection_size[i] positions of each dimension).
+ * @param buffersize The buffer size (in bytes), enough for the selection's last item.
  *
  * @return An error code.
  *
