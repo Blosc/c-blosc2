@@ -6,6 +6,8 @@
   Serializing a super-chunk that has a prefilter or a postfilter gives a frame
   with the chunks as they are stored, for every kind of storage, whereas
   blosc2_schunk_copy() applies the postfilter (the copy holds the data as read).
+  Setting the postfilter again on the deserialized super-chunk reads the same
+  data as the original.
 */
 
 #include <stdbool.h>
@@ -18,8 +20,11 @@
 #include "cutest.h"
 
 #define CHUNK_NITEMS (20 * 1000)
-#define NCHUNKS 4
+#define NCHUNKS 5
+#define ZERO_CHUNK 1  // a special chunk of zeros
 #define POSTFILTER_ADD 1000000
+#define VLMETA_NAME "vlmeta"
+#define VLMETA_CONTENT "vlmetalayer content"
 
 typedef struct {
   bool contiguous;
@@ -56,11 +61,34 @@ static int32_t chunk_nitems(int nchunk) {
 
 /* The values stored in `nchunk` (that is, after the prefilter, if any) */
 static int32_t stored_value(int nchunk, int32_t i, bool prefilter) {
+  if (nchunk == ZERO_CHUNK) {
+    return 0;
+  }
   int32_t value = nchunk * CHUNK_NITEMS + i;
   return prefilter ? 2 * value : value;
 }
 
-/* `other` has the chunks of `schunk` byte for byte */
+static int special_value(const uint8_t *chunk) {
+  return (chunk[BLOSC2_CHUNK_BLOSC2_FLAGS] >> 4) & BLOSC2_SPECIAL_MASK;
+}
+
+/* Whether `other` is `chunk`.  A frame keeps a special chunk as a special
+   value in its offsets and makes up its header (with the blocksize of the
+   frame) when it is read, so special chunks only need the same value and size. */
+static bool same_chunk(const uint8_t *chunk, int cbytes, const uint8_t *other, int other_cbytes) {
+  if (other_cbytes != cbytes) {
+    return false;
+  }
+  if (special_value(chunk) != 0) {
+    int32_t nbytes, other_nbytes;
+    blosc2_cbuffer_sizes(chunk, &nbytes, NULL, NULL);
+    blosc2_cbuffer_sizes(other, &other_nbytes, NULL, NULL);
+    return special_value(other) == special_value(chunk) && other_nbytes == nbytes;
+  }
+  return memcmp(chunk, other, (size_t)cbytes) == 0;
+}
+
+/* `other` has the chunks of `schunk` as they are stored */
 static int check_same_chunks(blosc2_schunk *schunk, blosc2_schunk *other) {
   CUTEST_ASSERT("nchunks differ", other->nchunks == schunk->nchunks);
   for (int nchunk = 0; nchunk < schunk->nchunks; nchunk++) {
@@ -69,7 +97,7 @@ static int check_same_chunks(blosc2_schunk *schunk, blosc2_schunk *other) {
     int cbytes = blosc2_schunk_get_chunk(schunk, nchunk, &chunk, &needs_free);
     int other_cbytes = blosc2_schunk_get_chunk(other, nchunk, &other_chunk, &other_needs_free);
     CUTEST_ASSERT("Error getting a chunk", cbytes > 0 && other_cbytes > 0);
-    bool same = other_cbytes == cbytes && memcmp(chunk, other_chunk, (size_t)cbytes) == 0;
+    bool same = same_chunk(chunk, cbytes, other_chunk, other_cbytes);
     if (needs_free) {
       free(chunk);
     }
@@ -92,6 +120,26 @@ static int check_values(blosc2_schunk *schunk, bool prefilter, int32_t add, int3
     }
   }
   return 0;
+}
+
+/* `schunk` has the vlmetalayer of the original, unchanged */
+static int check_vlmeta(blosc2_schunk *schunk) {
+  uint8_t *content;
+  int32_t content_len;
+  CUTEST_ASSERT("Error getting the vlmetalayer",
+                blosc2_vlmeta_get(schunk, VLMETA_NAME, &content, &content_len) >= 0);
+  bool same = content_len == (int32_t)sizeof(VLMETA_CONTENT) &&
+              memcmp(content, VLMETA_CONTENT, sizeof(VLMETA_CONTENT)) == 0;
+  free(content);
+  CUTEST_ASSERT("The vlmetalayer differs", same);
+  return 0;
+}
+
+/* Replace the decompression context of `schunk` with one that has `dparams` */
+static void set_dparams(blosc2_schunk *schunk, blosc2_dparams dparams) {
+  dparams.schunk = schunk;
+  blosc2_free_ctx(schunk->dctx);
+  schunk->dctx = blosc2_create_dctx(dparams);
 }
 
 static uint8_t *record_alloc(int64_t len, void *user_data) {
@@ -153,12 +201,25 @@ CUTEST_TEST_TEST(schunk_to_buffer_filters) {
   blosc2_schunk *schunk = blosc2_schunk_new(&storage);
   CUTEST_ASSERT("Error creating the super-chunk", schunk != NULL);
   for (int nchunk = 0; nchunk < NCHUNKS; nchunk++) {
-    for (int32_t i = 0; i < chunk_nitems(nchunk); i++) {
-      buffer[i] = nchunk * CHUNK_NITEMS + i;
+    int32_t nbytes = chunk_nitems(nchunk) * (int32_t)sizeof(int32_t);
+    int64_t rc;
+    if (nchunk == ZERO_CHUNK) {
+      uint8_t zeros[BLOSC_EXTENDED_HEADER_LENGTH];
+      CUTEST_ASSERT("Error creating a chunk of zeros",
+                    blosc2_chunk_zeros(cparams, nbytes, zeros, sizeof(zeros)) > 0);
+      rc = blosc2_schunk_append_chunk(schunk, zeros, true);
     }
-    int64_t rc = blosc2_schunk_append_buffer(schunk, buffer, chunk_nitems(nchunk) * (int32_t)sizeof(int32_t));
+    else {
+      for (int32_t i = 0; i < chunk_nitems(nchunk); i++) {
+        buffer[i] = nchunk * CHUNK_NITEMS + i;
+      }
+      rc = blosc2_schunk_append_buffer(schunk, buffer, nbytes);
+    }
     CUTEST_ASSERT("Error appending", rc == nchunk + 1);
   }
+  CUTEST_ASSERT("Error adding a vlmetalayer",
+                blosc2_vlmeta_add(schunk, VLMETA_NAME, (uint8_t *)VLMETA_CONTENT,
+                                  sizeof(VLMETA_CONTENT), NULL) >= 0);
   // What the super-chunk reads
   int32_t add = params.postfilter ? POSTFILTER_ADD : 0;
   CUTEST_ASSERT("The filter is not applied", check_values(schunk, prefilter, add, buffer) == 0);
@@ -171,6 +232,10 @@ CUTEST_TEST_TEST(schunk_to_buffer_filters) {
   CUTEST_ASSERT("Error deserializing", back != NULL);
   CUTEST_ASSERT("The frame must hold the chunks as stored", check_same_chunks(schunk, back) == 0);
   CUTEST_ASSERT("The frame must hold the stored values", check_values(back, prefilter, 0, buffer) == 0);
+  CUTEST_ASSERT("The frame must hold the vlmetalayer", check_vlmeta(back) == 0);
+  // With the postfilter set again, it reads what the original reads
+  set_dparams(back, dparams);
+  CUTEST_ASSERT("The postfilter must apply once", check_values(back, prefilter, add, buffer) == 0);
   blosc2_schunk_free(back);
 
   // The other ways of serializing give the same frame
@@ -196,6 +261,7 @@ CUTEST_TEST_TEST(schunk_to_buffer_filters) {
   blosc2_schunk *copy = blosc2_schunk_copy(schunk, &copy_storage);
   CUTEST_ASSERT("Error copying", copy != NULL);
   CUTEST_ASSERT("A copy must hold the values as read", check_values(copy, prefilter, add, buffer) == 0);
+  CUTEST_ASSERT("A copy must hold the vlmetalayer", check_vlmeta(copy) == 0);
   blosc2_schunk_free(copy);
 
   blosc2_schunk_free(schunk);
