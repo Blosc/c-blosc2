@@ -2163,7 +2163,10 @@ int b2nd_get_slice(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t
 }
 
 
-/* Fill the chunks of the result of b2nd_get_slice() one after the other from the source slice */
+/* Fill the chunks of the result of b2nd_get_slice() one after the other from the source slice.
+   The chunk-sized buffer comes from the thread's scratch cache (see blosc2_tmp_malloc()), also
+   for an in-memory result: unlike the compression buffers of schunk_scratch_malloc(), it never
+   becomes a chunk of the array, and freed per call glibc trims it and faults it in again. */
 static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2nd_array_t *src,
                             const int64_t *start, prefetch_batch *prefetch) {
   int8_t ndim = (*array)->ndim;
@@ -2214,7 +2217,8 @@ static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2n
       BLOSC_TRACE_ERROR("Buffer size is out of range");
       return BLOSC2_ERROR_INVALID_PARAM;
     }
-    uint8_t *buffer = malloc(buffersize);
+    size_t capacity;
+    uint8_t *buffer = blosc2_tmp_malloc(buffersize, &capacity);
     if (buffer == NULL) {
       b2nd_free(*array);
       *array = NULL;
@@ -2223,14 +2227,14 @@ static int get_slice_chunks(b2nd_context_t *ctx, b2nd_array_t **array, const b2n
     int g_rc = locked_get_set_slice(buffer, (int64_t) buffersize, src_start, src_stop, chunk_shape,
                                     (b2nd_array_t *) src, false, false, prefetch);
     if (g_rc < 0) {
-      free(buffer);
+      blosc2_tmp_free(buffer, capacity);
       b2nd_free(*array);
       *array = NULL;
       return g_rc;
     }
     int s_rc = b2nd_set_slice_cbuffer(buffer, chunk_shape, (int64_t)buffersize, chunk_start,
                                       chunk_stop, *array);
-    free(buffer);
+    blosc2_tmp_free(buffer, capacity);
     if (s_rc < 0) {
       b2nd_free(*array);
       *array = NULL;
