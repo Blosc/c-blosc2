@@ -2824,12 +2824,13 @@ static int read_lazy_chunk_bytes(blosc2_context* context, int32_t offset, uint8_
 
   uint8_t* read_buffer = buffer;
   int64_t rbytes = io_cb->read((void**)&read_buffer, 1, nbytes, io_pos, fp);
-  frame_reader_release(frame, io_cb, fp);
-  if (read_buffer != buffer) {
-    if (rbytes == nbytes && read_buffer != NULL) memcpy(buffer, read_buffer, (size_t)nbytes);
-    free(read_buffer);
+  bool complete = rbytes == nbytes && read_buffer != NULL;
+  if (complete && read_buffer != buffer) {
+    // An io that hands out its own memory (mmap) keeps owning it
+    memcpy(buffer, read_buffer, (size_t)nbytes);
   }
-  if (rbytes != nbytes || read_buffer == NULL) {
+  frame_reader_release(frame, io_cb, fp);
+  if (!complete) {
     BLOSC_TRACE_ERROR("%s", read_error);
     return BLOSC2_ERROR_FILE_READ;
   }
@@ -4392,13 +4393,13 @@ static int decompress_single_vlblock(blosc2_context* context, int32_t nblock,
     uint8_t nbuf[sizeof(int32_t)];
     uint8_t* nbufp = nbuf;
     int64_t rbytes = io_cb->read((void**)&nbufp, 1, sizeof(int32_t), io_pos, fp);
-    frame_reader_release(frame, io_cb, fp);
-    if (nbufp != nbuf) {
-      // io_cb allocated new memory; copy the result and free.
+    bool complete = rbytes == (int64_t)sizeof(int32_t) && nbufp != NULL;
+    if (complete && nbufp != nbuf) {
+      // An io that hands out its own memory (mmap) keeps owning it
       memcpy(nbuf, nbufp, sizeof(int32_t));
-      free(nbufp);
     }
-    if (rbytes != (int64_t)sizeof(int32_t)) {
+    frame_reader_release(frame, io_cb, fp);
+    if (!complete) {
       BLOSC_TRACE_ERROR("Cannot read VL-block uncompressed-size prefix from disk.");
       return BLOSC2_ERROR_FILE_READ;
     }
