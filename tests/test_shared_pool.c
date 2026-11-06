@@ -337,7 +337,7 @@ static char *test_pool_refcount_and_destroy(void)
   mu_assert("pool not acquired", ctx->thread_pool != NULL);
 
   blosc2_free_ctx(ctx);
-  /* After free, the pool pointer is gone; test passes if no crash */
+  /* After free, the pool is kept for reuse; test passes if no crash */
 
   return EXIT_SUCCESS;
 }
@@ -389,11 +389,146 @@ static char *test_many_contexts_share_pool(void)
   for (int i = 0; i < N_CTX; i++) {
     blosc2_free_ctx(ctxs[i]);
   }
-  /* All freed; pool is destroyed (no crash) */
+  /* All freed; the pool is kept for reuse (no crash) */
 
   return EXIT_SUCCESS;
 #undef N_CTX
 }
+
+
+#ifndef _WIN32
+/* ------------------------------------------------------------------ */
+/* contexts made for one call reuse the threads of an unused pool    */
+/* ------------------------------------------------------------------ */
+#define REUSE_NTHREADS 5
+
+/* The filters below count the threads that run them for the first time */
+static __thread bool this_thread_seen = false;
+static int32_t nthreads_seen = 0;
+
+static void see_thread(void)
+{
+  if (!this_thread_seen) {
+    this_thread_seen = true;
+    __atomic_fetch_add(&nthreads_seen, 1, __ATOMIC_RELAXED);
+  }
+}
+
+static int32_t get_nthreads_seen(void)
+{
+  return __atomic_load_n(&nthreads_seen, __ATOMIC_RELAXED);
+}
+
+static int counting_prefilter(blosc2_prefilter_params *params)
+{
+  see_thread();
+  memcpy(params->output, params->input, params->output_size);
+  return 0;
+}
+
+static int counting_postfilter(blosc2_postfilter_params *params)
+{
+  see_thread();
+  memcpy(params->output, params->input, params->size);
+  return 0;
+}
+
+static int64_t one_call_data[CHUNKSIZE / TYPESIZE];
+
+/* A round trip of one_call_data with contexts that live for one call each, as in
+   python-blosc2's compress2() and decompress2() (roundtrip() has static buffers) */
+static bool one_call_roundtrip(int16_t nthreads, int64_t *dest, uint8_t *cbuf)
+{
+  blosc2_prefilter_params preparams = {0};
+  blosc2_postfilter_params postparams = {0};
+  blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+  cp.nthreads = nthreads;
+  cp.blocksize = BLOCKSIZE;
+  cp.typesize = TYPESIZE;
+  cp.prefilter = counting_prefilter;
+  cp.preparams = &preparams;
+  blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+  dp.nthreads = nthreads;
+  dp.postfilter = counting_postfilter;
+  dp.postparams = &postparams;
+
+  blosc2_context *cctx = blosc2_create_cctx(cp);
+  if (cctx == NULL) return false;
+  int cbytes = blosc2_compress_ctx(cctx, one_call_data, CHUNKSIZE, cbuf, CHUNKSIZE * 2);
+  blosc2_free_ctx(cctx);
+  blosc2_context *dctx = blosc2_create_dctx(dp);
+  if (dctx == NULL) return false;
+  int dbytes = blosc2_decompress_ctx(dctx, cbuf, cbytes, dest, CHUNKSIZE);
+  blosc2_free_ctx(dctx);
+  return cbytes > 0 && dbytes == CHUNKSIZE && memcmp(one_call_data, dest, CHUNKSIZE) == 0;
+}
+
+static char *test_one_call_contexts_reuse_threads(void)
+{
+  static int64_t dest[CHUNKSIZE / TYPESIZE];
+  static uint8_t cbuf[CHUNKSIZE * 2];
+  for (int i = 0; i < CHUNKSIZE / TYPESIZE; i++) one_call_data[i] = i;
+  this_thread_seen = true;  /* count the pool threads only */
+
+  int32_t before = get_nthreads_seen();
+  for (int i = 0; i < 10; i++) {
+    mu_assert("round trip failed", one_call_roundtrip(REUSE_NTHREADS, dest, cbuf));
+  }
+  mu_assert("contexts with the same nthreads should reuse the threads of the pool",
+            get_nthreads_seen() - before <= REUSE_NTHREADS);
+
+  /* blosc2_free_resources() destroys the pools that no context uses */
+  blosc2_free_resources();
+  before = get_nthreads_seen();
+  mu_assert("round trip failed", one_call_roundtrip(REUSE_NTHREADS, dest, cbuf));
+  mu_assert("blosc2_free_resources() should destroy the unused pools", get_nthreads_seen() > before);
+
+  return EXIT_SUCCESS;
+}
+
+
+/* ------------------------------------------------------------------ */
+/* threads making one-call contexts with more thread counts than     */
+/* unused pools are kept: pools are destroyed while others are used  */
+/* ------------------------------------------------------------------ */
+#define CHURN_THREADS 4
+#define CHURN_NTHREADS_VALUES 8  /* more than the unused pools kept */
+
+static int64_t churn_dest[CHURN_THREADS][CHUNKSIZE / TYPESIZE];
+static uint8_t churn_cbuf[CHURN_THREADS][CHUNKSIZE * 2];
+static bool churn_ok[CHURN_THREADS];
+
+static void *churn_worker(void *arg)
+{
+  int id = (int)(intptr_t)arg;
+  bool ok = true;
+  for (int i = 0; ok && i < 5 * CHURN_NTHREADS_VALUES; i++) {
+    int16_t nthreads = (int16_t)(2 + (id + i) % CHURN_NTHREADS_VALUES);
+    ok = one_call_roundtrip(nthreads, churn_dest[id], churn_cbuf[id]);
+  }
+  churn_ok[id] = ok;
+  return NULL;
+}
+
+static char *test_one_call_contexts_concurrent_pool_churn(void)
+{
+  blosc2_pthread_t threads[CHURN_THREADS];
+  for (int i = 0; i < CHUNKSIZE / TYPESIZE; i++) one_call_data[i] = i;
+  for (int t = 0; t < CHURN_THREADS; t++) {
+    mu_assert("pthread_create failed",
+              blosc2_pthread_create(&threads[t], NULL, churn_worker, (void *)(intptr_t)t) == 0);
+  }
+  for (int t = 0; t < CHURN_THREADS; t++) {
+    blosc2_pthread_join(threads[t], NULL);
+  }
+  for (int t = 0; t < CHURN_THREADS; t++) {
+    mu_assert("round trip failed in a churn thread", churn_ok[t]);
+  }
+  blosc2_free_resources();
+
+  return EXIT_SUCCESS;
+}
+#endif  /* !_WIN32 */
 
 
 static char *all_tests(void)
@@ -418,6 +553,8 @@ static char *all_tests(void)
   mu_run_test(test_roundtrip_delta_serial);
 #ifndef _WIN32
   mu_run_test(test_many_contexts_share_pool);
+  mu_run_test(test_one_call_contexts_reuse_threads);
+  mu_run_test(test_one_call_contexts_concurrent_pool_churn);
 #endif
 
   return EXIT_SUCCESS;
