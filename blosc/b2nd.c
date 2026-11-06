@@ -3434,7 +3434,7 @@ static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_select
     for (int64_t j = 0; j < selection_size[i]; ++j) {
       int64_t value = ordered_selection[i][j].value;
       int64_t c = value / array->chunkshape[i];
-      if (value >= 0 && value < array->shape[i] && (naxis_chunks[i] == 0 || axis_chunks[i][naxis_chunks[i] - 1] != c)) {
+      if (naxis_chunks[i] == 0 || axis_chunks[i][naxis_chunks[i] - 1] != c) {
         axis_chunks[i][naxis_chunks[i]++] = c;
       }
     }
@@ -3475,9 +3475,11 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 
   for (int i = 0; i < ndim; ++i) {
     BLOSC_ERROR_NULL(selection[i], BLOSC2_ERROR_NULL_POINTER);
-    // Check that indexes are not larger than array shape
-    for (int j = 0; j < selection_size[i]; ++j) {
-      if (selection[i][j] > array->shape[i]) {
+    // Only [0, shape): negative indexes address memory outside the chunk buffer and the block mask
+    for (int64_t j = 0; j < selection_size[i]; ++j) {
+      if (selection[i][j] < 0 || selection[i][j] >= array->shape[i]) {
+        BLOSC_TRACE_ERROR("Index %" PRId64 " is out of bounds for axis %d with size %" PRId64,
+                          selection[i][j], i, array->shape[i]);
         BLOSC_ERROR(BLOSC2_ERROR_INVALID_INDEX);
       }
     }
@@ -3486,7 +3488,10 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
   // Check buffer size
   int64_t sel_size = array->sc->typesize;
   for (int i = 0; i < ndim; ++i) {
-    sel_size *= selection_size[i];
+    if (!blosc2_checked_mul_i64_nonneg(sel_size, selection_size[i], &sel_size)) {
+      BLOSC_TRACE_ERROR("Selection size %" PRId64 " of axis %d is negative or too large", selection_size[i], i);
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
   }
 
   if (sel_size < buffersize) {
