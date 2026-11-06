@@ -82,14 +82,14 @@ static int create_array(int clevel, int nthreads) {
 }
 
 
-static int open_array(bool mmap_io, b2nd_array_t **array, blosc2_stdio_mmap *mmap_file) {
+static int open_array(const char *urlpath, bool mmap_io, b2nd_array_t **array, blosc2_stdio_mmap *mmap_file) {
   if (!mmap_io) {
-    return b2nd_open(URLPATH, array);
+    return b2nd_open(urlpath, array);
   }
   *mmap_file = BLOSC2_STDIO_MMAP_DEFAULTS;
   mmap_file->mode = "r";
   blosc2_io io = {.id = BLOSC2_IO_FILESYSTEM_MMAP, .name = "filesystem_mmap", .params = mmap_file};
-  blosc2_schunk *schunk = blosc2_schunk_open_udio(URLPATH, &io);
+  blosc2_schunk *schunk = blosc2_schunk_open_udio(urlpath, &io);
   if (schunk == NULL) {
     return -1;
   }
@@ -107,9 +107,9 @@ static int64_t slice_nitems(int s) {
 
 
 /* Drop the file from the page cache, so that read-ahead has something to read (where the OS lets us) */
-static void evict(void) {
+static void evict(const char *urlpath) {
 #if defined(POSIX_FADV_DONTNEED)
-  int fd = open(URLPATH, O_RDONLY);
+  int fd = open(urlpath, O_RDONLY);
   if (fd >= 0) {
     posix_fadvise(fd, 0, 0, POSIX_FADV_DONTNEED);
     close(fd);
@@ -169,7 +169,7 @@ static int read_slice(b2nd_array_t *array, int s, result_t *out) {
 static int read_slices(bool mmap_io, result_t out[][NWAYS]) {
   b2nd_array_t *array;
   blosc2_stdio_mmap mmap_file;
-  CHECK(open_array(mmap_io, &array, &mmap_file) == 0, "open");
+  CHECK(open_array(URLPATH, mmap_io, &array, &mmap_file) == 0, "open");
   for (int s = 0; s < NSLICES; ++s) {
     CHECK(read_slice(array, s, out[s]) == 0, "read slice");
   }
@@ -205,7 +205,7 @@ static int check_reads(bool mmap_io, result_t expected[][NWAYS]) {
   int rc = 0;
   for (int warm = 0; warm < 2 && rc == 0; ++warm) {
     if (!warm) {
-      evict();
+      evict(URLPATH);
     }
     rc |= read_slices(mmap_io, got);
     rc |= compare_slices(expected, got);
@@ -286,6 +286,122 @@ static int check_empty(void) {
 }
 
 
+/* An array whose chunks (1 MiB, about as large compressed) are large enough for read-ahead to read only the blocks a
+   slice needs, and slices that need only some blocks of every chunk they touch; the second overlaps the first */
+#define BIG_URLPATH "test_b2nd_prefetch_big.b2nd"
+static const int64_t big_shape[NDIM] = {20, 256, 192};
+static const int32_t big_chunkshape[NDIM] = {16, 128, 128};
+static const int32_t big_blockshape[NDIM] = {8, 32, 32};
+static const int64_t big_starts[][NDIM] = {{2, 30, 40}, {0, 100, 0}};
+static const int64_t big_stops[][NDIM] = {{18, 220, 170}, {20, 256, 100}};
+#define NBIG ((int) (sizeof(big_starts) / sizeof(big_starts[0])))
+
+
+static int create_big_array(int clevel, int nthreads) {
+  blosc2_remove_urlpath(BIG_URLPATH);
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  cparams.compcode = BLOSC_LZ4;
+  cparams.clevel = clevel;
+  cparams.nthreads = nthreads;
+  blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+  storage.cparams = &cparams;
+  storage.contiguous = true;
+  storage.urlpath = BIG_URLPATH;
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, NDIM, big_shape, big_chunkshape, big_blockshape, NULL, 0, NULL, 0);
+  CHECK(ctx != NULL, "create ctx");
+  int64_t n = big_shape[0] * big_shape[1] * big_shape[2];
+  int32_t *data = malloc(n * sizeof(int32_t));
+  for (int64_t i = 0; i < n; ++i) {  // murmur3's finalizer: incompressible, so that compressed chunks stay large
+    uint32_t x = (uint32_t) i * 2654435761u;
+    x = (x ^ (x >> 16)) * 0x85ebca6bu;
+    x = (x ^ (x >> 13)) * 0xc2b2ae35u;
+    data[i] = (int32_t) (x ^ (x >> 16));
+  }
+  b2nd_array_t *array;
+  CHECK(b2nd_from_cbuffer(ctx, &array, data, n * (int64_t) sizeof(int32_t)) == 0, "from buffer");
+  free(data);
+  CHECK(array->sc->cbytes > array->sc->nchunks * 256 * 1024, "chunks too small to be read in part");
+  b2nd_free(array);
+  b2nd_free_ctx(ctx);
+  return 0;
+}
+
+
+static int read_big_slice(bool mmap_io, int s, int32_t **out, int64_t *nbytes) {
+  int64_t sshape[NDIM];
+  *nbytes = sizeof(int32_t);
+  for (int i = 0; i < NDIM; ++i) {
+    sshape[i] = big_stops[s][i] - big_starts[s][i];
+    *nbytes *= sshape[i];
+  }
+  *out = malloc(*nbytes);
+  b2nd_array_t *array;
+  blosc2_stdio_mmap mmap_file;
+  CHECK(*out != NULL && open_array(BIG_URLPATH, mmap_io, &array, &mmap_file) == 0, "open");
+  int rc = b2nd_get_slice_cbuffer(array, big_starts[s], big_stops[s], *out, sshape, *nbytes);
+  b2nd_free(array);
+  return rc;
+}
+
+
+/* Bytes this process has read with read(), pread() and the like so far, or -1 if unknown */
+static int64_t bytes_read(void) {
+  int64_t rchar = -1;
+#if defined(__linux__)
+  FILE *f = fopen("/proc/self/io", "r");
+  char line[128];
+  while (f != NULL && fgets(line, sizeof(line), f) != NULL) {
+    long long value;
+    if (sscanf(line, "rchar: %lld", &value) == 1) {
+      rchar = value;
+      break;
+    }
+  }
+  if (f != NULL) {
+    fclose(f);
+  }
+#endif
+  return rchar;
+}
+
+
+/* Slices that need only some blocks of each chunk, read cold, with some of their blocks cached by the slice before,
+   and cached.  Once cached, a slice of the mapped array reads no chunk data: read-ahead asks the page cache about
+   just the blocks the slice needs, and leaves them out. */
+static int check_partial_chunks(bool mmap_io, int clevel, int nthreads, int pf_nthreads, int64_t max_ahead,
+                                int64_t piece_size) {
+  CHECK(create_big_array(clevel, nthreads) == 0, "create big array");
+  int32_t *expected[NBIG];
+  int64_t nbytes[NBIG];
+  blosc2_set_prefetch(0, 0, 0);
+  for (int s = 0; s < NBIG; ++s) {
+    CHECK(read_big_slice(mmap_io, s, &expected[s], &nbytes[s]) == 0, "read without read-ahead");
+  }
+  CHECK(blosc2_set_prefetch(pf_nthreads, max_ahead, piece_size) >= 0, "set read-ahead");
+  evict(BIG_URLPATH);
+  // Cold; then the second slice, part of whose blocks the first has read; then the first again, all cached
+  const int order[] = {0, 1, 0};
+  for (int k = 0; k < 3; ++k) {
+    int s = order[k];
+    int32_t *got;
+    int64_t got_nbytes;
+    int64_t before = bytes_read();
+    CHECK(read_big_slice(mmap_io, s, &got, &got_nbytes) == 0, "read with read-ahead");
+    int64_t nread = bytes_read() - before;
+    CHECK(got_nbytes == nbytes[s] && memcmp(got, expected[s], nbytes[s]) == 0, "big slice differs with read-ahead");
+    free(got);
+    // Only the headers of the chunks, a few hundred bytes each (and /proc/self/io itself)
+    CHECK(k < 2 || !mmap_io || before < 0 || nread < 64 * 1024, "a cached slice read chunk data");
+  }
+  for (int s = 0; s < NBIG; ++s) {
+    free(expected[s]);
+  }
+  blosc2_remove_urlpath(BIG_URLPATH);
+  return 0;
+}
+
+
 typedef struct {
   int clevel;
   int nthreads;  // compression threads: with several, blocks are stored in the order they are done
@@ -336,6 +452,9 @@ CUTEST_TEST_TEST(prefetch) {
                 blosc2_set_prefetch(setting.nthreads, setting.max_ahead, setting.piece_size) >= 0);
   CUTEST_ASSERT("Slices differ with read-ahead", check_reads(mmap_io, expected) == 0);
   CUTEST_ASSERT("Empty array", check_empty() == 0);
+  CUTEST_ASSERT("Chunks read in part",
+                check_partial_chunks(mmap_io, layout.clevel, layout.nthreads, setting.nthreads, setting.max_ahead,
+                                     setting.piece_size) == 0);
 #if !defined(_WIN32)
   // The threads run in this process now (the cold reads above started them); a child must start its own
   fflush(NULL);
