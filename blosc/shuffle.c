@@ -47,6 +47,8 @@
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
 
+#include "threading.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -372,45 +374,38 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 }
 
 
-/* Flag indicating whether the implementation has been initialized.
-   Zero means it hasn't been initialized, non-zero means it has. */
-static int32_t implementation_initialized;
-
 /* The dynamically-chosen shuffle/unshuffle implementation.
-   This is only safe to use once `implementation_initialized` is set. */
+   Only use it after init_shuffle_implementation(). */
 static shuffle_implementation_t host_implementation;
 
-/* Initialize the shuffle implementation, if necessary. */
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((always_inline))
-#endif
-static
-#if defined(_MSC_VER)
-__forceinline
-#else
-inline
-#endif
-void init_shuffle_implementation(void) {
-  /* Initialization could (in rare cases) take place concurrently on
-     multiple threads, but it shouldn't matter because the
-     initialization should return the same result on each thread (so
-     the implementation will be the same). Since that's the case we
-     can avoid complicated synchronization here and get a small
-     performance benefit because we don't need to perform a volatile
-     load on the initialization variable each time this function is
-     called. */
-#if defined(__GNUC__) || defined(__clang__)
-  if (__builtin_expect(!implementation_initialized, 0)) {
-#else
-    if (!implementation_initialized) {
-#endif
-    /* Initialize the implementation. */
-    host_implementation = get_shuffle_implementation();
-
-    /* Set the flag indicating the implementation has been initialized. */
-    implementation_initialized = 1;
-  }
+static void set_host_implementation(void) {
+  host_implementation = get_shuffle_implementation();
 }
+
+/* The worker threads of a job can make their first shuffle call at the same
+   time: the once primitive makes them wait until host_implementation is
+   complete (a plain flag could be seen set before the struct was filled). */
+#if defined(_WIN32)
+static INIT_ONCE implementation_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK set_host_implementation_once(PINIT_ONCE once, PVOID param, PVOID* context) {
+  (void)once;
+  (void)param;
+  (void)context;
+  set_host_implementation();
+  return TRUE;
+}
+
+static void init_shuffle_implementation(void) {
+  InitOnceExecuteOnce(&implementation_once, set_host_implementation_once, NULL, NULL);
+}
+#else
+static pthread_once_t implementation_once = PTHREAD_ONCE_INIT;
+
+static void init_shuffle_implementation(void) {
+  pthread_once(&implementation_once, set_host_implementation);
+}
+#endif
 
 /* Shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */
