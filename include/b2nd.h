@@ -243,7 +243,9 @@ BLOSC_EXPORT int b2nd_free(b2nd_array_t *array);
  * @param schunk The blosc super-chunk where the b2nd array is stored.
  * @param array The memory pointer where the array will be created.
  *
- * @return An error code.
+ * @return An error code. BLOSC2_ERROR_INVALID_HEADER when the super-chunk contradicts its b2nd metalayer
+ * (fewer chunks than the shape covers, or chunks of another size than the chunk shape times the typesize),
+ * as a damaged frame does. On failure the super-chunk stays with the caller.
  */
 BLOSC_EXPORT int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
 

@@ -62,7 +62,9 @@ CUTEST_TEST_SETUP(slice_nchunks_mismatch) {
 
 CUTEST_TEST_TEST(slice_nchunks_mismatch) {
   /* A mebichunk announced, one stored: the loop used to push 8 MiB of chunk
-     indexes into an 8-byte allocation, which aborts the test runner. */
+     indexes into an 8-byte allocation, which aborts the test runner.  The
+     array that blosc2_get_slice_nchunks() builds out of the schunk now
+     rejects the missing chunks before that. */
   const int64_t nitems = 1024 * 1024;
   blosc2_schunk *schunk = crafted_schunk(nitems, 1);
   CUTEST_ASSERT("cannot build the crafted schunk", schunk != NULL);
@@ -72,6 +74,16 @@ CUTEST_TEST_TEST(slice_nchunks_mismatch) {
   int64_t stop = nitems;
   int64_t *chunks_idx = NULL;
   int64_t nchunks = blosc2_get_slice_nchunks(schunk, &start, &stop, &chunks_idx);
+  CUTEST_ASSERT("a schunk without the announced chunks must be rejected", nchunks < 0);
+  CUTEST_ASSERT("no chunk index buffer must be returned", chunks_idx == NULL);
+  blosc2_schunk_free(schunk);
+
+  /* With all its chunks stored, the slice spans every one of them */
+  schunk = crafted_schunk(nitems, 0);
+  CUTEST_ASSERT("cannot build the crafted schunk", schunk != NULL);
+  CUTEST_ASSERT("cannot store the chunks",
+                blosc2_schunk_fill_special(schunk, nitems, BLOSC2_SPECIAL_ZERO, 1) == nitems);
+  nchunks = blosc2_get_slice_nchunks(schunk, &start, &stop, &chunks_idx);
   CUTEST_ASSERT("the slice should span every announced chunk", nchunks == nitems);
   CUTEST_ASSERT("no chunk index buffer was returned", chunks_idx != NULL);
   CUTEST_ASSERT("unexpected first chunk index", chunks_idx[0] == 0);
@@ -81,11 +93,13 @@ CUTEST_TEST_TEST(slice_nchunks_mismatch) {
 
   /* Same mismatch seen from b2nd_to_cbuffer(): one item announced and no chunk
      stored, so the single-chunk fast path indexed a zero-sized allocation.  It
-     must now report the missing chunk instead. */
-  blosc2_schunk *empty = crafted_schunk(1, 0);
+     must now report the missing chunk instead.  b2nd_from_schunk() rejects a
+     schunk without it, so the chunk goes away after the array is built. */
+  blosc2_schunk *empty = crafted_schunk(1, 1);
   CUTEST_ASSERT("cannot build the empty crafted schunk", empty != NULL);
   b2nd_array_t *array = NULL;
   B2ND_TEST_ASSERT(b2nd_from_schunk(empty, &array));
+  CUTEST_ASSERT("cannot delete the only chunk", blosc2_schunk_delete_chunk(array->sc, 0) == 0);
   uint8_t out = 0;
   CUTEST_ASSERT("reading an announced but absent chunk must fail",
                 b2nd_to_cbuffer(array, &out, 1) < 0);

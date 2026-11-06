@@ -241,8 +241,14 @@ static int update_shape_struct(b2nd_array_t *array, int8_t ndim, const int64_t *
       array->block_chunk_strides[i] = array->block_chunk_strides[i + 1] *
                                       (array->extchunkshape[i + 1] /
                                        array->blockshape[i + 1]);
-      array->chunk_array_strides[i] = array->chunk_array_strides[i + 1] *
-                                      (array->extshape[i + 1] * array->chunkshape[i + 1]);
+      // Unused here, and this product can overflow for large (or damaged)
+      // shapes: 0 then, as for an empty dimension
+      int64_t extent;
+      if (!blosc2_checked_mul_i64_nonneg(array->extshape[i + 1], array->chunkshape[i + 1], &extent) ||
+          !blosc2_checked_mul_i64_nonneg(array->chunk_array_strides[i + 1], extent,
+                                         &array->chunk_array_strides[i])) {
+        array->chunk_array_strides[i] = 0;
+      }
     } else {
       array->item_array_strides[i] = 0;
       array->item_extchunk_strides[i] = 0;
@@ -601,6 +607,35 @@ int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value)
 }
 
 
+/* Reject a super-chunk that contradicts its b2nd metalayer, as a damaged frame
+ * does: readers trust the shape for chunk indexes and result sizes, and the
+ * chunk shape and typesize for the size of every chunk.  Only clear
+ * contradictions count: chunks missing for the shape, and chunks of another
+ * size than the chunk shape makes.  The dtype is not looked at: b2nd stores it
+ * for others and accepts any along with any typesize. */
+static int check_schunk_matches_meta(const blosc2_schunk *schunk, const b2nd_array_t *array) {
+  // Every chunk the shape covers exists: arrays are created with all of them,
+  // and resizes add chunks before they publish a larger shape.  More are fine.
+  int64_t needed_nchunks = array->chunknitems == 0 ? 0 : array->extnitems / array->chunknitems;
+  if (schunk->nchunks < needed_nchunks) {
+    BLOSC_TRACE_ERROR("The b2nd shape needs %" PRId64 " chunks, but the super-chunk holds %" PRId64,
+                      needed_nchunks, schunk->nchunks);
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+  // The chunks hold the chunk shape (padded to whole blocks) in typesize items;
+  // a super-chunk without chunks or with chunks of varying size (<= 0) says nothing
+  int64_t chunkbytes;
+  if (schunk->nchunks > 0 && schunk->chunksize > 0 &&
+      (!blosc2_checked_mul_i64_nonneg(array->extchunknitems, schunk->typesize, &chunkbytes) ||
+       chunkbytes != schunk->chunksize)) {
+    BLOSC_TRACE_ERROR("The b2nd chunk shape with typesize %d does not make the %d-byte chunks of the super-chunk",
+                      schunk->typesize, schunk->chunksize);
+    return BLOSC2_ERROR_INVALID_HEADER;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
 int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
   BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
@@ -660,6 +695,14 @@ int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array) {
   int rc = array_without_schunk(&params, array);
   free(params.dtype);
   BLOSC_ERROR(rc);
+
+  rc = check_schunk_matches_meta(schunk, *array);
+  if (rc < 0) {
+    // The schunk stays with the caller
+    b2nd_free(*array);
+    *array = NULL;
+    BLOSC_ERROR(rc);
+  }
 
   (*array)->sc = schunk;
   (*array)->last_tick = schunk->change_tick;
