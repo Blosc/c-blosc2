@@ -761,7 +761,8 @@ BLOSC_EXPORT int16_t blosc2_get_nthreads(void);
 /**
  * @brief Initialize a pool of threads for compression/decompression. If
  * @p nthreads is 1, then the serial version is chosen and a possible
- * previous existing pool is ended. If this is not called, @p nthreads
+ * previous existing pool is released (#blosc2_free_resources ends the
+ * pools that are no longer used). If this is not called, @p nthreads
  * is set to 1 internally. The threads are per process; a child process
  * created with fork() starts its own threads on first use (see
  * README_THREADED.rst).
@@ -941,6 +942,11 @@ BLOSC_EXPORT int blosc2_get_complib_info(const char* compname, char** complib,
 /**
  * @brief Free possible memory temporaries and thread resources. Use this
  * when you are not going to use Blosc for a long while.
+ *
+ * Blosc's own thread pools (not on Windows) that no context uses any more
+ * are kept, a few of them with the temporaries of their threads, so that
+ * contexts created later with the same number of threads do not start new
+ * threads; this function ends them.
  *
  * @return A 0 if succeeds, in case of problems releasing the resources,
  * it returns a negative number.
