@@ -2631,20 +2631,19 @@ int b2nd_concatenate(b2nd_context_t *ctx, const b2nd_array_t *src1, const b2nd_a
 int b2nd_save(const b2nd_array_t *array, char *urlpath) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
   BLOSC_ERROR_NULL(urlpath, BLOSC2_ERROR_NULL_POINTER);
+  BLOSC_ERROR(refresh_if_stale((b2nd_array_t *) array));
 
-  b2nd_array_t *tmp;
+  // The chunks as stored, like b2nd_to_cframe() and b2nd_save_append() (unlike
+  // b2nd_copy(), which applies a postfilter), in the layout of the array
   blosc2_storage b2_storage = BLOSC2_STORAGE_DEFAULTS;
-  b2nd_context_t params = {.b2_storage=&b2_storage};
   b2_storage.urlpath = urlpath;
   b2_storage.contiguous = array->sc->storage->contiguous;
-
-  for (int i = 0; i < array->ndim; ++i) {
-    params.chunkshape[i] = array->chunkshape[i];
-    params.blockshape[i] = array->blockshape[i];
+  blosc2_schunk *sc = schunk_copy_as_stored(array->sc, &b2_storage);
+  if (sc == NULL) {
+    BLOSC_TRACE_ERROR("Error saving the b2nd array");
+    return BLOSC2_ERROR_FAILURE;
   }
-
-  BLOSC_ERROR(b2nd_copy(&params, array, &tmp));
-  BLOSC_ERROR(b2nd_free(tmp));
+  blosc2_schunk_free(sc);
 
   return BLOSC2_ERROR_SUCCESS;
 }

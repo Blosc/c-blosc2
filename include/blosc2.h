@@ -2027,6 +2027,14 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage);
  * @param schunk The super-chunk to be copied.
  * @param storage The storage properties.
  *
+ * @remark If @p schunk has a postfilter, the copy holds the data as read from
+ * @p schunk, i.e. the output of the postfilter (except with variable-length
+ * blocks, whose chunks are always copied as they are).  The copy does not
+ * inherit the postfilter: it reads that output as it is, unless
+ * @p storage sets a postfilter in its dparams, which then runs on it again.
+ * To serialize the chunks as they are stored instead, see
+ * blosc2_schunk_to_buffer().
+ *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage);
@@ -2204,12 +2212,22 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const b
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio);
 
-/* @brief Convert a super-chunk into a contiguous frame buffer.
+/**
+ * @brief Convert a super-chunk into a contiguous frame buffer.
  *
  * @param schunk The super-chunk to convert.
  * @param cframe The address of the destination buffer (output).
  * @param needs_free The pointer to a boolean indicating if it is the user's
  * responsibility to free the resulting @p cframe buffer or not.
+ *
+ * @remark The frame holds the chunks as they are stored, whatever the storage of
+ * @p schunk: a postfilter of @p schunk is not applied (unlike in
+ * blosc2_schunk_copy()), and it is not part of the frame either, so a
+ * super-chunk made from the frame reads the stored values until the same
+ * postfilter is set on it again.  For a frame with the postfiltered values,
+ * serialize a blosc2_schunk_copy() of @p schunk.  The same holds for
+ * blosc2_schunk_to_buffer_alloc(), blosc2_schunk_to_file() and
+ * blosc2_schunk_append_file().
  *
  * @return If successful, return the size of the (frame) @p cframe buffer.
  * Else, a negative value.
@@ -2230,6 +2248,9 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** cf
  * of (at least) that many bytes, or NULL to give up.
  * @param user_data Passed on to @p alloc.
  *
+ * @remark Like blosc2_schunk_to_buffer(), it writes the chunks as they are
+ * stored, without applying a postfilter of @p schunk.
+ *
  * @return If successful, return the size of the frame written into the buffer.
  * Else (also when @p alloc returns NULL), a negative value.
  */
@@ -2237,20 +2258,29 @@ BLOSC_EXPORT int64_t blosc2_schunk_to_buffer_alloc(blosc2_schunk* schunk,
                                                    uint8_t* (*alloc)(int64_t len, void* user_data),
                                                    void* user_data);
 
-/* @brief Store a super-chunk into a file.
+/**
+ * @brief Store a super-chunk into a file.
  *
  * @param schunk The super-chunk to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark The file holds the same frame that blosc2_schunk_to_buffer()
+ * returns: the chunks as they are stored, without applying a postfilter of
+ * @p schunk.
  *
  * @return If successful, return the size of the (fileframe) in @p urlpath.
  * Else, a negative value.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
-/* @brief Append a super-chunk into a file.
+/**
+ * @brief Append a super-chunk into a file.
  *
  * @param schunk The super-chunk to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark It appends the same frame that blosc2_schunk_to_buffer() returns:
+ * the chunks as they are stored, without applying a postfilter of @p schunk.
  *
  * @return If successful, return the offset where @p schunk has been appended in @p urlpath.
  * Else, a negative value.
