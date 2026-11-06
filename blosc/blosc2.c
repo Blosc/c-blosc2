@@ -6661,6 +6661,8 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
 
   /* Populate the context, using zeros as default values */
   memset(context, 0, sizeof(blosc2_context));
+  /* Early, so that the cleanup at `failed` can always destroy it */
+  blosc2_pthread_mutex_init(&context->nchunk_mutex, NULL);
   context->do_compress = 1;   /* meant for compression */
   context->use_dict = cparams.use_dict;
   if (cparams.instr_codec) {
@@ -6674,14 +6676,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     if (context->filters[i] >= BLOSC_LAST_FILTER && context->filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
                         context->filters[i]);
-      free(context);
-      return NULL;
+      goto failed;
     }
     if (context->filters[i] > BLOSC_LAST_REGISTERED_FILTER && context->filters[i] <= BLOSC2_GLOBAL_REGISTERED_FILTERS_STOP) {
       BLOSC_TRACE_ERROR("filter (%d) is not yet defined",
                         context->filters[i]);
-      free(context);
-      return NULL;
+      goto failed;
     }
   }
 
@@ -6691,7 +6691,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     for (int i = 0; i < BLOSC2_MAX_FILTERS; ++i) {
       if ((context->filters[i] == BLOSC_SHUFFLE) || (context->filters[i] == BLOSC_BITSHUFFLE)) {
         BLOSC_TRACE_ERROR("ZFP cannot be run in presence of SHUFFLE / BITSHUFFLE");
-        return NULL;
+        goto failed;
       }
     }
   }
@@ -6765,7 +6765,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
     int codec = blosc2_compname_to_compcode(envvar);
     if (codec >= BLOSC_LAST_CODEC) {
       BLOSC_TRACE_ERROR("User defined codecs cannot be set here. Use Blosc2 mechanism instead.");
-      return NULL;
+      goto failed;
     }
     context->compcode = codec;
   }
@@ -6827,13 +6827,14 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   }
 
   context->threads_started = 0;
-  blosc2_pthread_mutex_init(&context->nchunk_mutex, NULL);
   context->schunk = cparams.schunk;
 
   if (cparams.prefilter != NULL) {
     context->prefilter = cparams.prefilter;
     context->preparams = (blosc2_prefilter_params*)my_malloc(sizeof(blosc2_prefilter_params));
-    BLOSC_ERROR_NULL(context->preparams, NULL);
+    if (context->preparams == NULL) {
+      goto failed;
+    }
     memcpy(context->preparams, cparams.preparams, sizeof(blosc2_prefilter_params));
   }
 
@@ -6845,18 +6846,18 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
         if (g_tuners[i].init == NULL) {
           if (fill_tuner(&g_tuners[i]) < 0) {
             BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
-            return NULL;
+            goto failed;
           }
         }
         if (g_tuners[i].init(cparams.tuner_params, context, NULL) < 0) {
           BLOSC_TRACE_ERROR("Error in user-defined tuner %d init function\n", cparams.tuner_id);
-          return NULL;
+          goto failed;
         }
         goto urtunersuccess;
       }
     }
     BLOSC_TRACE_ERROR("User-defined tuner %d not found\n", cparams.tuner_id);
-    return NULL;
+    goto failed;
   }
   urtunersuccess:;
 
@@ -6866,6 +6867,12 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   memcpy(context->filter_params, cparams.filter_params, BLOSC2_MAX_FILTERS * sizeof(void*));
 
   return context;
+
+failed:
+  my_free(context->preparams);
+  blosc2_pthread_mutex_destroy(&context->nchunk_mutex);
+  my_free(context);
+  return NULL;
 }
 
 /* Create a context for decompression */
@@ -6897,7 +6904,11 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
   if (dparams.postfilter != NULL) {
     context->postfilter = dparams.postfilter;
     context->postparams = (blosc2_postfilter_params*)my_malloc(sizeof(blosc2_postfilter_params));
-    BLOSC_ERROR_NULL(context->postparams, NULL);
+    if (context->postparams == NULL) {
+      blosc2_pthread_mutex_destroy(&context->nchunk_mutex);
+      my_free(context);
+      return NULL;
+    }
     memcpy(context->postparams, dparams.postparams, sizeof(blosc2_postfilter_params));
   }
 
