@@ -257,6 +257,9 @@ BLOSC_EXPORT int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
  * @param cframe_len The length of the in-memory array buffer.
  * @param needs_free Whether the buffer should be freed or not.
  *
+ * @remark The frame holds the chunks as they are stored, without applying a
+ * postfilter of @p array (see blosc2_schunk_to_buffer()).
+ *
  * @return An error code
  */
 BLOSC_EXPORT int b2nd_to_cframe(const b2nd_array_t *array, uint8_t **cframe,
@@ -301,6 +304,10 @@ BLOSC_EXPORT int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int
  * @param array The array to be saved.
  * @param urlpath The urlpath where the array will be stored.
  *
+ * @remark It saves the chunks as they are stored, without applying a
+ * postfilter of @p array (like b2nd_to_cframe() and b2nd_save_append(), unlike
+ * b2nd_copy()), as a contiguous or sparse frame like @p array.
+ *
  * @return An error code.
  */
 BLOSC_EXPORT int b2nd_save(const b2nd_array_t *array, char *urlpath);
@@ -310,6 +317,9 @@ BLOSC_EXPORT int b2nd_save(const b2nd_array_t *array, char *urlpath);
  *
  * @param array The array to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark It appends the chunks as they are stored, without applying a
+ * postfilter of @p array (see blosc2_schunk_append_file()).
  *
  * @return If successful, return the offset where @p array has been appended in @p urlpath.
  * Else, a negative value.
@@ -493,6 +503,9 @@ BLOSC_EXPORT int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffe
  * @return An error code
  *
  * @note The ndim and shape in ctx will be overwritten by the src ctx.
+ *
+ * @remark If @p src has a postfilter, the copy holds its output, as in
+ * blosc2_schunk_copy().
  *
  */
 BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array);

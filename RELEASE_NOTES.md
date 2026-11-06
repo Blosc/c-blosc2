@@ -60,6 +60,23 @@ pool scaling performance for jobs with small block counts.
   (retaining up to 2 pools), avoiding repeated thread spawn/join overhead in workloads
   using short-lived contexts such as single-call Python decompressions (#865).
 
+* **Behaviour change: serializing keeps the chunks as stored, also with a
+  postfilter.**  `blosc2_schunk_to_buffer()`, `blosc2_schunk_to_buffer_alloc()`,
+  `blosc2_schunk_to_file()`, `blosc2_schunk_append_file()`, `b2nd_to_cframe()`,
+  `b2nd_save()` and `b2nd_save_append()` now write the chunks as they are stored
+  for every storage.  Before, they wrote the postfilter's output for a
+  super-chunk with a postfilter unless it was an in-memory contiguous frame
+  (`b2nd_save()` always did), so the result depended on the storage and the
+  function, and setting the postfilter again on the loaded super-chunk applied
+  it twice.  Code that loads such a frame without setting the postfilter again
+  now reads the stored values instead of the postfiltered ones.  To serialize
+  the postfiltered values, serialize a `blosc2_schunk_copy()` (or `b2nd_copy()`)
+  of the super-chunk, which applies the postfilter as before (except for
+  super-chunks with variable-length blocks, whose chunks are always copied as
+  they are).  Super-chunks without filters give the same frames as before, and
+  with a prefilter or a postfilter, serializing no longer decompresses and
+  recompresses every chunk, which makes it much faster.
+
 Changes from 3.4.1 to 3.5.0
 ===========================
 
