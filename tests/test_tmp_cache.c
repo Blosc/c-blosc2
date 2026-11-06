@@ -6,8 +6,9 @@
   See LICENSE.txt for details about copyright and rights to use.
 
   The per-thread cache of large temporaries (blosc2_tmp_malloc/free): reuse,
-  its size limits, and that b2nd slice reads and writes on frames give their
-  chunk-sized buffers back to it.  Run under
+  its size limits, that b2nd slice reads and writes on frames give their
+  chunk-sized buffers back to it, and that b2nd_get_slice() does so with the
+  buffer it fills the new array from.  Run under
   AddressSanitizer/LeakSanitizer for the thread-exit and blosc2_destroy()
   cleanup.
 */
@@ -186,11 +187,65 @@ static char* test_slice_buffers_cached(void) {
 }
 
 
+/* b2nd_get_slice() gives the buffer that it fills each chunk of the new array
+   from back to the cache, also for an in-memory result (python-blosc2's
+   NDArray.slice() calls it for every slice) */
+static char* test_get_slice_buffer_cached(void) {
+#if !defined(_WIN32)
+  int8_t ndim = 3;
+  int64_t shape[] = {64, 128, 130};
+  int32_t chunkshape[] = {32, 32, 32};  // 128 KB: the scratch of the reads is far smaller...
+  int32_t blockshape[] = {16, 16, 16};
+  int32_t slice_chunkshape[] = {64, 128, 64};  // ...than a chunk of the slice (2 MB), all of them full
+  int32_t slice_blockshape[] = {16, 32, 32};
+  int64_t nitems = 64 * 128 * 130;
+  size_t slice_chunk_nbytes = 64 * 128 * 64 * sizeof(uint32_t);
+  uint32_t *buf = malloc(nitems * sizeof(uint32_t));
+  for (int64_t i = 0; i < nitems; ++i) {
+    buf[i] = (uint32_t) i * 2654435761u;
+  }
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(uint32_t);
+  blosc2_storage storage = {.contiguous=false, .cparams=&cparams};
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, ndim, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
+  b2nd_array_t *array;
+  mu_assert("Cannot create the array", b2nd_from_cbuffer(ctx, &array, buf, nitems * sizeof(uint32_t)) >= 0);
+  b2nd_context_t *slice_ctx = b2nd_create_ctx(&storage, ndim, shape, slice_chunkshape, slice_blockshape,
+                                              NULL, 0, NULL, 0);
+  int64_t start[] = {0, 0, 1};
+  int64_t stop[] = {64, 128, 129};
+  blosc2_tmp_cache_clear();
+  b2nd_array_t *slice;
+  mu_assert("Cannot get the slice", b2nd_get_slice(slice_ctx, &slice, array, start, stop) >= 0);
+  size_t cap;
+  void *p = blosc2_tmp_malloc(slice_chunk_nbytes - 1, &cap);
+  mu_assert("b2nd_get_slice must leave its chunk buffer in the cache", cap >= slice_chunk_nbytes);
+  free(p);
+  blosc2_tmp_cache_clear();
+  uint32_t *out = malloc(64 * 128 * 128 * sizeof(uint32_t));
+  mu_assert("Cannot read the slice", b2nd_to_cbuffer(slice, out, 64 * 128 * 128 * sizeof(uint32_t)) >= 0);
+  for (int64_t i = 0; i < 64 * 128; ++i) {
+    for (int64_t k = 0; k < 128; ++k) {
+      mu_assert("Wrong data in the slice", out[i * 128 + k] == buf[i * 130 + k + 1]);
+    }
+  }
+  free(out);
+  b2nd_free(slice);
+  b2nd_free_ctx(slice_ctx);
+  b2nd_free(array);
+  b2nd_free_ctx(ctx);
+  free(buf);
+#endif
+  return EXIT_SUCCESS;
+}
+
+
 static char* all_tests(void) {
   mu_run_test(test_reuse);
   mu_run_test(test_limits);
   mu_run_test(test_thread_exit);
   mu_run_test(test_slice_buffers_cached);
+  mu_run_test(test_get_slice_buffer_cached);
   return EXIT_SUCCESS;
 }
 
