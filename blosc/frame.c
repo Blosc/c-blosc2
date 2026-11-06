@@ -4327,9 +4327,17 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
       rbytes = io_cb->read((void**)chunk, 1, (int64_t)streams_offset, io_pos, fp);
     }
     else {
-      uint8_t* chunk_ptr;
+      // The io hands out its own memory (mmap) and none at all for a read past
+      // its end, which a damaged offset or header asks for: copy only after a
+      // complete read
+      uint8_t* chunk_ptr = NULL;
       rbytes = io_cb->read((void**)&chunk_ptr, 1, (int64_t)streams_offset, io_pos, fp);
-      memcpy(*chunk, chunk_ptr, streams_offset);
+      if (rbytes == (int64_t)streams_offset && chunk_ptr != NULL) {
+        memcpy(*chunk, chunk_ptr, streams_offset);
+      }
+      else {
+        rbytes = BLOSC2_ERROR_FILE_READ;
+      }
     }
 
     if (rbytes != (int64_t)streams_offset) {
@@ -4382,6 +4390,12 @@ int frame_get_lazychunk(blosc2_frame_s *frame, int64_t nchunk, uint8_t **chunk, 
         goto end;
       }
       for (size_t n = 0; n < nblocks; n++) {
+        // A block starts within its chunk; damaged starts would overflow the
+        // differences below (and in sort_offset())
+        if (block_csizes[n] < 0 || block_csizes[n] > chunk_cbytes) {
+          rc = BLOSC2_ERROR_INVALID_HEADER;
+          goto end;
+        }
         csize_idx[n].val = block_csizes[n];
         csize_idx[n].idx = (int)n;
       }

@@ -1099,7 +1099,8 @@ typedef struct {
   //!< The IO name.
   bool is_allocation_necessary;
   //!< If true, the caller needs to allocate data for the read function (ptr argument). If false, the read function
-  //!< takes care of memory allocation and stores the address in the allocated_ptr argument.
+  //!< stores in the ptr argument the address of memory that it owns (the caller must not free it), or NULL when
+  //!< it cannot read the requested bytes: check the returned count before using it.
   blosc2_open_cb open;
   //!< The IO open callback.
   blosc2_close_cb close;
