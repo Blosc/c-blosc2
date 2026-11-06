@@ -417,6 +417,22 @@ int64_t bshuf_trans_byte_bitrow_SSE(const void* in, void* out, const size_t size
 }
 
 
+/* Transpose the 8x8 bit matrix in each 64-bit lane (as TRANS_BIT_8X8). */
+static inline __m128i trans_bit_8x8_SSE(__m128i x) {
+  __m128i t;
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 7)),
+                    _mm_set1_epi64x(0x00AA00AA00AA00AALL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 7)));
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 14)),
+                    _mm_set1_epi64x(0x0000CCCC0000CCCCLL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 14)));
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 28)),
+                    _mm_set1_epi64x(0x00000000F0F0F0F0LL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 28)));
+  return x;
+}
+
+
 /* Shuffle bits within the bytes of eight element blocks. */
 int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t size,
                                         const size_t elem_size) {
@@ -426,6 +442,7 @@ int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t 
   // With a bit of care, this could be written such that such that it is
   // in_buf = out_buf safe.
   const char* in_b = (const char*) in;
+  char* out_b = (char*) out;
   uint16_t* out_ui16 = (uint16_t*) out;
 
   size_t ii, jj, kk;
@@ -434,7 +451,23 @@ int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t 
   __m128i xmm;
   int32_t bt;
 
-  if (elem_size % 2) {
+  if (elem_size <= 2) {
+    // Each 8-byte word holds the 8 bit rows of 8 one-byte elements, or of
+    // the low or the high bytes of 8 two-byte elements: transposing its
+    // bits gives those bytes.
+    for (ii = 0; ii + 15 < nbyte; ii += 16) {
+      xmm = trans_bit_8x8_SSE(_mm_loadu_si128((__m128i *) &in_b[ii]));
+      if (elem_size == 2) {
+        // interleave the low bytes (first word) and high bytes (second word)
+        xmm = _mm_unpacklo_epi8(xmm, _mm_unpackhi_epi64(xmm, xmm));
+      }
+      _mm_storeu_si128((__m128i *) &out_b[ii], xmm);
+    }
+    if (ii < nbyte) {
+      bshuf_shuffle_bit_eightelem_scal(&in_b[ii], &out_b[ii],
+                                       (nbyte - ii) / elem_size, elem_size);
+    }
+  } else if (elem_size % 2) {
     bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
   } else {
     for (ii = 0; ii + 8 * elem_size - 1 < nbyte;

@@ -11,9 +11,10 @@
   blosc2_bitshuffle()/blosc2_bitunshuffle() allocate one per call.  Checks
   every bitshuffle routine that is built (CMake does not build the NEON one)
   and supported by the CPU against the generic one with a scratch of exactly
-  size * elem_size bytes followed by guard bytes, the internal
-  bitshuffle()/bitunshuffle() with a scratch against the public API, that the
-  decompression pipeline uses tmp4, and round trips through the pipelines
+  size * elem_size bytes followed by guard bytes and with guard bytes after
+  the output (element counts leave every remainder of the vector loops), the
+  internal bitshuffle()/bitunshuffle() with a scratch against the public API,
+  that the decompression pipeline uses tmp4, and round trips through the pipelines
   with one large block per chunk and with partial blocks: serial and
   threaded, getitem, filter combinations, a prefilter and a postfilter, and
   lazy chunks of a file frame read through stdio and mmap.
@@ -110,11 +111,15 @@ static char* test_routines(void) {
     printf(" %s", variants[v].name);
   }
   printf("] ");
-  const size_t elem_sizes[] = {1, 2, 3, 4, 5, 8, 12, 16, 24, 32, 64};
-  const size_t sizes[] = {8, 24, 136, 1032, 16392};
+  const size_t elem_sizes[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 16, 17, 24, 32, 64};
+  // 8-64 elements (and 1032-1088, after whole vectors) leave every possible
+  // remainder of the 16, 32 and 64-byte loops; with 1024 the bit rows are a
+  // multiple of 32 bytes
+  const size_t sizes[] = {8, 16, 24, 32, 40, 48, 56, 64, 136, 1024,
+                          1032, 1040, 1048, 1056, 1064, 1072, 1080, 1088, 16392};
   size_t max_nbytes = 64 * 16392;
-  uint8_t* ref = malloc(max_nbytes);
-  uint8_t* out = malloc(max_nbytes);
+  uint8_t* ref = malloc(max_nbytes + GUARD);
+  uint8_t* out = malloc(max_nbytes + GUARD);
   uint8_t* scratch = malloc(max_nbytes + GUARD);
   for (size_t e = 0; e < ARRAY_SIZE(elem_sizes); e++) {
     for (size_t s = 0; s < ARRAY_SIZE(sizes); s++) {
@@ -125,15 +130,18 @@ static char* test_routines(void) {
         // the generic routine gives the reference
         uint8_t* shuffled = (v == 0) ? ref : out;
         memset(scratch, FILL, nbytes + GUARD);
+        memset(shuffled, FILL, nbytes + GUARD);
         int64_t rc = variants[v].trans(in, shuffled, size, elem_size, scratch);
-        bool ok = rc >= 0 && guard_intact(scratch, nbytes) && memcmp(shuffled, ref, nbytes) == 0;
+        bool ok = rc >= 0 && guard_intact(scratch, nbytes) && guard_intact(shuffled, nbytes) &&
+                  memcmp(shuffled, ref, nbytes) == 0;
         memset(scratch, FILL, nbytes + GUARD);
-        memset(out, 0xee, nbytes);
+        memset(out, FILL, nbytes + GUARD);
         rc = variants[v].untrans(ref, out, size, elem_size, scratch);
-        ok = ok && rc >= 0 && guard_intact(scratch, nbytes) && memcmp(out, in, nbytes) == 0;
+        ok = ok && rc >= 0 && guard_intact(scratch, nbytes) && guard_intact(out, nbytes) &&
+             memcmp(out, in, nbytes) == 0;
         if (!ok) {
           printf("\n%s routines, elem_size %zu, size %zu\n", variants[v].name, elem_size, size);
-          mu_assert("ERROR: bit(un)shuffle differs from the generic one or writes past its scratch", false);
+          mu_assert("ERROR: bit(un)shuffle differs from the generic one or writes past its scratch or output", false);
         }
       }
     }
