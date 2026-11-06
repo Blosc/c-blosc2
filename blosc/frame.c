@@ -3467,7 +3467,14 @@ blosc2_schunk* frame_to_schunk(blosc2_frame_s* frame, bool copy, const blosc2_io
       }
     }
   }
-  schunk->data = malloc(nchunks * sizeof(void*));
+  /* calloc(): the loop below can stop at a bad chunk, and the error path frees
+     every data[i] with i < nchunks, also the ones never set */
+  schunk->data = calloc(nchunks, sizeof(void*));
+  if (schunk->data == NULL && nchunks > 0) {
+    BLOSC_TRACE_ERROR("Cannot allocate the chunk pointers.");
+    rc = BLOSC2_ERROR_MEMORY_ALLOC;
+    goto end;
+  }
   for (int64_t i = 0; i < nchunks; i++) {
     if (frame->cframe != NULL) {
       if (needs_free) {
