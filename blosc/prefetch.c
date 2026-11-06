@@ -662,7 +662,9 @@ static int64_t block_ranges(const uint8_t *head, int64_t head_nbytes, int64_t ch
 /* Start a batch for chunks nchunks[0..n) at @p ranges (2 values each, from frame_get_chunk_ranges()).  Chunks all in
    the page cache are left out.  A large enough chunk with a maskout (see prefetch_batch_new()) that leaves blocks out
    is read in part: the headers of all such chunks are asked for at once (one round trip if not cached), then only
-   their blocks that are needed are read. */
+   their blocks that are needed are read.  Of such a chunk only the needed blocks are asked about, not the whole chunk:
+   the page cache check costs per page on file systems that cache files in single pages (NFS on Linux 6.8: ~22 us per
+   MiB), where checking whole chunks of which a slice needs a part made read-ahead cost cached slices several percent. */
 static prefetch_batch* plan_and_start(int fd, const uint8_t *map, const int64_t *nchunks, int64_t n,
                                       const int64_t *ranges, const bool *const *maskouts, int64_t nblocks) {
   int64_t page = sysconf(_SC_PAGESIZE);
@@ -690,14 +692,16 @@ static prefetch_batch* plan_and_start(int fd, const uint8_t *map, const int64_t 
   int64_t head_max = BLOSC_EXTENDED_HEADER_LENGTH + 4 * nblocks;
   int64_t npartial = 0;
   for (int64_t i = 0; i < n; ++i) {
-    plan[i] = ranges[2 * i + 1] > 0 && !range_cached(&query, ranges[2 * i], ranges[2 * i] + ranges[2 * i + 1]) ?
-              WHOLE : SKIP;
+    plan[i] = ranges[2 * i + 1] > 0 ? WHOLE : SKIP;
     const bool *maskout = maskouts != NULL ? maskouts[i] : NULL;
     for (int64_t b = 0; plan[i] == WHOLE && maskout != NULL && ranges[2 * i + 1] >= PARTIAL_MIN_NBYTES &&
                         b < nblocks; ++b) {
       plan[i] = maskout[b] ? PART : WHOLE;
     }
-    if (plan[i] == PART) {
+    if (plan[i] == WHOLE && range_cached(&query, ranges[2 * i], ranges[2 * i] + ranges[2 * i + 1])) {
+      plan[i] = SKIP;
+    }
+    if (plan[i] == PART) {  // batch_start() leaves out its blocks that are cached
       advise_willneed(fd, ranges[2 * i], head_max);  // all headers on their way at once
       npartial++;
     }
