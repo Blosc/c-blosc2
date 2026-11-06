@@ -179,6 +179,122 @@ static int check_out_of_bounds_selection(void) {
 }
 
 
+static void fill(int32_t *buffer, int n, int32_t value) {
+  for (int i = 0; i < n; ++i) {
+    buffer[i] = value;
+  }
+}
+
+
+/* Too small buffers are rejected untouched; larger ones (more bytes, a wider buffershape) work */
+static int check_selection_buffer(void) {
+  const int64_t shape[] = {10, 10};
+  const int32_t chunkshape[] = {4, 4};
+  const int32_t blockshape[] = {2, 2};
+  int32_t src[100];
+  for (int i = 0; i < 100; ++i) {
+    src[i] = i;
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = sizeof(int32_t);
+  cparams.nthreads = 1;
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = 1;
+  blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
+  storage.cparams = &cparams;
+  storage.dparams = &dparams;
+
+  b2nd_context_t *ctx = b2nd_create_ctx(&storage, 2, shape, chunkshape, blockshape, NULL, 0, NULL, 0);
+  CUTEST_ASSERT("Could not create context", ctx != NULL);
+  b2nd_array_t *array = NULL;
+  B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &array, src, sizeof(src)));
+
+  int64_t rows[] = {1, 8};
+  int64_t cols[] = {2, 7};
+  int64_t *selection[] = {rows, cols};
+  int64_t selection_size[] = {2, 2};
+  const int32_t values[] = {12, 17, 82, 87};  // the selection in C order; also its flat positions (src[i] == i)
+  int32_t buffer[15];
+  const int n = (int) (sizeof(buffer) / sizeof(buffer[0]));
+  int32_t all[100];
+
+  int64_t exact_shape[] = {2, 2};
+  int64_t narrow_shape[] = {2, 1};
+  int64_t wide_shape[] = {3, 5};  // row stride 5: the selection's last item is item 6
+  struct {
+    int64_t *buffershape;
+    int64_t nitems;
+  } bad[] = {
+      {exact_shape, 1},   // one item for four
+      {exact_shape, 3},   // one item short
+      {narrow_shape, 4},  // one column for two
+      {wide_shape, 6},    // the selection's size, but not its extent in the wider buffershape
+  };
+  for (size_t b = 0; b < sizeof(bad) / sizeof(bad[0]); ++b) {
+    int64_t nbytes = bad[b].nitems * (int64_t) sizeof(int32_t);
+    fill(buffer, n, -7);
+    CUTEST_ASSERT("Too small buffer not rejected by get",
+                  b2nd_get_orthogonal_selection(array, selection, selection_size, buffer, bad[b].buffershape,
+                                                nbytes) == BLOSC2_ERROR_INVALID_PARAM);
+    for (int i = 0; i < n; ++i) {
+      CUTEST_ASSERT("Rejected get wrote to the buffer", buffer[i] == -7);
+    }
+    CUTEST_ASSERT("Too small buffer not rejected by set",
+                  b2nd_set_orthogonal_selection(array, selection, selection_size, buffer, bad[b].buffershape,
+                                                nbytes) == BLOSC2_ERROR_INVALID_PARAM);
+  }
+  B2ND_TEST_ASSERT(b2nd_to_cbuffer(array, all, sizeof(all)));
+  CUTEST_ASSERT("Rejected set changed the array", memcmp(all, src, sizeof(src)) == 0);
+
+  struct {
+    int64_t *buffershape;
+    int64_t nitems;
+    int pos[4];  // where the selection's items go in the buffer
+  } larger[] = {
+      {exact_shape, 15, {0, 1, 2, 3}},  // more bytes than needed
+      {wide_shape, 7, {0, 1, 5, 6}},    // a wider buffershape, just large enough
+  };
+  for (size_t l = 0; l < sizeof(larger) / sizeof(larger[0]); ++l) {
+    int64_t nbytes = larger[l].nitems * (int64_t) sizeof(int32_t);
+    int32_t expected[15];
+    fill(expected, n, -7);
+    for (int k = 0; k < 4; ++k) {
+      expected[larger[l].pos[k]] = values[k];
+    }
+    fill(buffer, n, -7);
+    B2ND_TEST_ASSERT(b2nd_get_orthogonal_selection(array, selection, selection_size, buffer,
+                                                   larger[l].buffershape, nbytes));
+    CUTEST_ASSERT("Get into a larger buffer", memcmp(buffer, expected, sizeof(buffer)) == 0);
+
+    // Set back from the same positions, with other values
+    for (int k = 0; k < 4; ++k) {
+      buffer[larger[l].pos[k]] = -100 - k;
+    }
+    B2ND_TEST_ASSERT(b2nd_set_orthogonal_selection(array, selection, selection_size, buffer,
+                                                   larger[l].buffershape, nbytes));
+    int32_t expected_all[100];
+    memcpy(expected_all, src, sizeof(src));
+    for (int k = 0; k < 4; ++k) {
+      expected_all[values[k]] = -100 - k;
+    }
+    B2ND_TEST_ASSERT(b2nd_to_cbuffer(array, all, sizeof(all)));
+    CUTEST_ASSERT("Set from a larger buffer", memcmp(all, expected_all, sizeof(all)) == 0);
+    B2ND_TEST_ASSERT(b2nd_set_orthogonal_selection(array, selection, selection_size, values, exact_shape,
+                                                   sizeof(values)));  // restore
+  }
+
+  // An empty selection needs no buffer
+  int64_t empty_size[] = {0, 2};
+  B2ND_TEST_ASSERT(b2nd_get_orthogonal_selection(array, selection, empty_size, NULL, empty_size, 0));
+  B2ND_TEST_ASSERT(b2nd_set_orthogonal_selection(array, selection, empty_size, NULL, empty_size, 0));
+
+  b2nd_free(array);
+  b2nd_free_ctx(ctx);
+  return 0;
+}
+
+
 CUTEST_TEST_SETUP(orthogonal_selection) {
   blosc2_init();
 }
@@ -194,6 +310,7 @@ CUTEST_TEST_TEST(orthogonal_selection) {
   CUTEST_ASSERT("Orthogonal selection regression check failed (disk sframe)",
                 check_get_and_set_orthogonal_selection(false, "test_orthogonal_selection_s.b2nd") == 0);
   CUTEST_ASSERT("Out-of-bounds check failed", check_out_of_bounds_selection() == 0);
+  CUTEST_ASSERT("Buffer check failed", check_selection_buffer() == 0);
   return 0;
 }
 
