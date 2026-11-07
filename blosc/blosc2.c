@@ -61,6 +61,10 @@
 
 #include "threading.h"
 
+#if defined(__ARM_NEON) && defined(__aarch64__)
+  #include <arm_neon.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -1283,18 +1287,50 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 }
 
 
-// Optimized version for detecting runs.  It compares 8 bytes values wherever possible.
+// Optimized version for detecting runs.  It compares 64 bytes per iteration
+// with SSE2 or NEON, then 8 bytes values wherever possible.  Besides being
+// faster, the wide loop keeps the speed independent of where the code lands:
+// the 8-byte loop alone ran about 2x slower when it crossed a 64-byte boundary.
 static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   uint8_t x = *ip;
   int64_t value, value2;
   /* Broadcast the value for every byte in a 64-bit register */
   memset(&value, x, 8);
-  while (ip < (ip_bound - 8)) {
-#if defined(BLOSC_STRICT_ALIGN)
+#if defined(__SSE2__) || (defined(__ARM_NEON) && defined(__aarch64__))
+  if (ip_bound - ip >= 64) {
+    /* Streams that are not runs mostly differ in their first bytes */
     memcpy(&value2, ip, 8);
-#else
-    value2 = *(int64_t*)ip;
+    if (value != value2) {
+      return false;
+    }
+  }
 #endif
+#if defined(__SSE2__)
+  const __m128i vx = _mm_set1_epi8((char)x);
+  while (ip_bound - ip >= 64) {
+    const __m128i* p = (const __m128i*)ip;
+    __m128i eq01 = _mm_and_si128(_mm_cmpeq_epi8(_mm_loadu_si128(p), vx),
+                                 _mm_cmpeq_epi8(_mm_loadu_si128(p + 1), vx));
+    __m128i eq23 = _mm_and_si128(_mm_cmpeq_epi8(_mm_loadu_si128(p + 2), vx),
+                                 _mm_cmpeq_epi8(_mm_loadu_si128(p + 3), vx));
+    if (_mm_movemask_epi8(_mm_and_si128(eq01, eq23)) != 0xFFFF) {
+      return false;
+    }
+    ip += 64;
+  }
+#elif defined(__ARM_NEON) && defined(__aarch64__)
+  const uint8x16_t vx = vdupq_n_u8(x);
+  while (ip_bound - ip >= 64) {
+    uint8x16_t diff01 = vorrq_u8(veorq_u8(vld1q_u8(ip), vx), veorq_u8(vld1q_u8(ip + 16), vx));
+    uint8x16_t diff23 = vorrq_u8(veorq_u8(vld1q_u8(ip + 32), vx), veorq_u8(vld1q_u8(ip + 48), vx));
+    if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(diff01, diff23))) != 0) {
+      return false;
+    }
+    ip += 64;
+  }
+#endif
+  while (ip < (ip_bound - 8)) {
+    memcpy(&value2, ip, 8);
     if (value != value2) {
       // Values differ.  We don't have a run.
       return false;
