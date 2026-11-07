@@ -963,6 +963,12 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
 }
 
 
+/* dlsym() that treats a NULL name (unset in a plugin's `info`) as missing */
+static void *plugin_dlsym(void *lib, const char *name) {
+  return name == NULL ? NULL : dlsym(lib, name);
+}
+
+
 int fill_filter(blosc2_filter *filter) {
   char libpath[PATH_MAX];
   void *lib = load_lib(filter->name, libpath);
@@ -972,14 +978,21 @@ int fill_filter(blosc2_filter *filter) {
   }
 
   filter_info *info = dlsym(lib, "info");
-  filter->forward = dlsym(lib, info->forward);
-  filter->backward = dlsym(lib, info->backward);
+  if (info == NULL) {
+    BLOSC_TRACE_ERROR("`info` symbol cannot be loaded from plugin `%s`", filter->name);
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  void *forward = plugin_dlsym(lib, info->forward);
+  void *backward = plugin_dlsym(lib, info->backward);
 
-  if (filter->forward == NULL || filter->backward == NULL){
+  if (forward == NULL || backward == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
+  filter->forward = forward;
+  filter->backward = backward;
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -999,14 +1012,16 @@ int fill_codec(blosc2_codec *codec) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
-  codec->encoder = dlsym(lib, info->encoder);
-  codec->decoder = dlsym(lib, info->decoder);
+  void *encoder = plugin_dlsym(lib, info->encoder);
+  void *decoder = plugin_dlsym(lib, info->decoder);
 
-  if (codec->encoder == NULL || codec->decoder == NULL) {
+  if (encoder == NULL || decoder == NULL) {
     BLOSC_TRACE_ERROR("encoder or decoder cannot be loaded from plugin `%s`", codec->compname);
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
+  codec->encoder = encoder;
+  codec->decoder = decoder;
 
   /* If ever add .free function in future for codec params
   codecparams_info *info2 = dlsym(lib, "info2");
@@ -1033,18 +1048,27 @@ int fill_tuner(blosc2_tuner *tuner) {
   }
 
   tuner_info *info = dlsym(lib, "info");
-  tuner->init = dlsym(lib, info->init);
-  tuner->update = dlsym(lib, info->update);
-  tuner->next_blocksize = dlsym(lib, info->next_blocksize);
-  tuner->free = dlsym(lib, info->free);
-  tuner->next_cparams = dlsym(lib, info->next_cparams);
+  if (info == NULL) {
+    BLOSC_TRACE_ERROR("`info` symbol cannot be loaded from plugin `%s`", tuner->name);
+    dlclose(lib);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  void *init = plugin_dlsym(lib, info->init);
+  void *update = plugin_dlsym(lib, info->update);
+  void *next_blocksize = plugin_dlsym(lib, info->next_blocksize);
+  void *free_ = plugin_dlsym(lib, info->free);
+  void *next_cparams = plugin_dlsym(lib, info->next_cparams);
 
-  if (tuner->init == NULL || tuner->update == NULL || tuner->next_blocksize == NULL || tuner->free == NULL
-      || tuner->next_cparams == NULL){
+  if (init == NULL || update == NULL || next_blocksize == NULL || free_ == NULL || next_cparams == NULL){
     BLOSC_TRACE_ERROR("Wrong library loaded");
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
+  tuner->init = init;
+  tuner->update = update;
+  tuner->next_blocksize = next_blocksize;
+  tuner->free = free_;
+  tuner->next_cparams = next_cparams;
 
   return BLOSC2_ERROR_SUCCESS;
 }
