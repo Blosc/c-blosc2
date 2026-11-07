@@ -61,7 +61,16 @@
 
 #include "threading.h"
 
-#if defined(__ARM_NEON) && defined(__aarch64__)
+/* SIMD for get_run(): SSE2 on x86, NEON on 64-bit ARM.  MSVC defines neither
+   __SSE2__ nor __aarch64__, so its target macros are checked as well (x64,
+   x86 with /arch:SSE2, ARM64).  ARM64EC defines _M_X64 but compiles to ARM64
+   code; it keeps the scalar loop. */
+#if (defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)) && \
+    !defined(_M_ARM64EC)
+  #define BLOSC_RUN_SSE2
+  #include <emmintrin.h>
+#elif (defined(__ARM_NEON) && defined(__aarch64__)) || defined(_M_ARM64)
+  #define BLOSC_RUN_NEON
   #include <arm_neon.h>
 #endif
 
@@ -1272,7 +1281,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   int64_t value, value2;
   /* Broadcast the value for every byte in a 64-bit register */
   memset(&value, x, 8);
-#if defined(__SSE2__) || (defined(__ARM_NEON) && defined(__aarch64__))
+#if defined(BLOSC_RUN_SSE2) || defined(BLOSC_RUN_NEON)
   if (ip_bound - ip >= 64) {
     /* Streams that are not runs mostly differ in their first bytes */
     memcpy(&value2, ip, 8);
@@ -1281,7 +1290,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
     }
   }
 #endif
-#if defined(__SSE2__)
+#if defined(BLOSC_RUN_SSE2)
   const __m128i vx = _mm_set1_epi8((char)x);
   while (ip_bound - ip >= 64) {
     const __m128i* p = (const __m128i*)ip;
@@ -1294,7 +1303,7 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
     }
     ip += 64;
   }
-#elif defined(__ARM_NEON) && defined(__aarch64__)
+#elif defined(BLOSC_RUN_NEON)
   const uint8x16_t vx = vdupq_n_u8(x);
   while (ip_bound - ip >= 64) {
     uint8x16_t diff01 = vorrq_u8(veorq_u8(vld1q_u8(ip), vx), veorq_u8(vld1q_u8(ip + 16), vx));
