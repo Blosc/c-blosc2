@@ -83,8 +83,45 @@ static int32_t g_splitmode = BLOSC_FORWARD_COMPAT_SPLIT;
 /* the compressor to use by default */
 static int16_t g_nthreads = 1;
 static int32_t g_force_blocksize = 0;
-static int g_initlib = 0;
+static int g_initlib = 0;   /* see g_init_lock */
 static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
+
+/* Threads can make their first Blosc call at the same time, and lazy
+   initialization (calls without blosc2_init()) and dynamic plugins (loaded on
+   first use, by the worker threads of a job) must give each of them the
+   complete result of one initialization:
+   - blosc2_init() and blosc2_destroy() run under g_init_lock, and so does a
+     fork() (see atfork_prepare()), so nothing under g_init_lock may take a
+     lock that another module holds across fork() (see blosc2_destroy());
+   - dynamic plugins are loaded under g_plugin_lock (see fill_filter()), which
+     a fork() does not take: loading can take long, and popen() can fork;
+   - g_initlib and the plugin functions are also read without a lock, so they
+     are stored with release and checked with acquire semantics: a thread that
+     finds them set sees everything that was set up before.
+   Both locks are statically initialized, so they work before blosc2_init(). */
+#if defined(_WIN32)
+static SRWLOCK g_init_lock = SRWLOCK_INIT;
+static SRWLOCK g_plugin_lock = SRWLOCK_INIT;
+#define static_lock(l) AcquireSRWLockExclusive(l)
+#define static_unlock(l) ReleaseSRWLockExclusive(l)
+#else
+static pthread_mutex_t g_init_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_plugin_lock = PTHREAD_MUTEX_INITIALIZER;
+#define static_lock(l) pthread_mutex_lock(l)
+#define static_unlock(l) pthread_mutex_unlock(l)
+#endif
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#define load_acquire_int(p) ReadAcquire((LONG volatile *)(p))
+#define store_release_int(p, v) WriteRelease((LONG volatile *)(p), (v))
+#define load_acquire_ptr(p) ReadPointerAcquire((PVOID volatile *)(p))
+#define store_release_ptr(p, v) WritePointerRelease((PVOID volatile *)(p), (PVOID)(v))
+#else
+#define load_acquire_int(p) __atomic_load_n((p), __ATOMIC_ACQUIRE)
+#define store_release_int(p, v) __atomic_store_n((p), (v), __ATOMIC_RELEASE)
+#define load_acquire_ptr(p) __atomic_load_n((p), __ATOMIC_ACQUIRE)
+#define store_release_ptr(p, v) __atomic_store_n((p), (v), __ATOMIC_RELEASE)
+#endif
 
 blosc2_codec g_codecs[256] = {0};
 uint8_t g_ncodecs = 0;
@@ -166,37 +203,42 @@ static volatile int32_t g_destroy_count = 0;
 /* Threads do not survive fork(): a child must neither use its parent's pools
  * nor join their workers or destroy what they wait on (that hangs or crashes),
  * so it starts with an empty registry and a new epoch (atfork_child()).  The
- * prepare handler holds the global and the registry lock across fork(), so a
- * fork waits for a global operation or registry change in another thread. */
+ * prepare handler holds g_init_lock, the global and the registry lock across
+ * fork(), so a fork waits for a blosc2_init() / blosc2_destroy(), a global
+ * operation or a registry change in another thread. */
 static pthread_once_t atfork_once = PTHREAD_ONCE_INIT;
-static bool atfork_locked = false;
 /* The parent's pools: never used or freed in the child, only kept reachable
  * so that leak checkers do not report them */
 static struct blosc_shared_pool *forked_pools = NULL;
 
+/* g_initlib cannot change while atfork_prepare() holds g_init_lock: the
+   handlers below see the value it saw */
 static void atfork_prepare(void) {
+  static_lock(&g_init_lock);
   if (!g_initlib) {
     return;
   }
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   blosc2_pthread_mutex_lock(&pool_registry_mutex);
-  atfork_locked = true;
 }
 
 static void atfork_parent(void) {
-  if (!atfork_locked) {
-    return;
+  if (g_initlib) {
+    blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+    blosc2_pthread_mutex_unlock(&global_comp_mutex);
   }
-  atfork_locked = false;
-  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
-  blosc2_pthread_mutex_unlock(&global_comp_mutex);
+  static_unlock(&g_init_lock);
 }
 
 static void atfork_child(void) {
-  if (!atfork_locked) {
+  /* g_init_lock was locked in atfork_prepare(), and another thread may have
+     held g_plugin_lock: new ones for this process (as in prefetch.c) */
+  pthread_mutex_t unlocked = PTHREAD_MUTEX_INITIALIZER;
+  g_init_lock = unlocked;
+  g_plugin_lock = unlocked;
+  if (!g_initlib) {
     return;
   }
-  atfork_locked = false;
   struct blosc_shared_pool **tail = &shared_pools;
   while (*tail != NULL) {
     tail = &(*tail)->next;
@@ -969,7 +1011,12 @@ static void *plugin_dlsym(void *lib, const char *name) {
 }
 
 
-int fill_filter(blosc2_filter *filter) {
+/* Dynamic plugins (registry entries without functions, like grok or btune):
+   callers check a function with load_acquire_ptr() and, if it is NULL, call
+   fill_*(), which loads the library once (see g_plugin_lock);
+   load_*_locked() publish the functions only when all were found. */
+
+static int load_filter_locked(blosc2_filter *filter) {
   char libpath[PATH_MAX];
   void *lib = load_lib(filter->name, libpath);
   if(lib == NULL) {
@@ -991,14 +1038,26 @@ int fill_filter(blosc2_filter *filter) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
-  filter->forward = forward;
-  filter->backward = backward;
+  store_release_ptr(&filter->forward, forward);
+  store_release_ptr(&filter->backward, backward);
 
   return BLOSC2_ERROR_SUCCESS;
 }
 
 
-int fill_codec(blosc2_codec *codec) {
+int fill_filter(blosc2_filter *filter) {
+  int rc = BLOSC2_ERROR_SUCCESS;
+  static_lock(&g_plugin_lock);
+  /* Unless another thread loaded it meanwhile */
+  if (filter->forward == NULL || filter->backward == NULL) {
+    rc = load_filter_locked(filter);
+  }
+  static_unlock(&g_plugin_lock);
+  return rc;
+}
+
+
+static int load_codec_locked(blosc2_codec *codec) {
   char libpath[PATH_MAX];
   void *lib = load_lib(codec->compname, libpath);
   if(lib == NULL) {
@@ -1020,8 +1079,8 @@ int fill_codec(blosc2_codec *codec) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
-  codec->encoder = encoder;
-  codec->decoder = decoder;
+  store_release_ptr(&codec->encoder, encoder);
+  store_release_ptr(&codec->decoder, decoder);
 
   /* If ever add .free function in future for codec params
   codecparams_info *info2 = dlsym(lib, "info2");
@@ -1039,7 +1098,19 @@ int fill_codec(blosc2_codec *codec) {
 }
 
 
-int fill_tuner(blosc2_tuner *tuner) {
+int fill_codec(blosc2_codec *codec) {
+  int rc = BLOSC2_ERROR_SUCCESS;
+  static_lock(&g_plugin_lock);
+  /* Unless another thread loaded it meanwhile */
+  if (codec->encoder == NULL || codec->decoder == NULL) {
+    rc = load_codec_locked(codec);
+  }
+  static_unlock(&g_plugin_lock);
+  return rc;
+}
+
+
+static int load_tuner_locked(blosc2_tuner *tuner) {
   char libpath[PATH_MAX] = {0};
   void *lib = load_lib(tuner->name, libpath);
   if(lib == NULL) {
@@ -1064,13 +1135,26 @@ int fill_tuner(blosc2_tuner *tuner) {
     dlclose(lib);
     return BLOSC2_ERROR_FAILURE;
   }
-  tuner->init = init;
-  tuner->update = update;
-  tuner->next_blocksize = next_blocksize;
-  tuner->free = free_;
-  tuner->next_cparams = next_cparams;
+  store_release_ptr(&tuner->init, init);
+  store_release_ptr(&tuner->update, update);
+  store_release_ptr(&tuner->next_blocksize, next_blocksize);
+  store_release_ptr(&tuner->free, free_);
+  store_release_ptr(&tuner->next_cparams, next_cparams);
 
   return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int fill_tuner(blosc2_tuner *tuner) {
+  int rc = BLOSC2_ERROR_SUCCESS;
+  static_lock(&g_plugin_lock);
+  /* Unless another thread loaded it meanwhile */
+  if (tuner->init == NULL || tuner->update == NULL || tuner->next_blocksize == NULL || tuner->free == NULL ||
+      tuner->next_cparams == NULL) {
+    rc = load_tuner_locked(tuner);
+  }
+  static_unlock(&g_plugin_lock);
+  return rc;
 }
 
 
@@ -1247,7 +1331,7 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
       // Look for the filters_meta in user filters and run it
       for (uint64_t j = 0; j < g_nfilters; ++j) {
         if (g_filters[j].id == filters[i]) {
-          if (g_filters[j].forward == NULL) {
+          if (load_acquire_ptr(&g_filters[j].forward) == NULL) {
             // Dynamically load library
             if (fill_filter(&g_filters[j]) < 0) {
               BLOSC_TRACE_ERROR("Could not load filter %d\n", g_filters[j].id);
@@ -1487,7 +1571,7 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
     else if (context->compcode > BLOSC2_DEFINED_CODECS_STOP) {
       for (int i = 0; i < g_ncodecs; ++i) {
         if (g_codecs[i].compcode == context->compcode) {
-          if (g_codecs[i].encoder == NULL) {
+          if (load_acquire_ptr(&g_codecs[i].encoder) == NULL) {
             // Dynamically load codec plugin
             if (fill_codec(&g_codecs[i]) < 0) {
               BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
@@ -1666,7 +1750,7 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
         // Look for the filters_meta in user filters and run it
         for (uint64_t j = 0; j < g_nfilters; ++j) {
           if (g_filters[j].id == filters[i]) {
-            if (g_filters[j].backward == NULL) {
+            if (load_acquire_ptr(&g_filters[j].backward) == NULL) {
               // Dynamically load filter
               if (fill_filter(&g_filters[j]) < 0) {
                 BLOSC_TRACE_ERROR("Could not load filter %d.", g_filters[j].id);
@@ -2220,7 +2304,7 @@ static int blosc_d(
           thread_context->zfp_cell_nitems = 0;
           for (int i = 0; i < g_ncodecs; ++i) {
             if (g_codecs[i].compcode == context->compcode) {
-              if (g_codecs[i].decoder == NULL) {
+              if (load_acquire_ptr(&g_codecs[i].decoder) == NULL) {
                 // Dynamically load codec plugin
                 if (fill_codec(&g_codecs[i]) < 0) {
                   BLOSC_TRACE_ERROR("Could not load codec %d.", g_codecs[i].compcode);
@@ -2661,7 +2745,7 @@ static int initialize_context_compression(
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
-          if (g_tuners[i].next_cparams == NULL) {
+          if (load_acquire_ptr(&g_tuners[i].next_cparams) == NULL) {
             if (fill_tuner(&g_tuners[i]) < 0) {
               BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
@@ -2690,7 +2774,7 @@ static int initialize_context_compression(
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
-          if (g_tuners[i].next_blocksize == NULL) {
+          if (load_acquire_ptr(&g_tuners[i].next_blocksize) == NULL) {
             if (fill_tuner(&g_tuners[i]) < 0) {
               BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
@@ -3333,7 +3417,7 @@ static int blosc_compress_context(blosc2_context* context) {
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
-          if (g_tuners[i].update == NULL) {
+          if (load_acquire_ptr(&g_tuners[i].update) == NULL) {
             if (fill_tuner(&g_tuners[i]) < 0) {
               BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return BLOSC2_ERROR_FAILURE;
@@ -4016,7 +4100,7 @@ int blosc2_compress(int clevel, int doshuffle, int32_t typesize,
   char* envvar;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
 
   /* Check for a BLOSC_CLEVEL environment variable */
   envvar = getenv("BLOSC_CLEVEL");
@@ -4587,7 +4671,7 @@ int blosc2_decompress(const void* src, int32_t srcsize, void* dest, int32_t dest
   blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
 
   /* Check for a BLOSC_NTHREADS environment variable */
   envvar = getenv("BLOSC_NTHREADS");
@@ -5662,7 +5746,7 @@ static void destroy_shared_pool(struct blosc_shared_pool *pool) {
 static int attach_shared_pool(blosc2_context *context) {
   struct blosc_shared_pool *pool;
 
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
   blosc2_pthread_mutex_lock(&pool_registry_mutex);
   pool = find_shared_pool_locked(context->nthreads);
   if (pool == NULL) {
@@ -6001,9 +6085,7 @@ static int parallel_blosc(blosc2_context* context) {
 int16_t blosc2_get_nthreads(void)
 {
   int16_t nthreads;
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   nthreads = g_nthreads;
   blosc2_pthread_mutex_unlock(&global_comp_mutex);
@@ -6014,7 +6096,7 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
   int16_t ret;          /* the previous number of threads */
 
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
 
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   ret = g_nthreads;
@@ -6042,9 +6124,7 @@ int16_t blosc2_set_nthreads(int16_t nthreads) {
 const char* blosc1_get_compressor(void)
 {
   const char* compname;
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   blosc2_compcode_to_compname(g_compressor, &compname);
   blosc2_pthread_mutex_unlock(&global_comp_mutex);
@@ -6059,7 +6139,7 @@ int blosc1_set_compressor(const char* compname) {
     BLOSC_ERROR(BLOSC2_ERROR_CODEC_SUPPORT);
   }
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
 
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_compressor = code;
@@ -6070,7 +6150,7 @@ int blosc1_set_compressor(const char* compname) {
 
 void blosc2_set_delta(int dodelta) {
   /* Check whether the library should be initialized */
-  if (!g_initlib) blosc2_init();
+  blosc2_init();
 
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_delta = dodelta;
@@ -6078,48 +6158,15 @@ void blosc2_set_delta(int dodelta) {
 }
 
 const char* blosc2_list_compressors(void) {
-  static int compressors_list_done = 0;
-  static char ret[256];
-
-  if (compressors_list_done) return ret;
-  ret[0] = '\0';
-  size_t _avail = sizeof(ret);
-  char *_p = ret;
-  /* Start with the first compressor name. */
-  int _sw = snprintf(_p, _avail, "%s", BLOSC_BLOSCLZ_COMPNAME);
-  if (_sw < 0) {
-    ret[0] = '\0';
-    compressors_list_done = 1;
-    return ret;
-  }
-  if ((size_t)_sw >= _avail) {
-    /* Truncated; ensure terminated and return */
-    ret[sizeof(ret)-1] = '\0';
-    compressors_list_done = 1;
-    return ret;
-  }
-  _p += _sw; _avail -= (size_t)_sw;
-
-#define APPEND_COMP(NAME) do { \
-    if (_avail > 1) { \
-      int __w = snprintf(_p, _avail, ",%s", (NAME)); \
-      if (__w < 0) { break; } \
-      if ((size_t)__w >= _avail) { _p += _avail - 1; _avail = 1; *_p = '\0'; break; } \
-      _p += __w; _avail -= (size_t)__w; \
-    } \
-  } while(0)
-
-  APPEND_COMP(BLOSC_LZ4_COMPNAME);
-  APPEND_COMP(BLOSC_LZ4HC_COMPNAME);
+  /* A constant: several threads may call this at the same time */
+  return BLOSC_BLOSCLZ_COMPNAME "," BLOSC_LZ4_COMPNAME "," BLOSC_LZ4HC_COMPNAME
 #if defined(HAVE_ZLIB)
-  APPEND_COMP(BLOSC_ZLIB_COMPNAME);
+         "," BLOSC_ZLIB_COMPNAME
 #endif /* HAVE_ZLIB */
 #if defined(HAVE_ZSTD)
-  APPEND_COMP(BLOSC_ZSTD_COMPNAME);
+         "," BLOSC_ZSTD_COMPNAME
 #endif /* HAVE_ZSTD */
-#undef APPEND_COMP
-  compressors_list_done = 1;
-  return ret;
+         ;
 }
 
 
@@ -6285,9 +6332,7 @@ const char* blosc2_cbuffer_complib(const void* cbuffer) {
 int blosc1_get_blocksize(void)
 {
   int blocksize;
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   blocksize = (int)g_force_blocksize;
   blosc2_pthread_mutex_unlock(&global_comp_mutex);
@@ -6298,9 +6343,7 @@ int blosc1_get_blocksize(void)
 /* Force the use of a specific blocksize.  If 0, an automatic
    blocksize will be used (the default). */
 void blosc1_set_blocksize(size_t blocksize) {
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_force_blocksize = (int32_t)blocksize;
   blosc2_pthread_mutex_unlock(&global_comp_mutex);
@@ -6310,9 +6353,7 @@ void blosc1_set_blocksize(size_t blocksize) {
 /* Force the use of a specific split mode. */
 void blosc1_set_splitmode(int mode)
 {
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_splitmode = mode;
   blosc2_pthread_mutex_unlock(&global_comp_mutex);
@@ -6322,9 +6363,7 @@ void blosc1_set_splitmode(int mode)
 /* Set pointer to super-chunk.  If NULL, no super-chunk will be
    reachable (the default). */
 void blosc_set_schunk(blosc2_schunk* schunk) {
-  if (!g_initlib) {
-    blosc2_init();
-  }
+  blosc2_init();
   blosc2_pthread_mutex_lock(&global_comp_mutex);
   g_schunk = schunk;
   if (g_global_context != NULL) {
@@ -6339,10 +6378,8 @@ blosc2_io_cb BLOSC2_IO_CB_MMAP;
 
 int _blosc2_register_io_cb(const blosc2_io_cb *io);
 
-void blosc2_init(void) {
-  /* Return if Blosc is already initialized */
-  if (g_initlib) return;
-
+/* Runs under g_init_lock */
+static void blosc2_init_locked(void) {
   BLOSC2_IO_CB_DEFAULTS.id = BLOSC2_IO_FILESYSTEM;
   BLOSC2_IO_CB_DEFAULTS.name = "filesystem";
   BLOSC2_IO_CB_DEFAULTS.is_allocation_necessary = true;
@@ -6397,16 +6434,30 @@ void blosc2_init(void) {
   g_global_context->nthreads = g_nthreads;
   g_global_context->new_nthreads = g_nthreads;
   blosc2_pthread_mutex_init(&g_global_context->nchunk_mutex, NULL);
+  store_release_int(&g_initlib, 1);
+}
+
+
+void blosc2_init(void) {
+  /* Return if Blosc is already initialized */
+  if (load_acquire_int(&g_initlib)) return;
+
 #if !defined(_WIN32)
+  /* Before g_init_lock is taken: from now on a fork() waits for it */
   pthread_once(&atfork_once, register_atfork);
 #endif
-  g_initlib = 1;
+  static_lock(&g_init_lock);
+  /* Unless another thread initialized it meanwhile */
+  if (!g_initlib) {
+    blosc2_init_locked();
+  }
+  static_unlock(&g_init_lock);
 }
 
 
 int blosc2_free_resources(void) {
   /* Return if Blosc is not initialized */
-  if (!g_initlib) return BLOSC2_ERROR_FAILURE;
+  if (!load_acquire_int(&g_initlib)) return BLOSC2_ERROR_FAILURE;
 
   /* The calling thread's temporaries (other threads free theirs at exit) */
   blosc2_tmp_cache_clear();
@@ -6646,13 +6697,10 @@ size_t blosc2_tmp_cache_nbytes(void) {
   return nbytes;
 }
 
-void blosc2_destroy(void) {
-  /* Return if Blosc is not initialized */
-  if (!g_initlib) return;
-
+/* Runs under g_init_lock */
+static void blosc2_destroy_locked(void) {
   blosc2_free_resources();
-  prefetch_destroy();
-  g_initlib = 0;
+  store_release_int(&g_initlib, 0);
   blosc2_free_ctx(g_global_context);
   blosc2_tmp_cache_clear();
 
@@ -6673,6 +6721,20 @@ void blosc2_destroy(void) {
   blosc2_pthread_mutex_destroy(&pool_registry_mutex);
 
   blosc2_pthread_mutex_destroy(&global_comp_mutex);
+}
+
+void blosc2_destroy(void) {
+  /* Return if Blosc is not initialized */
+  if (!load_acquire_int(&g_initlib)) return;
+
+  /* Not under g_init_lock: a fork() holds the read-ahead pool's lock while it
+     waits for g_init_lock (prefetch.c registers its fork handlers later) */
+  prefetch_destroy();
+  static_lock(&g_init_lock);
+  if (g_initlib) {
+    blosc2_destroy_locked();
+  }
+  static_unlock(&g_init_lock);
 }
 
 
@@ -6866,7 +6928,7 @@ blosc2_context* blosc2_create_cctx(blosc2_cparams cparams) {
   } else {
     for (int i = 0; i < g_ntuners; ++i) {
       if (g_tuners[i].id == cparams.tuner_id) {
-        if (g_tuners[i].init == NULL) {
+        if (load_acquire_ptr(&g_tuners[i].init) == NULL) {
           if (fill_tuner(&g_tuners[i]) < 0) {
             BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
             return NULL;
@@ -6930,7 +6992,7 @@ blosc2_context* blosc2_create_dctx(blosc2_dparams dparams) {
 
 
 void blosc2_free_ctx(blosc2_context* context) {
-  if (g_initlib ||
+  if (load_acquire_int(&g_initlib) ||
       context->thread_backend == BLOSC_BACKEND_PER_CONTEXT ||
       context->thread_backend == BLOSC_BACKEND_CALLBACK) {
     release_thread_backend(context);
@@ -6964,7 +7026,7 @@ void blosc2_free_ctx(blosc2_context* context) {
     } else {
       for (int i = 0; i < g_ntuners; ++i) {
         if (g_tuners[i].id == context->tuner_id) {
-          if (g_tuners[i].free == NULL) {
+          if (load_acquire_ptr(&g_tuners[i].free) == NULL) {
             if (fill_tuner(&g_tuners[i]) < 0) {
               BLOSC_TRACE_ERROR("Could not load tuner %d.", g_tuners[i].id);
               return;
@@ -7460,7 +7522,7 @@ int blosc2_register_io_cb(const blosc2_io_cb *io) {
 blosc2_io_cb *blosc2_get_io_cb(uint8_t id) {
   // If g_initlib is not set by blosc2_init() this function will try to read
   // uninitialized memory. We should therefore always return NULL in that case
-  if (!g_initlib) {
+  if (!load_acquire_int(&g_initlib)) {
     return NULL;
   }
   for (uint64_t i = 0; i < g_nio; ++i) {
