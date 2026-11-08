@@ -22,8 +22,9 @@ typedef struct prefetch_batch prefetch_batch;
 bool prefetch_applies(const blosc2_frame_s *frame);
 
 /* Ask the kernel to start reading, in the background, what opening the frame at @p offset of the file behind @p fp (a
-   handle of the default filesystem or the mmap I/O; @p file_size bytes) reads next: its header at the start and its
-   trailer and chunk index at the end, also with read-ahead off; with read-ahead on, all of it up to 1 MiB */
+   handle of the default filesystem or the mmap I/O; @p file_size bytes) reads next: its trailer and chunk index at the
+   end and, when the file is mapped, its header at the start, also with read-ahead off; with read-ahead on, all of it up
+   to 1 MiB */
 void prefetch_open_hint(const blosc2_io *io, void *fp, int64_t offset, int64_t file_size);
 
 /* Start reading the parts of chunks nchunks[0..n) of a contiguous frame on disk that are not in the page cache, with

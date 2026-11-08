@@ -352,13 +352,16 @@ void prefetch_open_hint(const blosc2_io *io, void *fp, int64_t offset, int64_t f
     advise_willneed(fd, offset, nbytes);
     return;
   }
-  /* Both ends are read right after the open, so they are asked for with read-ahead off too, and before the rest of a
-     small frame, so that the header does not wait behind a read of the whole frame.  For a mapped frame this also
-     keeps the header access from being a page fault on an uncached page, which reads the whole fault-around window
-     before it returns (4-8 MiB on SMB mounts). */
-  advise_willneed(fd, offset, OPEN_EACH_END_NBYTES);
+  /* Both ends are read right after the open, so they are asked for with read-ahead off too.  The start is asked for
+     when the file is mapped, so that the header access is not a page fault on an uncached page, which reads the whole
+     fault-around window (4-8 MiB on SMB mounts), and before the rest of a small frame, so that the header does not
+     wait behind it.  Otherwise the read of the header right after this gets it in the same round trip as the end. */
+  bool ask_whole = prefetch_enabled() && nbytes <= OPEN_WHOLE_NBYTES;
+  if (map != NULL || ask_whole) {
+    advise_willneed(fd, offset, OPEN_EACH_END_NBYTES);
+  }
   advise_willneed(fd, file_size - OPEN_EACH_END_NBYTES, OPEN_EACH_END_NBYTES);
-  if (prefetch_enabled() && nbytes <= OPEN_WHOLE_NBYTES) {
+  if (ask_whole) {
     advise_willneed(fd, offset + OPEN_EACH_END_NBYTES, nbytes - 2 * OPEN_EACH_END_NBYTES);
   }
 }
