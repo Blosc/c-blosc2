@@ -5943,16 +5943,12 @@ static int parallel_blosc(blosc2_context* context) {
     job.active_workers = enqueued;
     job.pending_workers = enqueued;
     blosc2_pthread_mutex_unlock(&job.mutex);
-    /* Avoid waking idle pool workers that have no queue entry for this job. */
-    if (enqueued < pool->nthreads) {
-      for (int32_t i = 0; i < enqueued; ++i) {
-        blosc2_pthread_cond_signal(&pool->work_cv);
-      }
-    }
-    else {
-      blosc2_pthread_cond_broadcast(&pool->work_cv);
-    }
     blosc2_pthread_mutex_unlock(&pool->mutex);
+    /* Wake after unlocking (workers woken under pool->mutex block on it and
+       start one handoff at a time), and wake all idle workers, also when fewer
+       got an entry: the first ones up take the entries, so the job does not
+       wait for a worker that is slow to wake. */
+    blosc2_pthread_cond_broadcast(&pool->work_cv);
 
     blosc2_pthread_mutex_lock(&job.mutex);
     while (!job.completed) {
