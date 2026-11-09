@@ -11,6 +11,9 @@ pool scaling performance for jobs with small block counts.
 Key highlights include:
 
 - **Robustness and Frame Validation**:
+  - Consistently serialize super-chunks and b2nd arrays with chunks as stored regardless of
+    storage layout, eliminating double-postfiltering bugs upon deserialization and drastically
+    accelerating filter serialization (#858).
   - Fixed an out-of-bounds indexing and buffer validation vulnerability in
     orthogonal selections (`b2nd_get_orthogonal_selection()` / `b2nd_set_orthogonal_selection()`) (#864).
   - Prevented segmentation faults when copying damaged frames where chunk loading

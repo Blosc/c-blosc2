@@ -75,7 +75,7 @@ pool scaling performance for jobs with small block counts.
   super-chunks with variable-length blocks, whose chunks are always copied as
   they are).  Super-chunks without filters give the same frames as before, and
   with a prefilter or a postfilter, serializing no longer decompresses and
-  recompresses every chunk, which makes it much faster.
+  recompresses every chunk, which makes it much faster (#858).
 
 Changes from 3.4.1 to 3.5.0
 ===========================
