@@ -28,6 +28,13 @@ pool scaling performance for jobs with small block counts.
   `pthread_once()` / `InitOnceExecuteOnce()`, ensuring thread-safe lazy initialization
   when worker threads perform shuffle operations without prior `blosc2_init()` (#872).
 
+* Initialized the library and dynamic plugins in a thread-safe manner, eliminating races,
+  deadlocks, and segfaults when worker threads make their first Blosc calls concurrently without
+  prior `blosc2_init()`: `blosc2_init()`, `blosc2_destroy()`, and `fork()` now synchronize under
+  a statically initialized lock with acquire/release barriers, dynamic plugins are loaded exactly
+  once under a plugin lock, and `blosc2_list_compressors()` returns an immutable compile-time
+  constant (#875).
+
 * Prevented null-pointer dereferences and crashes when dynamically loading broken
   or incomplete filter, codec, or tuner plugins (#873).
 
