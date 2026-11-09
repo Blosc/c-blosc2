@@ -13,7 +13,9 @@
    I/O; with chunks that are special values; with blocks stored in order, out of order (several compression threads)
    and as plain copies (clevel 0), as slices read only the blocks they need of the chunks they cover in part; with a
    read-ahead budget smaller than a chunk; with small and large pieces; on an empty array; after fork(); and with
-   several threads of a process reading at once (their slices share the process's read-ahead pool). */
+   several threads of a process reading at once (their slices share the process's read-ahead pool).  The mmap I/O also
+   with the threads populating the mapping instead of reading (as on GPFS; BLOSC_PREFETCH_POPULATE=1), where the kernel
+   has MADV_POPULATE_READ (Linux >= 5.14). */
 
 #include "test_common.h"
 #include "blosc2/blosc2-stdio.h"
@@ -21,8 +23,12 @@
 #if !defined(_WIN32)
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
+#if defined(__linux__) && !defined(MADV_POPULATE_READ)
+#define MADV_POPULATE_READ 22
 #endif
 
 #define URLPATH "test_b2nd_prefetch.b2nd"
@@ -47,6 +53,29 @@ typedef struct {
 
 #define CHECK(cond, msg) do { if (!(cond)) { fprintf(stderr, "FAILED: %s (line %d)\n", msg, __LINE__); \
                                               return 1; } } while (0)
+
+/* The read-ahead threads populate the mapping of mmap'ed frames in this run (and the kernel can) */
+static bool populating = false;
+
+
+/* Whether madvise(MADV_POPULATE_READ) works here (Linux >= 5.14), tried on the first page of @p urlpath */
+static bool populate_works(const char *urlpath) {
+  bool works = false;
+#if defined(__linux__)
+  int fd = open(urlpath, O_RDONLY);
+  void *map = fd >= 0 ? mmap(NULL, 4096, PROT_READ, MAP_SHARED, fd, 0) : MAP_FAILED;
+  if (map != MAP_FAILED) {
+    works = madvise(map, 4096, MADV_POPULATE_READ) == 0;
+    munmap(map, 4096);
+  }
+  if (fd >= 0) {
+    close(fd);
+  }
+#else
+  BLOSC_UNUSED_PARAM(urlpath);
+#endif
+  return works;
+}
 
 
 static int create_array(int clevel, int nthreads) {
@@ -393,6 +422,8 @@ static int check_partial_chunks(bool mmap_io, int clevel, int nthreads, int pf_n
     free(got);
     // Only the headers of the chunks, a few hundred bytes each (and /proc/self/io itself)
     CHECK(k < 2 || !mmap_io || before < 0 || nread < 64 * 1024, "a cached slice read chunk data");
+    // Populating brings chunk data in with page faults, which read() counts do not include: cold slices too
+    CHECK(!populating || before < 0 || nread < 64 * 1024, "read-ahead read chunk data instead of populating");
   }
   for (int s = 0; s < NBIG; ++s) {
     free(expected[s]);
@@ -428,6 +459,7 @@ CUTEST_TEST_SETUP(prefetch) {
       {2, 0, 4 * 1024 * 1024},  // pieces larger than the file
   ));
   CUTEST_PARAMETRIZE(mmap_io, bool, CUTEST_DATA(false, true));
+  CUTEST_PARAMETRIZE(populate, bool, CUTEST_DATA(false, true));
 }
 
 
@@ -435,8 +467,29 @@ CUTEST_TEST_TEST(prefetch) {
   CUTEST_GET_PARAMETER(layout, layout_t);
   CUTEST_GET_PARAMETER(setting, prefetch_t);
   CUTEST_GET_PARAMETER(mmap_io, bool);
+  CUTEST_GET_PARAMETER(populate, bool);
+
+#if defined(_WIN32)
+  if (populate) {
+    return 0;  // read-ahead has no effect on Windows
+  }
+#else
+  if (populate && !mmap_io) {
+    return 0;  // populating is for mapped frames only: the same as the run without it
+  }
+  // Populate as on GPFS, or the default (blosc2_init() reads the variable; setup runs once for all parameters)
+  if (populate) {
+    setenv("BLOSC_PREFETCH_POPULATE", "1", 1);
+  }
+  else {
+    unsetenv("BLOSC_PREFETCH_POPULATE");
+  }
+  blosc2_destroy();
+  blosc2_init();
+#endif
 
   CUTEST_ASSERT("Cannot create the array", create_array(layout.clevel, layout.nthreads) == 0);
+  populating = populate && populate_works(URLPATH);
 
   result_t expected[NSLICES][NWAYS];
   blosc2_set_prefetch(0, 0, 0);
@@ -484,6 +537,9 @@ CUTEST_TEST_TEST(prefetch) {
 
 
 CUTEST_TEST_TEARDOWN(prefetch) {
+#if !defined(_WIN32)
+  unsetenv("BLOSC_PREFETCH_POPULATE");
+#endif
   blosc2_destroy();
 }
 
