@@ -6814,19 +6814,30 @@ static void blosc2_destroy_locked(void) {
   blosc2_pthread_mutex_destroy(&global_comp_mutex);
 }
 
+bool blosc2_is_initialized(void) {
+  return load_acquire_int(&g_initlib) == BLOSC_STATE_INITIALIZED;
+}
+
 void blosc2_destroy(void) {
   /* Return if Blosc is not initialized */
   if (load_acquire_int(&g_initlib) != BLOSC_STATE_INITIALIZED) return;
 
-  /* Not under g_init_lock: a fork() holds the read-ahead pool's lock while it
-     waits for g_init_lock (prefetch.c registers its fork handlers later) */
-  prefetch_destroy();
   static_lock(&g_init_lock);
-  if (g_initlib == BLOSC_STATE_INITIALIZED) {
-    store_release_int(&g_initlib, BLOSC_STATE_TEARDOWN);
-    blosc2_destroy_locked();
-    store_release_int(&g_initlib, BLOSC_STATE_UNINITIALIZED);
+  if (g_initlib != BLOSC_STATE_INITIALIZED) {
+    static_unlock(&g_init_lock);
+    return;
   }
+  store_release_int(&g_initlib, BLOSC_STATE_TEARDOWN);
+  static_unlock(&g_init_lock);
+
+  /* Not under g_init_lock: a fork() holds the read-ahead pool's lock while it
+     waits for g_init_lock (prefetch.c registers its fork handlers later).
+     New prefetch operations and threads are blocked by blosc2_is_initialized(). */
+  prefetch_destroy();
+
+  static_lock(&g_init_lock);
+  blosc2_destroy_locked();
+  store_release_int(&g_initlib, BLOSC_STATE_UNINITIALIZED);
   static_unlock(&g_init_lock);
 }
 

@@ -113,7 +113,7 @@ void prefetch_destroy(void) {
 #else  /* POSIX */
 
 static bool prefetch_enabled(void) {
-  return g_nthreads > 0;
+  return g_nthreads > 0 && blosc2_is_initialized();
 }
 
 
@@ -280,6 +280,9 @@ static void* pool_worker(void *arg) {
 
 /* Make sure the pool runs (at least) @p nthreads threads; false if it has none.  Called with the pool's mutex held. */
 static bool pool_ensure(int nthreads) {
+  if (!blosc2_is_initialized()) {
+    return false;
+  }
   if (!pool.atfork_registered) {
     pool.atfork_registered = pthread_atfork(pool_atfork_prepare, pool_atfork_parent, pool_atfork_child) == 0;
     if (!pool.atfork_registered) {

@@ -101,6 +101,12 @@ static void scramble_block_starts(uint8_t *chunk1) {
 }
 
 
+/* Block starts inside the chunk header (< streams_offset) */
+static void block_starts_in_header(uint8_t *chunk1) {
+  _sw32(chunk1 + BLOSC_EXTENDED_HEADER_LENGTH, 10);
+}
+
+
 static char *test_damaged_block_offsets(void) {
   int32_t data[NITEMS];
   for (int i = 0; i < NITEMS; i++) {
@@ -110,6 +116,9 @@ static char *test_damaged_block_offsets(void) {
   char *msg = check_damaged_chunk1("test_frame_lazychunk_io_damaged.b2frame", data, claim_many_blocks);
   if (msg == EXIT_SUCCESS) {
     msg = check_damaged_chunk1("test_frame_lazychunk_io_damaged.b2frame", data, scramble_block_starts);
+  }
+  if (msg == EXIT_SUCCESS) {
+    msg = check_damaged_chunk1("test_frame_lazychunk_io_damaged.b2frame", data, block_starts_in_header);
   }
   blosc2_destroy();
   return msg;
