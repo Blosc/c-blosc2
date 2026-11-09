@@ -78,6 +78,12 @@ data, and it spends more CPU per byte the more threads read the same file at onc
   kernel time read-ahead adds can cost more than it saves, and fewer threads (1-2) or none can be better.  In our
   tests on NFS (3D images, 24 to 96 reader processes on 64 hardware threads), 4 threads were the fastest setting or
   within 10% of it.
+* GPFS (IBM Storage Scale) needs no setting of its own.  GPFS caches what ``read()`` reads in its own pagepool, not in
+  the page cache, so for memory-mapped frames (``BLOSC2_IO_FILESYSTEM_MMAP``) reading ahead would not spare the slice
+  its page faults, and GPFS page faults are expensive.  There the threads populate the mapping instead
+  (``madvise(MADV_POPULATE_READ)``, Linux >= 5.14): 3D patches got 1.13-1.34x faster than with read-ahead reading
+  (cached and cold).  On NFS and local disks populating was slower for cold reads (up to 1.3x), so it is used on GPFS
+  only; ``BLOSC_PREFETCH_POPULATE=1`` (``0``) uses it for all memory-mapped frames (for none).
 
 How many read-ahead threads run: up to `nthreads` for each slice being read, per process.  A process that reads with
 one thread has `nthreads` of them; one whose 8 threads read at the same time, up to 8 x `nthreads` (at most 256 in

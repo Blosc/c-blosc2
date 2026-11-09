@@ -6353,6 +6353,10 @@ void blosc2_init(void) {
       blosc2_set_prefetch((int) nthreads, 0, 0);
     }
   }
+  // BLOSC_PREFETCH_POPULATE=1 (0) makes read-ahead populate the mapping of every memory-mapped frame (of none), instead
+  // of only of those on GPFS
+  const char *populate_env = getenv("BLOSC_PREFETCH_POPULATE");
+  prefetch_set_populate(populate_env != NULL && populate_env[0] != '\0' ? strtol(populate_env, NULL, 10) != 0 : -1);
 
   g_ncodecs = 0;
   g_nfilters = 0;

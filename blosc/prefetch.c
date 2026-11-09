@@ -14,6 +14,13 @@
   stays zero-copy).  Pages that are cached already are not read again: a warm slice costs a cachestat() or mincore()
   per piece.
 
+  GPFS (IBM Storage Scale) keeps what read() reads in a cache of its own (the pagepool), never in the page cache, and
+  its page faults cost several times what they cost on local file systems.  There a frame read through the mmap I/O
+  gains nothing from the threads reading: the slice still faults on every page.  So for such frames the threads
+  populate the mapping instead (madvise(MADV_POPULATE_READ), Linux >= 5.14), which brings the pages in and maps them,
+  and the slice finds them mapped; cached pages are populated too, as that still saves the slice its faults.  On other
+  file systems read() is the faster way to bring cold data in, so it stays (see populate_map()).
+
   POSIX only (Linux, macOS, BSDs).  On Windows everything here is a no-op and reads work as without read-ahead.
 */
 
@@ -55,6 +62,7 @@
 #define OPEN_WHOLE_NBYTES (1024 * 1024)
 
 static int g_nthreads = 0;
+static int g_populate = -1;  // populate mapped frames: -1 on GPFS only, 0 never, 1 always (prefetch_set_populate())
 static int64_t g_max_ahead = BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT;
 static int64_t g_piece_size = BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT;
 
@@ -71,6 +79,11 @@ int blosc2_set_prefetch(int nthreads, int64_t max_ahead, int64_t piece_size) {
   g_piece_size = piece_size > 0 ? piece_size : BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT;
   g_nthreads = nthreads;
   return previous;
+}
+
+
+void prefetch_set_populate(int mode) {
+  g_populate = mode < 0 ? -1 : (mode > 0);
 }
 
 
@@ -133,6 +146,13 @@ bool prefetch_applies(const blosc2_frame_s *frame) {
 
 #if defined(__linux__)
 #include <sys/syscall.h>
+#include <sys/vfs.h>
+/* statfs() f_type of GPFS (IBM Storage Scale) */
+#define PREFETCH_GPFS_MAGIC 0x47504653
+/* Linux >= 5.14; older C libraries lack the name */
+#if !defined(MADV_POPULATE_READ)
+#define MADV_POPULATE_READ 22
+#endif
 /* cachestat() (Linux >= 6.5) has no libc wrapper, and older kernel headers lack its number, which is 451 on all
    architectures except alpha, mips and x32 */
 #if !defined(SYS_cachestat) && ((defined(__x86_64__) && !defined(__ILP32__)) || defined(__i386__) || \
@@ -162,6 +182,8 @@ typedef struct {
 
 struct prefetch_batch {
   int fd;              // a dup() of the frame's descriptor, closed in prefetch_batch_free()
+  const uint8_t *map;  // the frame's mapping, if the threads populate it instead of reading (see populate_map())
+  int64_t page;
   piece_t *pieces;
   int64_t npieces;
   int64_t next;        // first piece not handed to a thread yet
@@ -255,12 +277,21 @@ static void* pool_worker(void *arg) {
     int64_t i = batch->next++;
     batch->inflight++;
     pthread_mutex_unlock(&pool.mutex);
-    if (batch->pieces[i].nbytes > scratch_nbytes) {
+    bool populated = false;
+#if defined(__linux__)
+    if (batch->map != NULL) {
+      // From the start of the page on; if this fails (kernel < 5.14), the piece is read instead
+      int64_t start = batch->pieces[i].offset / batch->page * batch->page;
+      int64_t stop = batch->pieces[i].offset + batch->pieces[i].nbytes;
+      populated = madvise((void *) (batch->map + start), (size_t) (stop - start), MADV_POPULATE_READ) == 0;
+    }
+#endif
+    if (!populated && batch->pieces[i].nbytes > scratch_nbytes) {
       free(scratch);
       scratch = malloc(batch->pieces[i].nbytes);
       scratch_nbytes = scratch != NULL ? batch->pieces[i].nbytes : 0;
     }
-    if (scratch != NULL) {
+    if (!populated && scratch != NULL) {
       read_piece(batch->fd, scratch, batch->pieces[i].offset, batch->pieces[i].nbytes, true);
     }
     pthread_mutex_lock(&pool.mutex);
@@ -327,6 +358,29 @@ static bool backend_fd(const blosc2_io *io, void *fp, int *fd, const uint8_t **m
     return false;
   }
   return *fd >= 0;
+}
+
+
+/* Whether the threads should populate @p map, the mmap I/O's mapping of the file behind @p fd (or NULL), instead of
+   reading into their scratch buffer: on GPFS, or as prefetch_set_populate() says.  Measured with 3D patches (KiTS,
+   BraTS, TotalSegmentator) read through the mmap I/O with 4 threads: on GPFS populating made patches 1.13-1.34x faster
+   (cached and cold); on NFS and XFS cold patches got up to 1.3x slower (the faults bring in less at a time than the
+   threads' reads) and cached ones up to 1.12x faster for more CPU, so there the threads keep reading. */
+static bool populate_map(int fd, const uint8_t *map) {
+#if defined(__linux__)
+  if (map == NULL || g_populate == 0) {
+    return false;
+  }
+  if (g_populate > 0) {
+    return true;
+  }
+  struct statfs st;
+  return fstatfs(fd, &st) == 0 && (int64_t) st.f_type == PREFETCH_GPFS_MAGIC;
+#else
+  BLOSC_UNUSED_PARAM(fd);
+  BLOSC_UNUSED_PARAM(map);
+  return false;
+#endif
 }
 
 
@@ -505,9 +559,10 @@ static void add_piece(prefetch_batch *batch, piece_t *piece) {
 
 /* Start reading the uncached parts of the byte ranges (2 values each: offset, nbytes) of chunks nchunks[0..n) with the
    pool, chunk i's being ranges first_range[i]..first_range[i + 1], in pieces of at most the piece size, ranges that
-   follow each other in the file joined.  NULL if there is nothing to read. */
-static prefetch_batch* batch_start(const cache_query *query, int fd, const int64_t *nchunks, int64_t n,
-                                   const int64_t *ranges, const int64_t *first_range) {
+   follow each other in the file joined; or populating them in @p map, if not NULL.  NULL if there is nothing to
+   read. */
+static prefetch_batch* batch_start(const cache_query *query, int fd, const uint8_t *map, const int64_t *nchunks,
+                                   int64_t n, const int64_t *ranges, const int64_t *first_range) {
   int64_t piece_size = g_piece_size;
   int nthreads = g_nthreads;
   if (nthreads <= 0) {
@@ -530,6 +585,8 @@ static prefetch_batch* batch_start(const cache_query *query, int fd, const int64
   batch->nchunks = n;
   batch->max_ahead = g_max_ahead;
   batch->nthreads = nthreads;
+  batch->map = map;
+  batch->page = query->page;
 
   // Pieces never cross a multiple of the piece size nor a gap in the file, and cached parts (asked about in windows
   // that do not cross a multiple of CHECK_NBYTES either) are left out
@@ -687,8 +744,12 @@ static prefetch_batch* plan_and_start(int fd, const uint8_t *map, const int64_t 
     free(first_range);
     return NULL;
   }
+  bool populate = populate_map(fd, map);
   cache_query query;
   cache_query_init(&query, fd, map, lo, hi, page);
+  if (populate) {
+    query.how = CACHE_UNKNOWN;  // cached pages get populated too: that maps them for the slice
+  }
   int64_t head_max = BLOSC_EXTENDED_HEADER_LENGTH + 4 * nblocks;
   int64_t npartial = 0;
   for (int64_t i = 0; i < n; ++i) {
@@ -730,7 +791,7 @@ static prefetch_batch* plan_and_start(int fd, const uint8_t *map, const int64_t 
       nplanned += nranges > 0 ? nranges : 0;
     }
     first_range[n] = nplanned;
-    batch = batch_start(&query, fd, nchunks, n, planned, first_range);
+    batch = batch_start(&query, fd, populate ? map : NULL, nchunks, n, planned, first_range);
   }
   cache_query_destroy(&query);
   free(planned);

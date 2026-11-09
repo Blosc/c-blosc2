@@ -42,6 +42,10 @@ void prefetch_batch_wait(prefetch_batch *batch, int64_t nchunk);
 /* Drop the reads not started yet, wait for those in flight and free @p batch.  No-op for NULL. */
 void prefetch_batch_free(prefetch_batch *batch);
 
+/* Whether the read-ahead threads populate the mapping of frames read through the mmap I/O instead of reading them:
+   @p mode -1 on GPFS only (the default), 0 never, 1 always (blosc2_init(), from BLOSC_PREFETCH_POPULATE) */
+void prefetch_set_populate(int mode);
+
 /* Stop and join the read-ahead threads (blosc2_destroy()) */
 void prefetch_destroy(void);
 
