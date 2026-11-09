@@ -306,7 +306,7 @@ static bool pool_ensure(int nthreads) {
 void prefetch_destroy(void) {
   pthread_mutex_lock(&destroy_mutex);
   pthread_mutex_lock(&pool.mutex);
-  if (pool.threads == NULL || pool.nthreads == 0) {
+  if (pool.threads == NULL) {
     pthread_mutex_unlock(&pool.mutex);
     pthread_mutex_unlock(&destroy_mutex);
     return;
