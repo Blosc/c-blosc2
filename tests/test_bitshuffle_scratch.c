@@ -104,6 +104,32 @@ static bool guard_intact(const uint8_t* scratch, size_t nbytes) {
 /* Every routine with a scratch of exactly size * elem_size bytes gives the
    generic result and writes nothing past the scratch */
 static char* test_routines(void) {
+  // Check the two-byte inverse's intermediate layout independently of SIMD:
+  // each 16-byte (128-bit) lane contains low then high bytes of eight
+  // elements.  Lane-local unpacks are correct for AVX2 AND AVX-512.
+  uint8_t input[64], shuffled[64], intermediate[64], scratch_layout[64], restored[64];
+  for (int i = 0; i < 32; ++i) {
+    input[2 * i] = (uint8_t)(i * 7 + 3);
+    input[2 * i + 1] = (uint8_t)(i * 11 + 129);
+  }
+  bshuf_trans_bit_elem_scal(input, shuffled, 32, 2, scratch_layout);
+  bshuf_trans_byte_bitrow_scal(shuffled, intermediate, 32, 2);
+  for (int lane = 0; lane < 4; ++lane) {
+    uint8_t lo[8] = {0}, hi[8] = {0};
+    for (int i = 0; i < 8; ++i) {
+      for (int bit = 0; bit < 8; ++bit) {
+        lo[i] |= ((intermediate[16 * lane + bit] >> i) & 1) << bit;
+        hi[i] |= ((intermediate[16 * lane + 8 + bit] >> i) & 1) << bit;
+      }
+    }
+    for (int i = 0; i < 8; ++i) {
+      restored[16 * lane + 2 * i] = lo[i];
+      restored[16 * lane + 2 * i + 1] = hi[i];
+    }
+  }
+  mu_assert("ERROR: two-byte inverse does not have lane-local low/high groups",
+            memcmp(restored, input, sizeof(input)) == 0);
+
   bshuf_variant variants[8];
   int nvariants = get_variants(variants);
   printf("[bitshuffle routines:");
