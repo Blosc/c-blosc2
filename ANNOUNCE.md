@@ -19,6 +19,13 @@ Key highlights include:
     buffers in lazy chunk reads, prevented NULL pointer dereferences on failed reads,
     validated block sizes within chunks, and guarded against 64-bit stride arithmetic overflows (#871).
   - Validated that super-chunk chunk counts match b2nd metadata upon opening (#871).
+- **Performance and SIMD Optimizations**:
+  - Accelerated run-length detection in `get_run()` comparing 64 bytes per iteration
+    via SSE2 and ARM NEON intrinsics (5.5%–8% faster compression on repetitive data) (#874).
+  - Vectorized the last transposition step of bitunshuffle for 1- and 2-byte elements
+    using AVX-512, AVX2, and SSE2 bit-matrix transpositions (#867).
+  - Retained up to 2 unused thread pools across context frees to eliminate thread spawn
+    and join overhead for short-lived contexts (#865).
 - **Concurrency and Thread Safety**:
   - Ensured thread-safe lazy initialization for shuffle/bitshuffle operations across
     multiple threads using `pthread_once` (#872).

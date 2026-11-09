@@ -48,6 +48,18 @@ pool scaling performance for jobs with small block counts.
   hint on unmapped stdio frame files, avoiding an unnecessary syscall when opening
   files (#877).
 
+* Accelerated run-length detection in `get_run()` by comparing 64 bytes per iteration
+  with SSE2 and ARM NEON intrinsics, yielding 5.5%–8% faster compression on repetitive
+  data while eliminating an unaligned pointer cast (#874).
+
+* Vectorized the final transposition step of bitunshuffle for 1-byte and 2-byte
+  elements using AVX-512, AVX2, and SSE2 bit-matrix transpositions, accelerating
+  bitunshuffle for small element sizes (#867).
+
+* Cached unused thread pools across context destructions in `release_thread_backend()`
+  (retaining up to 2 pools), avoiding repeated thread spawn/join overhead in workloads
+  using short-lived contexts such as single-call Python decompressions (#865).
+
 Changes from 3.4.1 to 3.5.0
 ===========================
 
