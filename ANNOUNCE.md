@@ -1,45 +1,38 @@
-# Announcing C-Blosc2 3.5.0
+# Announcing C-Blosc2 3.6.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This minor release introduces new APIs and delivers major performance enhancements,
-particularly for frame slicing, serialization, read-ahead prefetching, and I/O
-handling on local disks and NFS, alongside bug and leak fixes.
+This release focuses on robustness, security, and thread safety by hardening
+input and frame validation, eliminating memory corruption vulnerabilities on
+damaged or malformed frames, fixing multithreading races, and restoring thread
+pool scaling performance for jobs with small block counts.
 
 Key highlights include:
 
-- **Read-ahead prefetching for on-disk frames**: With `blosc2_set_prefetch()` (or
-  the `BLOSC_PREFETCH` environment variable), slicing operations can prefetch
-  chunks ahead using background threads. On NFS, cold slice reads of 3D images
-  are 3x–5x faster; on local NVMe, 1.5x–3x faster.
-- **New APIs**:
-  - `blosc2_schunk_to_buffer_alloc()`: serializes an SChunk into a contiguous
-    frame provided by a caller callback without extra copying.
-  - `blosc2_schunk_get_chunk_range()`: returns the byte offset and size of a
-    chunk in an on-disk contiguous frame.
-  - `blosc2_set_prefetch()` / `blosc2_get_prefetch()`: controls background
-    prefetching parameters for frame reads.
-- **1-byte shuffle optimization**: The filter pipeline now skips the shuffle step
-  for 1-byte elements, accelerating uint8/int8 compression by ~2x and decompression
-  by ~3.5x when SHUFFLE is enabled.
-- **Faster b2nd slices and frame copies**:
-  - Slice reads/writes decompress/compress directly into/from caller buffers where
-    contiguous, bypassing chunk scratch copies and reusing chunk temporaries via
-    thread-local caches.
-  - Frame copies and serialization (`blosc2_schunk_copy()`) write chunks and frame
-    metadata in a single pass.
-- **Robustness and Bug Fixes**:
-  - Fixed a divide-by-zero vulnerability during slice operations when `chunksize <= 0` (#834).
-  - Fixed uninitialized chunk reads returning stale memory in `b2nd_uninit()`.
-  - Fixed an issue where chunks stored uncompressed with `use_dict` retained dictionary
-    flags and failed on decompression.
-  - Fixed multiple memory leaks and dangling state on error paths.
-  - Silenced CMake CMP0218 and minimum version deprecation warnings on newer CMake versions.
+- **Robustness and Frame Validation**:
+  - Fixed an out-of-bounds indexing and buffer validation vulnerability in
+    orthogonal selections (`b2nd_get_orthogonal_selection()` / `b2nd_set_orthogonal_selection()`) (#864).
+  - Prevented segmentation faults when copying damaged frames where chunk loading
+    fails partway through (#869).
+  - Hardened frame reading against corrupt files: prevented improper freeing of mmap
+    buffers in lazy chunk reads, prevented NULL pointer dereferences on failed reads,
+    validated block sizes within chunks, and guarded against 64-bit stride arithmetic overflows (#871).
+  - Validated that super-chunk chunk counts match b2nd metadata upon opening (#871).
+- **Concurrency and Thread Safety**:
+  - Ensured thread-safe lazy initialization for shuffle/bitshuffle operations across
+    multiple threads using `pthread_once` (#872).
+  - Restored thread pool worker wakeup performance in `parallel_blosc()` by broadcasting
+    after releasing the pool mutex, resolving lock contention regressions on few-block jobs (#878).
+- **Bug and Leak Fixes**:
+  - Prevented crashes when loading broken dynamic plugins with missing or null symbols (#873).
+  - Ensured complete cleanup of contexts, preparams, postparams, and mutexes across all
+    error return paths in `blosc2_create_cctx()` and `blosc2_create_dctx()` (#868).
+  - Reused thread-local scratch buffers in `b2nd_get_slice()` to avoid glibc heap trim
+    and page-fault churn during slice operations (#866).
+  - Skipped redundant advisory start hints when opening unmapped stdio frame files (#877).
 
-Because new APIs were added, the minor version and library SOVERSION have been bumped.
-
-Special thanks to Fabian Isensee for a nice bunch of quality contributions!
+Special thanks to Fabian Isensee for his outstanding contributions and bug fixes!
 
 For more info, see the release notes in:
 

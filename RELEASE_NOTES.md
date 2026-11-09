@@ -1,10 +1,52 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.5.0 to 3.5.1
+Changes from 3.5.0 to 3.6.0
 ===========================
 
-#XXX version-specific blurb XXX#
+This release focuses on robustness, security, and thread safety by hardening
+input and frame validation, eliminating memory corruption vulnerabilities on
+damaged or malformed frames, fixing multithreading races, and restoring thread
+pool scaling performance for jobs with small block counts.
+
+* Fixed a critical out-of-bounds indexing and buffer validation vulnerability in
+  `b2nd_get_orthogonal_selection()` and `b2nd_set_orthogonal_selection()`. Negative
+  indices and indices equal to array shape are now rejected, and buffer dimensions
+  and sizes are properly validated against stride overflows (#864).
+
+* Prevented crashes (SEGV) when copying damaged frames where chunk loading
+  aborts mid-way: chunk pointers are now calloc'd and checked so the error
+  path frees only allocated chunks (#869).
+
+* Hardened frame reading against corrupted/damaged files: fixed improper freeing
+  of mmap buffers in `read_lazy_chunk_bytes()`, prevented NULL pointer dereferences
+  in `frame_get_lazychunk()` on incomplete reads, validated block sizes against chunk
+  bounds, checked for 64-bit stride arithmetic overflows, and rejected b2nd metalayers
+  that contradict super-chunk chunk counts (#871).
+
+* Fixed a concurrency race in `init_shuffle_implementation()` by switching to
+  `pthread_once()` / `InitOnceExecuteOnce()`, ensuring thread-safe lazy initialization
+  when worker threads perform shuffle operations without prior `blosc2_init()` (#872).
+
+* Prevented null-pointer dereferences and crashes when dynamically loading broken
+  or incomplete filter, codec, or tuner plugins (#873).
+
+* Fixed resource leaks on error paths of `blosc2_create_cctx()` and
+  `blosc2_create_dctx()`: contexts, preparams, postparams, and mutexes are now
+  reliably freed when initialization fails (#868).
+
+* Resolved a performance regression introduced in 3.5.0 in `parallel_blosc()`:
+  workers are now woken with `pthread_cond_broadcast()` after unlocking the pool
+  mutex, avoiding mutex lock contention and wake serialization on workloads with
+  fewer blocks than threads (#878).
+
+* Improved slice memory efficiency in `b2nd_get_slice()` by reusing the thread-local
+  scratch buffer (`blosc2_tmp_malloc`/`blosc2_tmp_free`), avoiding repeated malloc/free
+  cycles and glibc page fault thrashing (#866).
+
+* Optimized frame file open latency by skipping the advisory `posix_fadvise` start
+  hint on unmapped stdio frame files, avoiding an unnecessary syscall when opening
+  files (#877).
 
 Changes from 3.4.1 to 3.5.0
 ===========================
