@@ -284,6 +284,16 @@ static int check_selection_buffer(void) {
                                                    sizeof(values)));  // restore
   }
 
+  // Impossible metadata counts must be rejected before reading selection[]:
+  // the actual index lists above are deliberately small.
+  int64_t huge_size[] = {1, (int64_t)(SIZE_MAX / 16) + 1};
+  CUTEST_ASSERT("Get accepted overflowing selection metadata",
+                b2nd_get_orthogonal_selection(array, selection, huge_size, buffer, huge_size, INT64_MAX) ==
+                    BLOSC2_ERROR_INVALID_PARAM);
+  CUTEST_ASSERT("Set accepted overflowing selection metadata",
+                b2nd_set_orthogonal_selection(array, selection, huge_size, buffer, huge_size, INT64_MAX) ==
+                    BLOSC2_ERROR_INVALID_PARAM);
+
   // An empty selection needs no buffer
   int64_t empty_size[] = {0, 2};
   B2ND_TEST_ASSERT(b2nd_get_orthogonal_selection(array, selection, empty_size, NULL, empty_size, 0));
