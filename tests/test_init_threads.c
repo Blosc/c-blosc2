@@ -133,6 +133,50 @@ static int run_threads(const char *when) {
   return failed;
 }
 
+/* Only lifecycle calls overlap here, not compression using a context being
+   destroyed.  In particular init must not replace globals during teardown's
+   unlocked prefetch join phase. */
+static void* lifecycle_worker(void *arg) {
+  blosc2_pthread_mutex_lock(&gate_mutex);
+  while (!gate_open) {
+    blosc2_pthread_cond_wait(&gate_cv, &gate_mutex);
+  }
+  blosc2_pthread_mutex_unlock(&gate_mutex);
+  if (arg == NULL) {
+    blosc2_destroy();
+  } else {
+    blosc2_init();
+  }
+  return NULL;
+}
+
+static int race_lifecycle(void) {
+  for (int round = 0; round < 200; ++round) {
+    blosc2_pthread_t threads[NTHREADS];
+    blosc2_init();
+    gate_open = 0;
+    for (int t = 0; t < NTHREADS; ++t) {
+      if (blosc2_pthread_create(&threads[t], NULL, lifecycle_worker, t == 0 ? NULL : &threads[t]) != 0) {
+        return 1;
+      }
+    }
+    blosc2_pthread_mutex_lock(&gate_mutex);
+    gate_open = 1;
+    blosc2_pthread_cond_broadcast(&gate_cv);
+    blosc2_pthread_mutex_unlock(&gate_mutex);
+    for (int t = 0; t < NTHREADS; ++t) {
+      blosc2_pthread_join(threads[t], NULL);
+    }
+    // Either ordering is valid; a subsequent init must always be usable.
+    blosc2_init();
+    if (blosc2_get_nthreads() < 1 || blosc2_free_resources() < 0) {
+      return 1;
+    }
+    blosc2_destroy();
+  }
+  return 0;
+}
+
 int main(void) {
   int failed;
 
@@ -148,6 +192,7 @@ int main(void) {
   blosc2_destroy();
   failed |= run_threads("after blosc2_destroy()");
   blosc2_destroy();
+  failed |= race_lifecycle();
 
   blosc2_pthread_cond_destroy(&gate_cv);
   blosc2_pthread_mutex_destroy(&gate_mutex);
