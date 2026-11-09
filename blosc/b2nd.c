@@ -231,16 +231,20 @@ static int update_shape_struct(b2nd_array_t *array, int8_t ndim, const int64_t *
     // / b2nd_open / b2nd_from_cframe would otherwise crash any consumer.
     if (shape[i + 1] != 0 && array->chunkshape[i + 1] != 0 &&
         array->blockshape[i + 1] != 0) {
-      array->item_array_strides[i] = array->item_array_strides[i + 1] * array->shape[i + 1];
-      array->item_extchunk_strides[i] =
-              array->item_extchunk_strides[i + 1] * array->extchunkshape[i + 1];
-      array->item_chunk_strides[i] =
-              array->item_chunk_strides[i + 1] * array->chunkshape[i + 1];
-      array->item_block_strides[i] =
-              array->item_block_strides[i + 1] * array->blockshape[i + 1];
-      array->block_chunk_strides[i] = array->block_chunk_strides[i + 1] *
-                                      (array->extchunkshape[i + 1] /
-                                       array->blockshape[i + 1]);
+      if (!blosc2_checked_mul_i64_nonneg(array->item_array_strides[i + 1], array->shape[i + 1],
+                                         &array->item_array_strides[i]) ||
+          !blosc2_checked_mul_i64_nonneg(array->item_extchunk_strides[i + 1], array->extchunkshape[i + 1],
+                                         &array->item_extchunk_strides[i]) ||
+          !blosc2_checked_mul_i64_nonneg(array->item_chunk_strides[i + 1], array->chunkshape[i + 1],
+                                         &array->item_chunk_strides[i]) ||
+          !blosc2_checked_mul_i64_nonneg(array->item_block_strides[i + 1], array->blockshape[i + 1],
+                                         &array->item_block_strides[i]) ||
+          !blosc2_checked_mul_i64_nonneg(array->block_chunk_strides[i + 1],
+                                         array->extchunkshape[i + 1] / array->blockshape[i + 1],
+                                         &array->block_chunk_strides[i])) {
+        BLOSC_TRACE_ERROR("Dimension stride overflow in array shape");
+        return BLOSC2_ERROR_INVALID_PARAM;
+      }
       // Unused here, and this product can overflow for large (or damaged)
       // shapes: 0 then, as for an empty dimension
       int64_t extent;

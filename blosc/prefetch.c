@@ -194,6 +194,7 @@ static struct {
   bool stop;
   bool atfork_registered;
 } pool = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, NULL, 0, NULL, 0, false, false};
+static pthread_mutex_t destroy_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 static void pool_atfork_prepare(void) {
@@ -212,6 +213,7 @@ static void pool_atfork_child(void) {
   free(pool.threads);
   pool.mutex = mutex;
   pool.work = work;
+  destroy_mutex = mutex;
   pool.batches = NULL;
   pool.nbatches = 0;
   pool.threads = NULL;
@@ -299,17 +301,30 @@ static bool pool_ensure(int nthreads) {
 
 
 void prefetch_destroy(void) {
+  pthread_mutex_lock(&destroy_mutex);
   pthread_mutex_lock(&pool.mutex);
+  if (pool.threads == NULL || pool.nthreads == 0) {
+    pthread_mutex_unlock(&pool.mutex);
+    pthread_mutex_unlock(&destroy_mutex);
+    return;
+  }
   pool.stop = true;
   pthread_cond_broadcast(&pool.work);
-  pthread_mutex_unlock(&pool.mutex);
-  for (int i = 0; i < pool.nthreads; ++i) {
-    pthread_join(pool.threads[i], NULL);
-  }
-  free(pool.threads);
+  int nthreads = pool.nthreads;
+  pthread_t *threads = pool.threads;
   pool.threads = NULL;
   pool.nthreads = 0;
+  pthread_mutex_unlock(&pool.mutex);
+
+  for (int i = 0; i < nthreads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+  free(threads);
+
+  pthread_mutex_lock(&pool.mutex);
   pool.stop = false;
+  pthread_mutex_unlock(&pool.mutex);
+  pthread_mutex_unlock(&destroy_mutex);
 }
 
 
