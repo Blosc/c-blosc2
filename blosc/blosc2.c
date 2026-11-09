@@ -117,11 +117,13 @@ static blosc2_schunk* g_schunk = NULL;   /* the pointer to super-chunk */
    Both locks are statically initialized, so they work before blosc2_init(). */
 #if defined(_WIN32)
 static SRWLOCK g_init_lock = SRWLOCK_INIT;
+static CONDITION_VARIABLE g_init_cv = CONDITION_VARIABLE_INIT;
 static SRWLOCK g_plugin_lock = SRWLOCK_INIT;
 #define static_lock(l) AcquireSRWLockExclusive(l)
 #define static_unlock(l) ReleaseSRWLockExclusive(l)
 #else
 static pthread_mutex_t g_init_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_init_cv = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t g_plugin_lock = PTHREAD_MUTEX_INITIALIZER;
 #define static_lock(l) pthread_mutex_lock(l)
 #define static_unlock(l) pthread_mutex_unlock(l)
@@ -255,6 +257,13 @@ static void atfork_child(void) {
   pthread_mutex_t unlocked = PTHREAD_MUTEX_INITIALIZER;
   g_init_lock = unlocked;
   g_plugin_lock = unlocked;
+  pthread_cond_t idle = PTHREAD_COND_INITIALIZER;
+  g_init_cv = idle;
+  /* A teardown paused outside g_init_lock has not touched the global
+     resources yet, and its thread does not exist in this child. */
+  if (g_initlib == BLOSC_STATE_TEARDOWN) {
+    store_release_int(&g_initlib, BLOSC_STATE_INITIALIZED);
+  }
   if (g_initlib != BLOSC_STATE_INITIALIZED) {
     return;
   }
@@ -6527,6 +6536,15 @@ void blosc2_init(void) {
   pthread_once(&atfork_once, register_atfork);
 #endif
   static_lock(&g_init_lock);
+  /* Teardown drops this lock while joining prefetch workers.  Wait without
+     holding it so the destroyer can finish; never reinitialize live globals. */
+  while (g_initlib == BLOSC_STATE_TEARDOWN) {
+#if defined(_WIN32)
+    SleepConditionVariableSRW(&g_init_cv, &g_init_lock, INFINITE, 0);
+#else
+    pthread_cond_wait(&g_init_cv, &g_init_lock);
+#endif
+  }
   /* Unless another thread initialized it meanwhile */
   if (g_initlib != BLOSC_STATE_INITIALIZED) {
     blosc2_init_locked();
@@ -6838,6 +6856,11 @@ void blosc2_destroy(void) {
   static_lock(&g_init_lock);
   blosc2_destroy_locked();
   store_release_int(&g_initlib, BLOSC_STATE_UNINITIALIZED);
+#if defined(_WIN32)
+  WakeAllConditionVariable(&g_init_cv);
+#else
+  pthread_cond_broadcast(&g_init_cv);
+#endif
   static_unlock(&g_init_lock);
 }
 
