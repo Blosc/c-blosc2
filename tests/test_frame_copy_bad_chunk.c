@@ -9,6 +9,7 @@
 */
 
 #include <stdio.h>
+#include "blosc-private.h"
 #include "test_common.h"
 
 #define NITEMS 1000
@@ -55,7 +56,7 @@ int main(void) {
     return 1;
   }
   int32_t huge = cbytes + 1000000;
-  memcpy(pos + BLOSC2_CHUNK_CBYTES, &huge, sizeof(huge));
+  _sw32(pos + BLOSC2_CHUNK_CBYTES, huge);
 
   blosc2_schunk *copy = blosc2_schunk_from_buffer(bad, len, true);
   int rc = 0;
