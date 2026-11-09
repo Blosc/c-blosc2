@@ -211,14 +211,20 @@ static int parallel_blosc(blosc2_context* context);
 /* global variable to change threading backend from Blosc-managed to caller-managed */
 static blosc_threads_callback threads_callback = 0;
 static void *threads_callback_data = 0;
-/* guards shared_pools and the context_refs and next fields of each pool */
-static blosc2_pthread_mutex_t pool_registry_mutex;
+/* Process-lifetime lock: late context releases must be able to check their
+ * epoch even after blosc2_destroy().  Also guards shared_pools, context_refs,
+ * next, and epoch changes; never destroyed or reinitialized by init/destroy. */
+#if defined(_WIN32)
+static SRWLOCK pool_registry_mutex = SRWLOCK_INIT;
+#else
+static pthread_mutex_t pool_registry_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 static struct blosc_shared_pool *shared_pools = NULL;
 /* Incremented each time the pool registry is torn down: by blosc2_destroy(),
  * and in the child of a fork() (see atfork_child()).  Contexts store the epoch
  * at attach time; a mismatch means the pool they hold a pointer to has already
  * been freed, or has no threads in this process. */
-static volatile int32_t g_destroy_count = 0;
+static int32_t g_destroy_count = 0;  /* atomic reads outside the registry lock */
 
 #if !defined(_WIN32)
 /* Threads do not survive fork(): a child must neither use its parent's pools
@@ -236,16 +242,16 @@ static struct blosc_shared_pool *forked_pools = NULL;
    handlers below see the value it saw */
 static void atfork_prepare(void) {
   static_lock(&g_init_lock);
-  if (g_initlib != BLOSC_STATE_INITIALIZED) {
-    return;
+  if (g_initlib != BLOSC_STATE_UNINITIALIZED) {
+    blosc2_pthread_mutex_lock(&global_comp_mutex);
   }
-  blosc2_pthread_mutex_lock(&global_comp_mutex);
-  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  /* Late releases can take this lock even while the library is uninitialized. */
+  static_lock(&pool_registry_mutex);
 }
 
 static void atfork_parent(void) {
-  if (g_initlib == BLOSC_STATE_INITIALIZED) {
-    blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+  static_unlock(&pool_registry_mutex);
+  if (g_initlib != BLOSC_STATE_UNINITIALIZED) {
     blosc2_pthread_mutex_unlock(&global_comp_mutex);
   }
   static_unlock(&g_init_lock);
@@ -257,6 +263,7 @@ static void atfork_child(void) {
   pthread_mutex_t unlocked = PTHREAD_MUTEX_INITIALIZER;
   g_init_lock = unlocked;
   g_plugin_lock = unlocked;
+  pool_registry_mutex = unlocked;
   pthread_cond_t idle = PTHREAD_COND_INITIALIZER;
   g_init_cv = idle;
   /* A teardown paused outside g_init_lock has not touched the global
@@ -274,9 +281,8 @@ static void atfork_child(void) {
   *tail = forked_pools;
   forked_pools = shared_pools;
   shared_pools = NULL;
-  g_destroy_count++;
+  store_release_int(&g_destroy_count, load_acquire_int(&g_destroy_count) + 1);
   /* Locked in atfork_prepare(); new ones for this process (as in prefetch.c) */
-  blosc2_pthread_mutex_init(&pool_registry_mutex, NULL);
   blosc2_pthread_mutex_init(&global_comp_mutex, NULL);
 }
 
@@ -2582,7 +2588,7 @@ static int check_nthreads(blosc2_context* context, bool start_backend) {
    * epoch mismatch tells us the pool pointer is dangling or has no threads;
    * clear it so the re-attach logic below creates a fresh one. */
   if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL &&
-      context->pool_epoch != g_destroy_count) {
+      context->pool_epoch != load_acquire_int(&g_destroy_count)) {
     context->thread_pool = NULL;
     context->threads_started = 0;
     context->thread_backend = BLOSC_BACKEND_SERIAL;
@@ -5841,24 +5847,23 @@ static int attach_shared_pool(blosc2_context *context) {
   struct blosc_shared_pool *pool;
 
   blosc2_init();
-  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  static_lock(&pool_registry_mutex);
   pool = find_shared_pool_locked(context->nthreads);
   if (pool == NULL) {
     int rc = create_shared_pool(context->nthreads, &pool);
     if (rc < 0) {
-      blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+      static_unlock(&pool_registry_mutex);
       return rc;
     }
     pool->next = shared_pools;
     shared_pools = pool;
   }
   pool->context_refs++;
-  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
-
   context->thread_pool = pool;
   context->thread_backend = BLOSC_BACKEND_SHARED_POOL;
   context->threads_started = context->nthreads;
-  context->pool_epoch = g_destroy_count;
+  context->pool_epoch = load_acquire_int(&g_destroy_count);
+  static_unlock(&pool_registry_mutex);
   return 0;
 }
 
@@ -6009,10 +6014,11 @@ static int release_thread_backend(blosc2_context *context) {
   else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
     struct blosc_shared_pool *pool = context->thread_pool;
 
-    if (context->pool_epoch != g_destroy_count) {
-      /* blosc2_destroy() already freed this pool and tore down pool_registry_mutex,
-       * or the pool is the parent's after a fork().  Just clear the pointer;
-       * nothing else to do. */
+    static_lock(&pool_registry_mutex);
+    if (context->pool_epoch != load_acquire_int(&g_destroy_count)) {
+      /* Check under the process-lifetime registry lock: destruction cannot
+       * invalidate the pool between this check and the refcount update. */
+      static_unlock(&pool_registry_mutex);
       context->thread_pool = NULL;
       context->threads_started = 0;
       context->thread_backend = BLOSC_BACKEND_SERIAL;
@@ -6026,7 +6032,6 @@ static int release_thread_backend(blosc2_context *context) {
      * released unused pools are kept, the others destroyed (the pool moves to
      * the front of the registry); blosc2_free_resources() destroys all. */
     struct blosc_shared_pool *unused = NULL;
-    blosc2_pthread_mutex_lock(&pool_registry_mutex);
     pool->context_refs--;
     if (pool->context_refs == 0) {
       struct blosc_shared_pool **prev = &shared_pools;
@@ -6040,7 +6045,7 @@ static int release_thread_backend(blosc2_context *context) {
       }
       unused = unlink_unused_pools_locked(BLOSC2_UNUSED_POOLS_MAX);
     }
-    blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+    static_unlock(&pool_registry_mutex);
     destroy_shared_pools(unused);
     context->thread_pool = NULL;
   }
@@ -6516,7 +6521,6 @@ static void blosc2_init_locked(void) {
   register_tuners();
 #endif
   blosc2_pthread_mutex_init(&global_comp_mutex, NULL);
-  blosc2_pthread_mutex_init(&pool_registry_mutex, NULL);
   /* Create a global context */
   g_global_context = (blosc2_context*)my_malloc(sizeof(blosc2_context));
   memset(g_global_context, 0, sizeof(blosc2_context));
@@ -6558,9 +6562,9 @@ static int blosc2_free_resources_locked(void) {
   blosc2_tmp_cache_clear();
   int rc = release_thread_backend(g_global_context);
   /* The thread pools that no context uses (kept for reuse) */
-  blosc2_pthread_mutex_lock(&pool_registry_mutex);
+  static_lock(&pool_registry_mutex);
   struct blosc_shared_pool *unused = unlink_unused_pools_locked(0);
-  blosc2_pthread_mutex_unlock(&pool_registry_mutex);
+  static_unlock(&pool_registry_mutex);
   destroy_shared_pools(unused);
   return rc;
 }
@@ -6818,16 +6822,15 @@ static void blosc2_destroy_locked(void) {
   blosc2_free_ctx(g_global_context);
   blosc2_tmp_cache_clear();
 
-  /* Bump the epoch so any live context can detect its pool is now stale.
-   * Do this before freeing the pools so that release_thread_backend callers
-   * that race with us will take the "skip" path rather than locking the
-   * soon-to-be-destroyed pool_registry_mutex. */
-  g_destroy_count++;
-
-  /* Tear down any remaining shared pools */
-  destroy_shared_pools(shared_pools);
+  /* Atomically invalidate outstanding context pointers and detach the registry.
+   * A release either finishes its refcount update before this, or observes the
+   * new epoch without dereferencing its stale pool.  Join outside the lock. */
+  static_lock(&pool_registry_mutex);
+  store_release_int(&g_destroy_count, load_acquire_int(&g_destroy_count) + 1);
+  struct blosc_shared_pool *pools = shared_pools;
   shared_pools = NULL;
-  blosc2_pthread_mutex_destroy(&pool_registry_mutex);
+  static_unlock(&pool_registry_mutex);
+  destroy_shared_pools(pools);
 
   blosc2_pthread_mutex_destroy(&global_comp_mutex);
 }
