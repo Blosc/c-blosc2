@@ -289,6 +289,11 @@ static int check_selection_buffer(void) {
   B2ND_TEST_ASSERT(b2nd_get_orthogonal_selection(array, selection, empty_size, NULL, empty_size, 0));
   B2ND_TEST_ASSERT(b2nd_set_orthogonal_selection(array, selection, empty_size, NULL, empty_size, 0));
 
+  // A non-empty selection rejects a NULL buffer
+  int64_t non_empty_size[] = {1, 1};
+  B2ND_TEST_ASSERT(b2nd_get_orthogonal_selection(array, selection, non_empty_size, NULL, non_empty_size, 100) == BLOSC2_ERROR_NULL_POINTER);
+  B2ND_TEST_ASSERT(b2nd_set_orthogonal_selection(array, selection, non_empty_size, NULL, non_empty_size, 100) == BLOSC2_ERROR_NULL_POINTER);
+
   b2nd_free(array);
   b2nd_free_ctx(ctx);
   return 0;

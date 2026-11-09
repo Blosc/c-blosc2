@@ -327,6 +327,9 @@ void blosc2_tmp_cache_clear(void);
    thread_context (for tests). */
 size_t blosc2_tmp_cache_nbytes(void);
 
+/* Check whether the library is currently fully initialized (not tearing down). */
+bool blosc2_is_initialized(void);
+
 
 #if defined(_WIN32)
 #include <windows.h>

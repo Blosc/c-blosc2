@@ -3513,7 +3513,8 @@ static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_select
    reaching the selection's last item.  A larger buffer is fine (the items go to the first
    selection_size[i] positions of each axis); an empty selection needs none. */
 static int check_selection_buffer_strides(int8_t ndim, int32_t typesize, const int64_t *selection_size,
-                                          const int64_t *buffershape, int64_t buffersize, int64_t *bufferstrides) {
+                                          const int64_t *buffershape, int64_t buffersize, void *buffer,
+                                          int64_t *bufferstrides, bool *empty_out) {
   bool empty = false;
   int64_t last = 0;  // buffer offset of the selection's last item
   int64_t stride = 1;
@@ -3535,10 +3536,17 @@ static int check_selection_buffer_strides(int8_t ndim, int32_t typesize, const i
       last += (selection_size[i] - 1) * bufferstrides[i];
     }
   }
+  if (!empty && buffer == NULL) {
+    BLOSC_TRACE_ERROR("Buffer cannot be NULL for a non-empty selection");
+    BLOSC_ERROR(BLOSC2_ERROR_NULL_POINTER);
+  }
   int64_t needed;
   if (!empty && (!blosc2_checked_mul_i64_nonneg(last + 1, typesize, &needed) || buffersize < needed)) {
     BLOSC_TRACE_ERROR("A buffer of %" PRId64 " bytes is too small for the selection", buffersize);
     BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+  }
+  if (empty_out != NULL) {
+    *empty_out = empty;
   }
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -3566,9 +3574,13 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
     }
   }
 
+  bool empty = false;
   int64_t bufferstrides[B2ND_MAX_DIM];
   BLOSC_ERROR(check_selection_buffer_strides(ndim, array->sc->typesize, selection_size, buffershape, buffersize,
-                                             bufferstrides));
+                                             buffer, bufferstrides, &empty));
+  if (empty) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
 
   // Size of the reusable chunk buffer allocated further down.  Computed here,
   // before any allocation, so the error path has nothing to unwind: the cast
