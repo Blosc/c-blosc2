@@ -17,6 +17,11 @@
    with the threads populating the mapping instead of reading (as on GPFS; BLOSC_PREFETCH_POPULATE=1), where the kernel
    has MADV_POPULATE_READ (Linux >= 5.14). */
 
+#if defined(__linux__) && !defined(_GNU_SOURCE)
+// madvise() is not POSIX: make it visible despite -D_XOPEN_SOURCE=600 (as in b2nd.c)
+#define _GNU_SOURCE
+#endif
+
 #include "test_common.h"
 #include "blosc2/blosc2-stdio.h"
 
