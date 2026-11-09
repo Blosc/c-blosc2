@@ -12,10 +12,17 @@ consistent frame serialization preserving stored chunks across all storage layou
 a new b2nd sub-box slice extraction API (`b2nd_get_slice_cbuffer_into()`), and widespread
 SIMD and memory-allocation optimizations.
 
-* **New public API: `b2nd_get_slice_cbuffer_into()`**: Extracts an ND slice directly
-  into a sub-box of an existing, larger C-order destination buffer (e.g. for batch slots,
-  padded arrays, or multi-channel buffers) without zeroing surrounding memory or allocating
-  temporaries (#845).
+* **New public APIs**:
+  - `b2nd_get_slice_cbuffer_into()`: Extracts an ND slice directly
+    into a sub-box of an existing, larger C-order destination buffer (e.g. for batch slots,
+    padded arrays, or multi-channel buffers) without zeroing surrounding memory or allocating
+    temporaries (#845).
+  - `blosc2_schunk_insert_buffer()` and `blosc2_schunk_update_buffer()`: Insert or update
+    uncompressed data into a super-chunk directly, reusing the calling thread's compression
+    buffers instead of allocating per-chunk temporaries (#868).
+  - `blosc2_schunk_begin_updates()` and `blosc2_schunk_end_updates()`: Bracket multiple chunk
+    modifications into a single atomic pass, taking an exclusive lock and compacting any freed
+    frame space in one efficient pass (#858).
 
 * **Behaviour change: serializing keeps the chunks as stored, also with a
   postfilter.**  `blosc2_schunk_to_buffer()`, `blosc2_schunk_to_buffer_alloc()`,

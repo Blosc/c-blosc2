@@ -74,6 +74,12 @@ Frame specific functions
 
 .. doxygenfunction:: blosc2_frame_get_offsets
 
+Batch updates
+-------------
+
+.. doxygenfunction:: blosc2_schunk_begin_updates
+.. doxygenfunction:: blosc2_schunk_end_updates
+
 Locking
 -------
 
