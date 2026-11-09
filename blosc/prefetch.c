@@ -361,9 +361,48 @@ static bool backend_fd(const blosc2_io *io, void *fp, int *fd, const uint8_t **m
 }
 
 
+#if defined(__linux__)
+/* Whether the file behind @p fd is on GPFS.  This runs on every read, and on NFS fstatfs() asks the server every time
+   (0.2 ms) and fstat() at times (0.1 ms after the file's pages were dropped), so each thread keeps the answer for the
+   last few file systems it read from, by the device of the file from statx() asking for no attributes and not to sync
+   them, which NFS answers from its cache.  Without statx() (glibc < 2.28) there is no check, and no populating unless
+   asked for (prefetch_set_populate()). */
+#define FS_SEEN 4
+static bool on_gpfs(int fd) {
+#if defined(AT_STATX_DONT_SYNC) && defined(STATX_TYPE)
+  static __thread struct {uint64_t dev; bool gpfs;} seen[FS_SEEN];
+  static __thread int nseen = 0;
+  static __thread int next = 0;
+  struct statx sx;
+  if (statx(fd, "", AT_EMPTY_PATH | AT_STATX_DONT_SYNC, 0, &sx) != 0) {
+    return false;
+  }
+  uint64_t dev = (uint64_t) sx.stx_dev_major << 32 | sx.stx_dev_minor;
+  for (int i = 0; i < nseen; ++i) {
+    if (seen[i].dev == dev) {
+      return seen[i].gpfs;
+    }
+  }
+  struct statfs st;
+  if (fstatfs(fd, &st) != 0) {
+    return false;
+  }
+  seen[next].dev = dev;
+  seen[next].gpfs = (int64_t) st.f_type == PREFETCH_GPFS_MAGIC;
+  next = (next + 1) % FS_SEEN;
+  nseen = nseen < FS_SEEN ? nseen + 1 : FS_SEEN;
+  return (int64_t) st.f_type == PREFETCH_GPFS_MAGIC;
+#else
+  BLOSC_UNUSED_PARAM(fd);
+  return false;
+#endif
+}
+#endif
+
+
 /* Whether the threads should populate @p map, the mmap I/O's mapping of the file behind @p fd (or NULL), instead of
    reading into their scratch buffer: on GPFS, or as prefetch_set_populate() says.  Measured with 3D patches (KiTS,
-   BraTS, TotalSegmentator) read through the mmap I/O with 4 threads: on GPFS populating made patches 1.13-1.34x faster
+   BraTS, TotalSegmentator) read through the mmap I/O with 4 threads: on GPFS populating made patches 1.10-1.34x faster
    (cached and cold); on NFS and XFS cold patches got up to 1.3x slower (the faults bring in less at a time than the
    threads' reads) and cached ones up to 1.12x faster for more CPU, so there the threads keep reading. */
 static bool populate_map(int fd, const uint8_t *map) {
@@ -374,8 +413,7 @@ static bool populate_map(int fd, const uint8_t *map) {
   if (g_populate > 0) {
     return true;
   }
-  struct statfs st;
-  return fstatfs(fd, &st) == 0 && (int64_t) st.f_type == PREFETCH_GPFS_MAGIC;
+  return on_gpfs(fd);
 #else
   BLOSC_UNUSED_PARAM(fd);
   BLOSC_UNUSED_PARAM(map);

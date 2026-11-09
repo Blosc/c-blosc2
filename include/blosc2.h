@@ -820,8 +820,9 @@ BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
  * On GPFS (IBM Storage Scale) read() does not fill the page cache but a cache of GPFS's own, so for a frame read
  * through the mmap I/O (#BLOSC2_IO_FILESYSTEM_MMAP) the threads populate its mapping there instead
  * (madvise(MADV_POPULATE_READ), Linux >= 5.14), cached pages included: the slice then finds the pages mapped and does
- * not fault on them.  The **BLOSC_PREFETCH_POPULATE** environment variable, read at #blosc2_init, does this for the
- * memory-mapped frames on every file system when set to 1, and for none when set to 0.
+ * not fault on them (builds with glibc >= 2.28 recognize GPFS).  The **BLOSC_PREFETCH_POPULATE** environment
+ * variable, read at #blosc2_init, does this for the memory-mapped frames on every file system when set to 1, and for
+ * none when set to 0.
  *
  * How many threads: each slice being read gets up to @p nthreads read-ahead threads, and slices that threads of the
  * process read at the same time get theirs each.  So a process runs up to @p nthreads times the number of slices it
