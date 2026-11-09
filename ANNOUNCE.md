@@ -30,6 +30,8 @@ Key highlights include:
   - Retained up to 2 unused thread pools across context frees to eliminate thread spawn
     and join overhead for short-lived contexts (#865).
 - **Concurrency and Thread Safety**:
+  - Thread-safe lazy initialization of the library, dynamic plugins, and `blosc2_list_compressors()`,
+    eliminating races, deadlocks, and segfaults when threads call Blosc concurrently without prior `blosc2_init()` (#875).
   - Ensured thread-safe lazy initialization for shuffle/bitshuffle operations across
     multiple threads using `pthread_once` (#872).
   - Restored thread pool worker wakeup performance in `parallel_blosc()` by broadcasting
