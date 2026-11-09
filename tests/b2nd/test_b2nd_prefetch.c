@@ -460,7 +460,10 @@ CUTEST_TEST_TEST(prefetch) {
   fflush(NULL);
   pid_t pid = fork();
   if (pid == 0) {
-    _exit(check_reads(mmap_io, expected));
+    alarm(30);  // also catch a deadlock in fork-child pool teardown
+    int rc = check_reads(mmap_io, expected);
+    blosc2_destroy();
+    _exit(rc);
   }
   int status;
   CUTEST_ASSERT("Cannot fork", pid > 0 && waitpid(pid, &status, 0) == pid);

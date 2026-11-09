@@ -242,7 +242,9 @@ int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t 
     for (ii = 0; ii + 31 < nbyte; ii += 32) {
       ymm = trans_bit_8x8_AVX(_mm256_loadu_si256((__m256i *) &in_b[ii]));
       if (elem_size == 2) {
-        // interleave the low bytes (first word) and high bytes (second word)
+        // Each 128-bit lane is [low bytes, high bytes] for ONE group of
+        // eight elements, not [low0, low1, high0, high1] across the vector.
+        // Lane-local unpacks therefore pair the corresponding bytes.
         ymm = _mm256_unpacklo_epi8(ymm, _mm256_unpackhi_epi64(ymm, ymm));
       }
       _mm256_storeu_si256((__m256i *) &out_b[ii], ymm);

@@ -138,7 +138,8 @@ int64_t bshuf_shuffle_bit_eightelem_AVX512(const void* in, void* out, const size
     for (ii = 0; ii + 63 < nbyte; ii += 64) {
       zmm = trans_bit_8x8_AVX512(_mm512_loadu_si512((__m512i *) &in_b[ii]));
       if (elem_size == 2) {
-        // interleave the low bytes (first word) and high bytes (second word)
+        // Each 128-bit lane is [low bytes, high bytes] for ONE group of
+        // eight elements.  Both unpacks intentionally stay within that lane.
         zmm = _mm512_unpacklo_epi8(zmm, _mm512_unpackhi_epi64(zmm, zmm));
       }
       _mm512_storeu_si512((__m512i *) &out_b[ii], zmm);
