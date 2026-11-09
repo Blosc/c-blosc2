@@ -3482,7 +3482,10 @@ static prefetch_batch* prefetch_selection(const b2nd_array_t *array, b2nd_select
         axis_chunks[i][naxis_chunks[i]++] = c;
       }
     }
-    n *= naxis_chunks[i];
+    if (!blosc2_checked_mul_i64_nonneg(n, naxis_chunks[i], &n) ||
+        (uint64_t) n > SIZE_MAX / sizeof(int64_t)) {
+      goto out;  // read-ahead is optional; never wrap its chunk-list allocation
+    }
   }
   nchunks = n > 0 ? malloc(n * sizeof(int64_t)) : NULL;
   if (nchunks != NULL) {
@@ -3564,6 +3567,16 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
 
   for (int i = 0; i < ndim; ++i) {
     BLOSC_ERROR_NULL(selection[i], BLOSC2_ERROR_NULL_POINTER);
+    // Validate allocation counts before reading any selection entries.  Both
+    // ordered_selection and prefetch's axis_chunks use these counts.
+    if (selection_size[i] < 0 ||
+        (uint64_t) selection_size[i] > SIZE_MAX / sizeof(b2nd_selection_t) ||
+        (uint64_t) selection_size[i] > SIZE_MAX / sizeof(int64_t)) {
+      BLOSC_TRACE_ERROR("Selection metadata size overflows");
+      BLOSC_ERROR(BLOSC2_ERROR_INVALID_PARAM);
+    }
+  }
+  for (int i = 0; i < ndim; ++i) {
     // Only [0, shape): negative indexes address memory outside the chunk buffer and the block mask
     for (int64_t j = 0; j < selection_size[i]; ++j) {
       if (selection[i][j] < 0 || selection[i][j] >= array->shape[i]) {
@@ -3615,7 +3628,7 @@ int orthogonal_selection(b2nd_array_t *array, int64_t **selection, int64_t *sele
       rc = BLOSC2_ERROR_MEMORY_ALLOC;
       goto out;
     }
-    for (int j = 0; j < selection_size[i]; ++j) {
+    for (int64_t j = 0; j < selection_size[i]; ++j) {
       ordered_selection[i][j].index = j;
       ordered_selection[i][j].value = selection[i][j];
     }
