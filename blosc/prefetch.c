@@ -280,7 +280,8 @@ static void* pool_worker(void *arg) {
     bool populated = false;
 #if defined(__linux__)
     if (batch->map != NULL) {
-      // From the start of the page on; if this fails (kernel < 5.14), the piece is read instead
+      // From the start of the page on.  The kernel knows the advice (populate_map()); should the call fail anyway (the
+      // file got shorter, say), the piece is read instead.
       int64_t start = batch->pieces[i].offset / batch->page * batch->page;
       int64_t stop = batch->pieces[i].offset + batch->pieces[i].nbytes;
       populated = madvise((void *) (batch->map + start), (size_t) (stop - start), MADV_POPULATE_READ) == 0;
@@ -397,12 +398,23 @@ static bool on_gpfs(int fd) {
   return false;
 #endif
 }
+
+
+static bool populate_supported = false;
+static pthread_once_t populate_probe_once = PTHREAD_ONCE_INIT;
+
+/* Whether the kernel knows MADV_POPULATE_READ (Linux >= 5.14), once per process: madvise() rejects advice it does not
+   know before it looks at the range, and does nothing for an empty one */
+static void populate_probe(void) {
+  populate_supported = madvise(NULL, 0, MADV_POPULATE_READ) == 0;
+}
 #endif
 
 
 /* Whether the threads should populate @p map, the mmap I/O's mapping of the file behind @p fd (or NULL), instead of
-   reading into their scratch buffer: on GPFS, or as prefetch_set_populate() says.  Measured with 3D patches (KiTS,
-   BraTS, TotalSegmentator) read through the mmap I/O with 4 threads: on GPFS populating made patches 1.10-1.34x faster
+   reading into their scratch buffer: on GPFS, or as prefetch_set_populate() says, and only if the kernel can (else
+   they read, leaving out what is cached, as on other file systems).  Measured with 3D patches (KiTS, BraTS,
+   TotalSegmentator) read through the mmap I/O with 4 threads: on GPFS populating made patches 1.10-1.34x faster
    (cached and cold); on NFS and XFS cold patches got up to 1.3x slower (the faults bring in less at a time than the
    threads' reads) and cached ones up to 1.12x faster for more CPU, so there the threads keep reading. */
 static bool populate_map(int fd, const uint8_t *map) {
@@ -410,10 +422,11 @@ static bool populate_map(int fd, const uint8_t *map) {
   if (map == NULL || g_populate == 0) {
     return false;
   }
-  if (g_populate > 0) {
-    return true;
+  pthread_once(&populate_probe_once, populate_probe);
+  if (!populate_supported) {
+    return false;
   }
-  return on_gpfs(fd);
+  return g_populate > 0 || on_gpfs(fd);
 #else
   BLOSC_UNUSED_PARAM(fd);
   BLOSC_UNUSED_PARAM(map);
@@ -468,14 +481,19 @@ typedef struct {
 } cache_query;
 
 
-/* Prepare to ask about [lo, hi) of @p fd.  @p map maps the file from its start (mmap I/O), or is NULL. */
-static void cache_query_init(cache_query *q, int fd, const uint8_t *map, int64_t lo, int64_t hi, int64_t page) {
+/* Prepare to ask about [lo, hi) of @p fd.  @p map maps the file from its start (mmap I/O), or is NULL.  Unless @p ask,
+   the kernel is not asked anything and nothing counts as cached. */
+static void cache_query_init(cache_query *q, int fd, const uint8_t *map, int64_t lo, int64_t hi, int64_t page,
+                             bool ask) {
   q->fd = fd;
   q->page = page;
   q->lo = lo / page * page;
   q->span = NULL;
   q->span_nbytes = 0;
   q->how = CACHE_UNKNOWN;
+  if (!ask) {
+    return;
+  }
 #if defined(__linux__)
   // Linux >= 5.0 tells only the owner of a file, or who may write to it, what of it is cached: for others cachestat()
   // fails and mincore() claims that all of it is.  Nothing counts as cached then, so cold slices still get read ahead
@@ -784,10 +802,7 @@ static prefetch_batch* plan_and_start(int fd, const uint8_t *map, const int64_t 
   }
   bool populate = populate_map(fd, map);
   cache_query query;
-  cache_query_init(&query, fd, map, lo, hi, page);
-  if (populate) {
-    query.how = CACHE_UNKNOWN;  // cached pages get populated too: that maps them for the slice
-  }
+  cache_query_init(&query, fd, map, lo, hi, page, !populate);  // cached pages get populated too: that maps them
   int64_t head_max = BLOSC_EXTENDED_HEADER_LENGTH + 4 * nblocks;
   int64_t npartial = 0;
   for (int64_t i = 0; i < n; ++i) {
