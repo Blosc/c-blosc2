@@ -4,7 +4,35 @@ Release notes for C-Blosc2
 Changes from 3.6.0 to 3.6.1
 ===========================
 
-#XXX version-specific blurb XXX#
+This is a bugfix and performance release that optimizes read-ahead prefetching
+for memory-mapped frames on GPFS (IBM Storage Scale), avoiding page faults by
+populating mappings with `madvise(MADV_POPULATE_READ)` on Linux.
+
+* **Prefetching on GPFS via memory mapping population**: For frames read through
+  the mmap I/O backend (`BLOSC2_IO_FILESYSTEM_MMAP`) on GPFS, read-ahead threads now
+  populate the mapping directly using `madvise(MADV_POPULATE_READ)` (Linux >= 5.14)
+  instead of `read()`. Because GPFS caches read data in its internal pagepool rather
+  than the kernel page cache, populating the mapping avoids costly page faults and
+  speeds up multi-dimensional slice reads by 1.10x–1.34x (#880).
+
+* **Cached filesystem type checks**: Filesystem type queries via `statx()` are now
+  cached per thread across the last 4 accessed devices. This avoids redundant
+  `fstatfs()` RPC roundtrips to servers on remote filesystems such as NFS, preventing
+  I/O latency regressions on cached patch reads (#880).
+
+* **Kernel `MADV_POPULATE_READ` runtime detection**: Added a one-time per-process probe
+  to verify kernel support for `MADV_POPULATE_READ`. When unsupported (Linux < 5.14),
+  read-ahead threads safely fall back to reading chunks without issuing superfluous
+  page-cache queries via `cachestat()` (#880).
+
+* **New `BLOSC_PREFETCH_POPULATE` environment variable**: Setting
+  `BLOSC_PREFETCH_POPULATE=1` forces memory-mapped frame prefetching to populate
+  mappings via `madvise(MADV_POPULATE_READ)` across all filesystems, while `0`
+  disables it completely (#880).
+
+* **Fixed test build under Clang on Linux**: Defined `_GNU_SOURCE` in
+  `tests/b2nd/test_b2nd_prefetch.c` so `madvise()` is exposed when building with Clang
+  under `-D_XOPEN_SOURCE=600` (#880).
 
 Changes from 3.5.0 to 3.6.0
 ===========================

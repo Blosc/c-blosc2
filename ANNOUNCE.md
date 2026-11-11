@@ -1,33 +1,29 @@
-# Announcing C-Blosc2 3.6.0
+# Announcing C-Blosc2 3.6.1
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This release focuses on robustness, concurrency, multiprocess safety, and slicing performance.
+This bugfix and performance release optimizes read-ahead prefetching for
+memory-mapped frames on GPFS (IBM Storage Scale) and introduces the
+`BLOSC_PREFETCH_POPULATE` environment variable.
 
 Key highlights include:
 
-- **New Sub-Box Slicing API**: `b2nd_get_slice_cbuffer_into()` allows decompressing ND
-  slices directly into a sub-box of an existing larger buffer (e.g. batch items or padded
-  arrays) without temporaries or zero-fill (#845).
-- **Consistent Frame Serialization**: Super-chunks and b2nd arrays now consistently serialize
-  raw chunks as stored regardless of storage layout, resolving double-postfiltering bugs upon
-  deserialization and drastically speeding up filter serialization (#858).
-- **Multiprocessing & Thread Safety**: Full `fork()` safety for shared thread pools and
-  reader caches (#852), race-free lazy initialization of the library and dynamic plugins across
-  concurrent threads (#875), thread-safe shuffle initialization (#872), thread pool caching
-  across short-lived contexts (#865), and restored thread pool scaling on small workloads (#878).
-- **Robustness & Security Hardening**: Strict index bounds and buffer validation for
-  orthogonal selections (#864), hardened frame reading and metadata validation against corrupted or
-  damaged files (#871), crash prevention on partial frame copies (#869), safe error-path cleanups
-  in context creation (#868), and protection of metalayers against filter corruption (#857).
-- **Performance & SIMD Optimizations**: Vectorized 64-byte run-length detection via SSE2/NEON
-  (5.5%–8% faster compression) (#874), AVX-512/AVX2/SSE2 vectorized bitunshuffle for 1- and 2-byte
-  elements (#867), dimension merging for b2nd box copies (#851) and orthogonal selections (~4.7x faster
-  for channels-last images) (#861), direct zero-fill for special chunks in slices (#844), and extensive
-  scratch buffer reuse across bitshuffle (#860) and slicing (#866).
+- **GPFS Read-Ahead Prefetching Optimization**: Read-ahead threads reading
+  memory-mapped frames (`BLOSC2_IO_FILESYSTEM_MMAP`) on GPFS now populate
+  mappings via `madvise(MADV_POPULATE_READ)` (Linux >= 5.14) instead of issuing
+  `read()` calls, avoiding redundant page faults and delivering 1.10x–1.34x faster
+  reads for multi-dimensional slices (#880).
+- **Filesystem Detection Caching**: Cached filesystem type checks per thread
+  via `statx()` avoid redundant `fstatfs()` server RPC calls when accessing
+  remote filesystems such as NFS (#880).
+- **Kernel Capability Probing & `BLOSC_PREFETCH_POPULATE`**: Added runtime probing
+  for kernel `MADV_POPULATE_READ` support and the `BLOSC_PREFETCH_POPULATE` environment
+  variable to control memory-mapping prefetch behaviour across filesystems (#880).
+- **Clang Test Build Fix**: Ensured `madvise()` visibility in `test_b2nd_prefetch.c`
+  under Clang on Linux (#880).
 
-Special thanks to Fabian Isensee for his outstanding contributions and bug fixes!
+Special thanks to Fabian Isensee for this contribution!
 
 For more info, see the release notes in:
 
