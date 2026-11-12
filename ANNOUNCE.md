@@ -1,29 +1,14 @@
-# Announcing C-Blosc2 3.6.1
+# Announcing C-Blosc2 3.6.2
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This bugfix and performance release optimizes read-ahead prefetching for
-memory-mapped frames on GPFS (IBM Storage Scale) and introduces the
-`BLOSC_PREFETCH_POPULATE` environment variable.
+This is a maintenance release that updates the bundled LZ4 codec from
+version 1.10.0 to 1.11.1.
 
 Key highlights include:
 
-- **GPFS Read-Ahead Prefetching Optimization**: Read-ahead threads reading
-  memory-mapped frames (`BLOSC2_IO_FILESYSTEM_MMAP`) on GPFS now populate
-  mappings via `madvise(MADV_POPULATE_READ)` (Linux >= 5.14) instead of issuing
-  `read()` calls, avoiding redundant page faults and delivering 1.10x–1.34x faster
-  reads for multi-dimensional slices (#880).
-- **Filesystem Detection Caching**: Cached filesystem type checks per thread
-  via `statx()` avoid redundant `fstatfs()` server RPC calls when accessing
-  remote filesystems such as NFS (#880).
-- **Kernel Capability Probing & `BLOSC_PREFETCH_POPULATE`**: Added runtime probing
-  for kernel `MADV_POPULATE_READ` support and the `BLOSC_PREFETCH_POPULATE` environment
-  variable to control memory-mapping prefetch behaviour across filesystems (#880).
-- **Clang Test Build Fix**: Ensured `madvise()` visibility in `test_b2nd_prefetch.c`
-  under Clang on Linux (#880).
-
-Special thanks to Fabian Isensee for this contribution!
+- **Update bundled LZ4**: Upgraded internal LZ4 sources to version 1.11.1.
 
 For more info, see the release notes in:
 
