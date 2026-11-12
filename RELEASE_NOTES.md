@@ -4,7 +4,7 @@ Release notes for C-Blosc2
 Changes from 3.6.1 to 3.6.2
 ===========================
 
-#XXX version-specific blurb XXX#
+* Update bundled LZ4 from 1.10.0 to 1.11.1.
 
 Changes from 3.6.0 to 3.6.1
 ===========================

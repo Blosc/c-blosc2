@@ -139,7 +139,7 @@ set(BLOSC_ENABLE_ZFP "AUTO" CACHE STRING
     "ZFP codec support: AUTO enables it when available, ON requires it, OFF disables it.")
 set_property(CACHE BLOSC_ENABLE_ZFP PROPERTY STRINGS AUTO ON OFF)
 
-set(BLOSC_LZ4_VERSION "1.10.0" CACHE STRING
+set(BLOSC_LZ4_VERSION "1.11.1" CACHE STRING
     "lz4 version to use when fetching internal sources.")
 set(BLOSC_LZ4_SOURCE_DIR "" CACHE PATH
     "Optional local lz4 checkout to use instead of downloading sources.")
