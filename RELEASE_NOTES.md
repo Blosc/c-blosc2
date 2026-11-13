@@ -4,7 +4,11 @@ Release notes for C-Blosc2
 Changes from 3.6.2 to 3.6.3
 ===========================
 
-#XXX version-specific blurb XXX#
+* Reuse worker-local LZ4 compression state for independent blocks when using
+  bundled LZ4; external LZ4 retains its existing compressor entry point.
+* Reduce dynamic block-scheduling lock acquisitions by claiming the next block
+  while reserving compressed output, preserving cancellation and error handling.
+  Public APIs and prefilter zero-initialization are unchanged.
 
 Changes from 3.6.1 to 3.6.2
 ===========================

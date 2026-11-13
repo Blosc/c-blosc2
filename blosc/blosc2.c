@@ -33,6 +33,9 @@
 #include "blosc2/filters-registry.h"
 #include "blosc2/tuners-registry.h"
 
+#ifdef BLOSC_LZ4_FAST_RESET
+#define LZ4_STATIC_LINKING_ONLY
+#endif
 #include "lz4.h"
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
@@ -573,6 +576,9 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
   if (context->use_dict && context->dict_cdict != NULL) {
     if (thread_context->lz4_cstream == NULL) {
       thread_context->lz4_cstream = LZ4_createStream();
+      if (thread_context->lz4_cstream == NULL) {
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
     }
     // Reset the thread stream to dict-only context before each block so that
     // each compressed block references only the dictionary (not prior blocks).
@@ -582,7 +588,22 @@ static int lz4_wrap_compress(const char* input, size_t input_length,
     cbytes = LZ4_compress_fast_continue((LZ4_stream_t*)thread_context->lz4_cstream,
                                         input, output, (int)input_length, (int)maxout, accel);
   } else {
+#ifdef BLOSC_LZ4_FAST_RESET
+    if (thread_context->lz4_cstream == NULL) {
+      thread_context->lz4_cstream = LZ4_createStream();
+      if (thread_context->lz4_cstream == NULL) {
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+    }
+    // Keep the same independent-block compressor and its small-input table
+    // selection, but retain worker-local state instead of clearing a new table
+    // for every stream. The streaming API chooses a different table for small
+    // inputs, so keep the independent-block entry point here.
+    cbytes = LZ4_compress_fast_extState_fastReset(thread_context->lz4_cstream,
+        input, output, (int)input_length, (int)maxout, accel);
+#else
     cbytes = LZ4_compress_fast(input, output, (int)input_length, (int)maxout, accel);
+#endif
   }
   return cbytes;
 }
@@ -5423,7 +5444,7 @@ static int ensure_thread_context_capacity(struct thread_context* thread_context,
 static int32_t claim_job_block(struct blosc_job_group *job) {
   int32_t nblock_;
   blosc2_pthread_mutex_lock(&job->mutex);
-  nblock_ = ++job->next_block;
+  nblock_ = job->giveup_code > 0 ? ++job->next_block : INT32_MAX;
   blosc2_pthread_mutex_unlock(&job->mutex);
   return nblock_;
 }
@@ -5502,12 +5523,14 @@ static void t_blosc_do_job(void *ctxt) {
 
   leftoverblock = 0;
   while (nblock_ < tblock) {
-    blosc2_pthread_mutex_lock(&job->mutex);
-    if (job->giveup_code <= 0) {
+    if (job->static_schedule) {
+      blosc2_pthread_mutex_lock(&job->mutex);
+      if (job->giveup_code <= 0) {
+        blosc2_pthread_mutex_unlock(&job->mutex);
+        break;
+      }
       blosc2_pthread_mutex_unlock(&job->mutex);
-      break;
     }
-    blosc2_pthread_mutex_unlock(&job->mutex);
 
     bsize = vlblocks ? context->blocknbytes[nblock_] : blocksize;
     leftoverblock = 0;
@@ -5569,6 +5592,10 @@ static void t_blosc_do_job(void *ctxt) {
     }
 
     blosc2_pthread_mutex_lock(&job->mutex);
+    if (job->giveup_code <= 0) {
+      blosc2_pthread_mutex_unlock(&job->mutex);
+      break;
+    }
     if (compress && !memcpyed) {
       ntdest = job->output_bytes;
       if (!(context->use_dict && context->dict_cdict == NULL)) {
@@ -5580,19 +5607,24 @@ static void t_blosc_do_job(void *ctxt) {
         break;
       }
       job->output_bytes += cbytes;
+      // Claim the next block while reserving this block's output: one lock
+      // acquisition instead of separate cancellation, output and queue locks.
+      if (!job->static_schedule) {
+        nblock_ = ++job->next_block;
+      }
       blosc2_pthread_mutex_unlock(&job->mutex);
       memcpy(dest + ntdest, tmp2, (unsigned int)cbytes);
     }
     else {
       job->output_bytes += cbytes;
+      if (!job->static_schedule) {
+        nblock_ = ++job->next_block;
+      }
       blosc2_pthread_mutex_unlock(&job->mutex);
     }
 
     if (job->static_schedule) {
       nblock_++;
-    }
-    else {
-      nblock_ = claim_job_block(job);
     }
   }
 

@@ -92,7 +92,49 @@ static char* test_vl_dict_content(void) {
   return check_dict_content(true);
 }
 
+static char* test_reused_lz4_state(void) {
+  // Reused LZ4 worker state must not reference an earlier stream/block/chunk,
+  // including after an incompressible or output-capacity fallback.
+  for (int threads = 1; threads <= 4; threads += 3) {
+    for (int split = 0; split < 2; split++) {
+      blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+      blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+      cp.compcode = BLOSC_LZ4;
+      cp.typesize = 8;
+      cp.nthreads = threads;
+      cp.blocksize = BLOCKSIZE;
+      cp.splitmode = split ? BLOSC_ALWAYS_SPLIT : BLOSC_NEVER_SPLIT;
+      dp.nthreads = threads;
+      uint8_t input[INPUT_SIZE], output[INPUT_SIZE];
+      uint8_t chunk[INPUT_SIZE + BLOSC2_MAX_OVERHEAD];
+      uint32_t random = 1234567;
+      blosc2_context *encoder = blosc2_create_cctx(cp);
+      blosc2_context *decoder = blosc2_create_dctx(dp);
+      for (int round = 0; round < 12; round++) {
+        int size = INPUT_SIZE - round * 8;  // Include partial last blocks.
+        for (int i = 0; i < size; i++) {
+          random = random * 1664525U + 1013904223U;
+          input[i] = round % 3 == 0 ? (uint8_t)(random >> 24) : (uint8_t)((i + round) % 251);
+        }
+        if (round % 3 == 0) {
+          mu_assert("Small output should fail or fall back",
+                    blosc2_compress_ctx(encoder, input, size, chunk, BLOSC2_MAX_OVERHEAD) <= 0);
+        }
+        int bytes = blosc2_compress_ctx(encoder, input, size, chunk, sizeof(chunk));
+        mu_assert("Reused stream compression failed", bytes > 0);
+        mu_assert("Reused stream decompression failed",
+                  blosc2_decompress_ctx(decoder, chunk, bytes, output, sizeof(output)) == size);
+        mu_assert("Reused stream referenced prior data", memcmp(input, output, size) == 0);
+      }
+      blosc2_free_ctx(encoder);
+      blosc2_free_ctx(decoder);
+    }
+  }
+  return EXIT_SUCCESS;
+}
+
 static char* all_tests(void) {
+  mu_run_test(test_reused_lz4_state);
   mu_run_test(test_dict_content);
   mu_run_test(test_vl_dict_content);
   return EXIT_SUCCESS;

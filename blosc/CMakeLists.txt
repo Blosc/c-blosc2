@@ -104,6 +104,11 @@ endif()
 #   "link" dependent targets via target_link_libraries (preferred) and
 #   manually add includes / libs for others
 if(LZ4_FOUND)
+    # The fast-reset extState entry point is a static-only API. Do not require
+    # it from external shared LZ4 libraries, which need not export that symbol.
+    if(LZ4_FETCHED)
+        add_compile_definitions(BLOSC_LZ4_FAST_RESET)
+    endif()
     if(TARGET LZ4::lz4)
         list(APPEND LIBS LZ4::lz4)
     elseif(TARGET lz4_static)
