@@ -13,6 +13,7 @@
 #include "blosc-private.h"
 #include "blosc-checked.h"
 #include "../plugins/codecs/zfp/blosc2-zfp.h"
+#include "../plugins/filters/bytedelta/bytedelta.h"
 #include "frame.h"
 #include "prefetch.h"
 #include "sframe.h"
@@ -773,6 +774,25 @@ static int32_t shuffle_size(const blosc2_context* context, int i) {
   return context->filters_meta[i] == 0 ? context->typesize : context->filters_meta[i];
 }
 
+#if defined(BLOSC_FUSED_SHUFFLE_BYTEDELTA)
+#define BLOSC_USE_FUSED_SHUFFLE_BYTEDELTA
+/* Do not reinterpret legacy BYTEDELTA_BUGGY, mismatched grouping metadata or
+ * meta=0 without a schunk: those must retain their existing behavior/errors. */
+static int fused_shuffle_bytedelta_size(const blosc2_context *context, int i) {
+  if (i < 0 || i + 1 >= BLOSC2_MAX_FILTERS || context->filters[i] != BLOSC_SHUFFLE ||
+      context->filters[i + 1] != BLOSC_FILTER_BYTEDELTA) {
+    return 0;
+  }
+  int delta_size = context->filters_meta[i + 1];
+  if (delta_size == 0 && context->schunk != NULL) {
+    delta_size = context->schunk->typesize;
+  }
+  int size = shuffle_size(context, i);
+  return (size == 2 || size == 4 || size == 8) && size == delta_size &&
+         shuffle_bytedelta_available() ? size : 0;
+}
+#endif
+
 
 int do_nothing(const blosc2_context* context, int i, char cmode) {
   uint8_t filter = context->filters[i];
@@ -1354,6 +1374,14 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     if (do_nothing(context, i, 'c')) {
       continue;
     }
+#ifdef BLOSC_USE_FUSED_SHUFFLE_BYTEDELTA
+    int fused_size = fused_shuffle_bytedelta_size(context, i);
+    if (fused_size && shuffle_bytedelta_forward(_src, _dest, bsize, fused_size)) {
+      i++;
+      _cycle_buffers_forward(&_src, &_dest, &_tmp, src + offset);
+      continue;
+    }
+#endif
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:
@@ -1799,9 +1827,17 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
     if (do_nothing(context, i, 'd')) {
       continue;
     }
-    // Delta filter requires the whole chunk ready
-    int last_copy_filter = (last_filter_index == i) || (filters[i] == BLOSC_DELTA) ||
-                           (next_filter(context, i, 'd') == BLOSC_DELTA);
+    int first_index = i;
+#ifdef BLOSC_USE_FUSED_SHUFFLE_BYTEDELTA
+    int fused_size = fused_shuffle_bytedelta_size(context, i - 1);
+    if (fused_size) {
+      first_index = i - 1;
+    }
+#endif
+    // Delta filter requires the whole chunk ready. A fused inverse ends at
+    // SHUFFLE's position, so select its sink using the pair's first index.
+    int last_copy_filter = (last_filter_index == first_index) || (filters[i] == BLOSC_DELTA) ||
+                           (next_filter(context, first_index, 'd') == BLOSC_DELTA);
     if (last_copy_filter && context->postfilter == NULL &&
         (filters[i] == BLOSC_DELTA || _src != dest + offset)) {
       _dest = dest + offset;
@@ -1809,6 +1845,16 @@ int pipeline_backward(struct thread_context* thread_context, const int32_t bsize
       _dest = (_src == src) ? tmp : src;
     }
     int rc = BLOSC2_ERROR_SUCCESS;
+#ifdef BLOSC_USE_FUSED_SHUFFLE_BYTEDELTA
+    if (fused_size && shuffle_bytedelta_backward(_src, _dest, bsize, fused_size)) {
+      i--;
+      _src = _dest;
+      if (last_filter_index == i) {
+        break;
+      }
+      continue;
+    }
+#endif
     if (filters[i] <= BLOSC2_DEFINED_FILTERS_STOP) {
       switch (filters[i]) {
         case BLOSC_SHUFFLE:

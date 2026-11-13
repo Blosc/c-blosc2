@@ -10,6 +10,11 @@
 set(SOURCES ${SOURCES} ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PARENT_SCOPE)
 
 if(BUILD_TESTS)
+    add_executable(test_shuffle_bytedelta test_shuffle_bytedelta.c)
+    target_link_libraries(test_shuffle_bytedelta blosc_testing)
+    add_test(NAME test_shuffle_bytedelta COMMAND test_shuffle_bytedelta)
+    add_executable(bench_shuffle_bytedelta bench_shuffle_bytedelta.c)
+    target_link_libraries(bench_shuffle_bytedelta blosc_testing)
     # targets
     add_executable(test_bytedelta test_bytedelta.c)
     # Define the BLOSC_TESTING symbol so normally-hidden functions

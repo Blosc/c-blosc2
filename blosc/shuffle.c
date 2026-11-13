@@ -10,6 +10,7 @@
 
 #include "blosc2.h" /* needs to be included first to define macros */
 #include "shuffle.h"
+#include "../plugins/filters/bytedelta/bytedelta.h"
 
 /*  Include hardware-accelerated shuffle/unshuffle routines based on
     the target architecture. Note that a target architecture may support
@@ -66,6 +67,7 @@
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
 typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
+typedef int(* shuffle_bytedelta_func)(const uint8_t*, uint8_t*, int32_t, int);
 // For bitshuffle, everything is done in terms of size_t and int64_t (return value)
 // and although this is not strictly necessary for Blosc, it does not hurt either.
 // The last argument is a scratch buffer of size * elem_size bytes.
@@ -93,6 +95,7 @@ typedef enum {
   BLOSC_HAVE_NEON = 4,
   BLOSC_HAVE_ALTIVEC = 8,
   BLOSC_HAVE_AVX512 = 16,
+  BLOSC_HAVE_SSSE3 = 32,
 } blosc_cpu_features;
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
@@ -105,6 +108,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
   if (__builtin_cpu_supports("sse2")) {
     cpu_features |= BLOSC_HAVE_SSE2;
+  }
+  if (__builtin_cpu_supports("ssse3")) {
+    cpu_features |= BLOSC_HAVE_SSSE3;
   }
   if (__builtin_cpu_supports("avx2")) {
     cpu_features |= BLOSC_HAVE_AVX2;
@@ -258,6 +264,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   if (sse2_available) {
     result |= BLOSC_HAVE_SSE2;
   }
+  if (sse2_available && ssse3_available) {
+    result |= BLOSC_HAVE_SSSE3;
+  }
   if (xmm_state_enabled && ymm_state_enabled && avx2_available) {
     result |= BLOSC_HAVE_AVX2;
   }
@@ -377,9 +386,21 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 /* The dynamically-chosen shuffle/unshuffle implementation.
    Only use it after init_shuffle_implementation(). */
 static shuffle_implementation_t host_implementation;
+static shuffle_bytedelta_func host_shuffle_bytedelta_forward;
+static shuffle_bytedelta_func host_shuffle_bytedelta_backward;
 
 static void set_host_implementation(void) {
   host_implementation = get_shuffle_implementation();
+#if defined(SHUFFLE_BYTEDELTA_SSSE3_ENABLED)
+  /* SSSE3 needs only the legacy XMM state, not AVX/XSAVE or YMM support. */
+  if (blosc_get_cpu_features() & BLOSC_HAVE_SSSE3) {
+    host_shuffle_bytedelta_forward = shuffle_bytedelta_ssse3_forward;
+    host_shuffle_bytedelta_backward = shuffle_bytedelta_ssse3_backward;
+  }
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  host_shuffle_bytedelta_forward = shuffle_bytedelta_neon_forward;
+  host_shuffle_bytedelta_backward = shuffle_bytedelta_neon_backward;
+#endif
 }
 
 /* The worker threads of a job can make their first shuffle call at the same
@@ -406,6 +427,31 @@ static void init_shuffle_implementation(void) {
   pthread_once(&implementation_once, set_host_implementation);
 }
 #endif
+
+/* Generic entry points never contain SSSE3 instructions. The once initializer
+ * publishes the pair of ISA-specific function pointers to all native workers. */
+int shuffle_bytedelta_available(void) {
+  init_shuffle_implementation();
+  return host_shuffle_bytedelta_forward != NULL;
+}
+
+int shuffle_bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+  init_shuffle_implementation();
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output ||
+      host_shuffle_bytedelta_forward == NULL) {
+    return 0;
+  }
+  return host_shuffle_bytedelta_forward(input, output, length, typesize);
+}
+
+int shuffle_bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+  init_shuffle_implementation();
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output ||
+      host_shuffle_bytedelta_backward == NULL) {
+    return 0;
+  }
+  return host_shuffle_bytedelta_backward(input, output, length, typesize);
+}
 
 /* Shuffle a block by dynamically dispatching to the appropriate
    hardware-accelerated routine at run-time. */

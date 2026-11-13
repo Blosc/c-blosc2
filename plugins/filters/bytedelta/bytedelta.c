@@ -10,7 +10,7 @@
 
 // ByteDelta filter.  This is based on work by Aras Pranckevičius:
 // https://aras-p.info/blog/2023/03/01/Float-Compression-7-More-Filtering-Optimization/
-// This requires Intel SSE4.1 and ARM64 NEON, which should be widely available by now.
+// SIMD implementations use Intel SSSE3 or ARM64 NEON.
 
 #include "bytedelta.h"
 #include "blosc2.h"
@@ -81,6 +81,199 @@ uint8_t simd_get_last(bytes16 x) { return vgetq_lane_u8(x, 15); }
 
 #endif
 
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* Sixteen records remain in registers between byte transpose and delta. For
+ * eight-byte records, LD4 sees alternating low/high four-byte halves; UZP
+ * separates those halves into the eight original byte planes. */
+static inline void load_planes16(const uint8_t *input, bytes16 *planes, int typesize) {
+  if (typesize == 2) {
+    uint8x16x2_t values = vld2q_u8(input);
+    planes[0] = values.val[0];
+    planes[1] = values.val[1];
+    return;
+  }
+  uint8x16x4_t lo = vld4q_u8(input);
+  if (typesize == 4) {
+    for (int p = 0; p < 4; p++) {
+      planes[p] = lo.val[p];
+    }
+  }
+  else {
+    uint8x16x4_t hi = vld4q_u8(input + 64);
+    for (int p = 0; p < 4; p++) {
+      planes[p] = vuzp1q_u8(lo.val[p], hi.val[p]);
+      planes[p + 4] = vuzp2q_u8(lo.val[p], hi.val[p]);
+    }
+  }
+}
+
+static inline void store_planes16(uint8_t *output, const bytes16 *planes, int typesize) {
+  if (typesize == 2) {
+    uint8x16x2_t values;
+    values.val[0] = planes[0];
+    values.val[1] = planes[1];
+    vst2q_u8(output, values);
+    return;
+  }
+  uint8x16x4_t lo;
+  if (typesize == 4) {
+    for (int p = 0; p < 4; p++) {
+      lo.val[p] = planes[p];
+    }
+    vst4q_u8(output, lo);
+  }
+  else {
+    uint8x16x4_t hi;
+    for (int p = 0; p < 4; p++) {
+      lo.val[p] = vzip1q_u8(planes[p], planes[p + 4]);
+      hi.val[p] = vzip2q_u8(planes[p], planes[p + 4]);
+    }
+    vst4q_u8(output, lo);
+    vst4q_u8(output + 64, hi);
+  }
+}
+#endif
+
+int shuffle_bytedelta_neon_forward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output) {
+    return 0;
+  }
+  int count = length / typesize;
+  int vector_count = count / 16 * 16;
+  bytes16 previous[8], planes[8];
+  for (int p = 0; p < typesize; p++) {
+    previous[p] = simd_zero();
+  }
+  /* Keep plane counts compile-time constants. A variable eight-plane loop
+   * makes Clang spill the transpose/carry vectors to the stack on each tile. */
+  if (typesize == 2) {
+    int i = 0;
+    /* Two-byte groups otherwise spend disproportionate time on per-tile
+     * branches and carry-register moves. Keep four tiles in flight. */
+    for (; i + 64 <= vector_count; i += 64) {
+      for (int tile = 0; tile < 4; tile++) {
+        load_planes16(input + (i + tile * 16) * 2, planes + tile * 2, 2);
+      }
+      for (int p = 0; p < 2; p++) {
+        bytes16 carry = previous[p];
+        for (int tile = 0; tile < 4; tile++) {
+          bytes16 value = planes[tile * 2 + p];
+          bytes16 delta = simd_sub(value, simd_concat(value, carry));
+          simd_store(output + p * count + i + tile * 16, delta);
+          carry = value;
+        }
+        previous[p] = carry;
+      }
+    }
+    for (; i < vector_count; i += 16) {
+      load_planes16(input + i * 2, planes, 2);
+      for (int p = 0; p < 2; p++) {
+        bytes16 delta = simd_sub(planes[p], simd_concat(planes[p], previous[p]));
+        simd_store(output + p * count + i, delta);
+        previous[p] = planes[p];
+      }
+    }
+  }
+  else if (typesize == 4) {
+    for (int i = 0; i < vector_count; i += 16) {
+      load_planes16(input + i * 4, planes, 4);
+      for (int p = 0; p < 4; p++) {
+        bytes16 delta = simd_sub(planes[p], simd_concat(planes[p], previous[p]));
+        simd_store(output + p * count + i, delta);
+        previous[p] = planes[p];
+      }
+    }
+  }
+  else {
+    for (int i = 0; i < vector_count; i += 16) {
+      load_planes16(input + i * 8, planes, 8);
+      for (int p = 0; p < 8; p++) {
+        bytes16 delta = simd_sub(planes[p], simd_concat(planes[p], previous[p]));
+        simd_store(output + p * count + i, delta);
+        previous[p] = planes[p];
+      }
+    }
+  }
+  for (int p = 0; p < typesize; p++) {
+    uint8_t carry = simd_get_last(previous[p]);
+    for (int i = vector_count; i < count; i++) {
+      uint8_t value = input[i * typesize + p];
+      output[p * count + i] = (uint8_t)(value - carry);
+      carry = value;
+    }
+  }
+  /* Shuffle and the corrected BYTEDELTA both pass incomplete records through. */
+  memcpy(output + count * typesize, input + count * typesize, (size_t)(length % typesize));
+  return 1;
+#else
+  BLOSC_UNUSED_PARAM(input);
+  BLOSC_UNUSED_PARAM(output);
+  BLOSC_UNUSED_PARAM(length);
+  BLOSC_UNUSED_PARAM(typesize);
+  return 0;
+#endif
+}
+
+int shuffle_bytedelta_neon_backward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output) {
+    return 0;
+  }
+  int count = length / typesize;
+  int vector_count = count / 16 * 16;
+  bytes16 previous[8], planes[8];
+  for (int p = 0; p < typesize; p++) {
+    previous[p] = simd_zero();
+  }
+  if (typesize == 2) {
+    for (int i = 0; i < vector_count; i += 16) {
+      for (int p = 0; p < 2; p++) {
+        bytes16 delta = simd_load(input + p * count + i);
+        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
+        previous[p] = planes[p];
+      }
+      store_planes16(output + i * 2, planes, 2);
+    }
+  }
+  else if (typesize == 4) {
+    for (int i = 0; i < vector_count; i += 16) {
+      for (int p = 0; p < 4; p++) {
+        bytes16 delta = simd_load(input + p * count + i);
+        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
+        previous[p] = planes[p];
+      }
+      store_planes16(output + i * 4, planes, 4);
+    }
+  }
+  else {
+    for (int i = 0; i < vector_count; i += 16) {
+      for (int p = 0; p < 8; p++) {
+        bytes16 delta = simd_load(input + p * count + i);
+        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
+        previous[p] = planes[p];
+      }
+      store_planes16(output + i * 8, planes, 8);
+    }
+  }
+  for (int p = 0; p < typesize; p++) {
+    uint8_t carry = simd_get_last(previous[p]);
+    for (int i = vector_count; i < count; i++) {
+      carry = (uint8_t)(carry + input[p * count + i]);
+      output[i * typesize + p] = carry;
+    }
+  }
+  memcpy(output + count * typesize, input + count * typesize, (size_t)(length % typesize));
+  return 1;
+#else
+  BLOSC_UNUSED_PARAM(input);
+  BLOSC_UNUSED_PARAM(output);
+  BLOSC_UNUSED_PARAM(length);
+  BLOSC_UNUSED_PARAM(typesize);
+  return 0;
+#endif
+}
 
 // Fetch 16b from N streams, compute SIMD delta
 int bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, uint8_t meta,

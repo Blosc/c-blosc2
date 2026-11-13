@@ -9,6 +9,12 @@
 # A simple way to detect that we are using CMAKE
 add_definitions(-DUSING_CMAKE)
 
+# Experimental internal dispatch only: stored filters and public APIs are unchanged.
+option(BLOSC2_FUSED_SHUFFLE_BYTEDELTA "Fuse matching SHUFFLE and BYTEDELTA filters on ARM64/SSSE3" OFF)
+if(BLOSC2_FUSED_SHUFFLE_BYTEDELTA)
+    add_compile_definitions(BLOSC_FUSED_SHUFFLE_BYTEDELTA)
+endif()
+
 set(version_string ${BLOSC2_VERSION_MAJOR}.${BLOSC2_VERSION_MINOR}.${BLOSC2_VERSION_PATCH})
 
 # targets
@@ -252,6 +258,17 @@ if(COMPILER_SUPPORT_SSE2)
     endif()
     if(SSSE3_FLAG) 
         set_source_files_properties( ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}" COMPILE_DEFINITIONS "HAVE_SSSE3=1" ) 
+    endif()
+    if(SSSE3_FLAG)
+        # Keep SSSE3 confined to its translation unit; shuffle.c remains baseline
+        # ISA and selects this implementation only after the runtime CPUID check.
+        # Without an accepted SSSE3 flag the pair stays unavailable and every
+        # call falls back to the staged filters.
+        list(APPEND SOURCES blosc/shuffle-bytedelta-ssse3.c)
+        set_source_files_properties(shuffle-bytedelta-ssse3.c
+            PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}")
+        set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS
+            SHUFFLE_BYTEDELTA_SSSE3_ENABLED)
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation

@@ -15,6 +15,17 @@
 
 #include <stdint.h>
 
+/* Internal, out-of-place pair kernels. Return 1 when handled, 0 for fallback.
+ * They emit/consume exactly the existing SHUFFLE + BYTEDELTA representation. */
+int shuffle_bytedelta_forward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+/* Availability is initialized with the existing thread-safe shuffle dispatcher. */
+int shuffle_bytedelta_available(void);
+int shuffle_bytedelta_neon_forward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_neon_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_ssse3_forward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_ssse3_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+
 int bytedelta_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
                       blosc2_cparams* cparams, uint8_t id);
 
