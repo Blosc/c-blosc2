@@ -1063,7 +1063,9 @@ static int blosc2_initialize_context_from_header(blosc2_context* context, blosc_
     context->filter_flags = filters_to_flags(header->filters);
     context->special_type = (header->blosc2_flags >> 4) & BLOSC2_SPECIAL_MASK;
 
-    is_lazy = (context->blosc2_flags & 0x08u);
+    // Chunks with special values cannot be lazy (as in blosc_d()), and their
+    // value is read from the buffer, so the cbytes check below must apply
+    is_lazy = (context->blosc2_flags & 0x08u) && !context->special_type;
   }
   else {
     context->header_overhead = BLOSC_MIN_HEADER_LENGTH;
