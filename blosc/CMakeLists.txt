@@ -9,8 +9,8 @@
 # A simple way to detect that we are using CMAKE
 add_definitions(-DUSING_CMAKE)
 
-# Experimental internal dispatch only: stored filters and public APIs are unchanged.
-option(BLOSC2_FUSED_SHUFFLE_BYTEDELTA "Fuse matching SHUFFLE and BYTEDELTA filters on ARM64/SSSE3" OFF)
+# Internal pair dispatch only: stored filters and public APIs are unchanged.
+option(BLOSC2_FUSED_SHUFFLE_BYTEDELTA "Fuse matching SHUFFLE and BYTEDELTA filters on ARM64/SSSE3" ON)
 if(BLOSC2_FUSED_SHUFFLE_BYTEDELTA)
     add_compile_definitions(BLOSC_FUSED_SHUFFLE_BYTEDELTA)
 endif()
