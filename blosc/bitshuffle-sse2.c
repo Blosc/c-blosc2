@@ -31,6 +31,7 @@
 #if defined(__SSE2__)
 
 #include <emmintrin.h>
+#include "bitshuffle-constant.h"
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -278,7 +279,9 @@ int64_t bshuf_trans_bit_byte_SSE(const void* in, void* out, const size_t size,
   __m128i xmm;
   int32_t bt;
 
-  for (ii = 0; ii + 15 < nbyte; ii += 16) {
+  ii = bshuf_emit_constant_prefix(in, out, nbyte);
+  if (ii == nbyte) return nbyte;
+  for (; ii + 15 < nbyte; ii += 16) {
     xmm = _mm_loadu_si128((__m128i *) &in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
       bt = _mm_movemask_epi8(xmm);

@@ -32,6 +32,7 @@
 #if defined(__AVX2__)
 
 #include <immintrin.h>
+#include "bitshuffle-constant.h"
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -75,7 +76,9 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
   __m256i ymm;
   int32_t bt;
 
-  for (ii = 0; ii + 31 < nbyte; ii += 32) {
+  ii = bshuf_emit_constant_prefix(in, out, nbyte);
+  if (ii == nbyte) return nbyte;
+  for (; ii + 31 < nbyte; ii += 32) {
     ymm = _mm256_loadu_si256((__m256i *) &in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
       bt = _mm256_movemask_epi8(ymm);

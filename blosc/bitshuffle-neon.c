@@ -30,6 +30,7 @@
 #if defined(__ARM_NEON)
 
 #include <arm_neon.h>
+#include "bitshuffle-constant.h"
 
 /* Independent 8x8 bit transposes in the two 64-bit lanes.  Unlike an
  * emulated movemask this never extracts individual bits into scalar registers. */
@@ -307,10 +308,13 @@ int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
 
     CHECK_MULT_EIGHT(nbyte);
 
+    ii = bshuf_emit_constant_prefix(in, out, nbyte);
+    if (ii == nbyte) return nbyte;
+
     /* An entire 128-byte tile lets us replace 64 short scalar stores with
      * eight vector stores.  First transpose bits in 64-bit lanes, then
      * transpose the resulting eight rows of 16-bit bit pairs. */
-    for (ii = 0; ii + 127 < nbyte; ii += 128) {
+    for (; ii + 127 < nbyte; ii += 128) {
         uint8x16_t x[8], y[8];
         for (size_t j = 0; j < 8; ++j) {
             uint8x16_t v = trans_bit_8x8_NEON(vld1q_u8((const uint8_t*)in_b + ii + 16 * j));

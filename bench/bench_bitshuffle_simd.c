@@ -16,8 +16,8 @@ static double now(void) {
   clock_gettime(CLOCK_MONOTONIC, &t);
   return t.tv_sec + t.tv_nsec * 1e-9;
 }
-static int check(kernel f, kernel g) {
-  unsigned char a[8192], b[8192], c[8192], d[8192], tmp[8192];
+static int check(kernel f, kernel g, int pattern) {
+  unsigned char a[32768], b[32768], c[32768], d[32768], tmp[32768];
   unsigned state = 42;
   for (size_t i = 0; i < sizeof(a); ++i) {
     state ^= state << 13; state ^= state >> 17; state ^= state << 5;
@@ -26,16 +26,21 @@ static int check(kernel f, kernel g) {
   const size_t types[] = {1, 2, 3, 4, 8, 16, 24};
   for (size_t t = 0; t < sizeof(types) / sizeof(types[0]); ++t) {
     size_t e = types[t];
-    for (size_t n = 8; n <= 264; n += 8) {
+    if (pattern) {
+      for (size_t i = 0; i < sizeof(a); ++i) a[i] = (unsigned char)((i % e) * 31 + e);
+    }
+    for (size_t n = 8; n <= 1032; n += 8) {
       for (size_t off = 0; off < 4; ++off) {
+        if (pattern == 2) a[off + (n / 2) * e] ^= 0x80;
         bshuf_trans_bit_elem_scal(a + off, b + off, n, e, tmp + off);
         if (f(a + off, c + off, n, e, tmp + off) != (int64_t)(n * e) ||
             memcmp(b + off, c + off, n * e) ||
             g(b + off, d + off, n, e, tmp + off) != (int64_t)(n * e) ||
             memcmp(a + off, d + off, n * e)) {
-          fprintf(stderr, "Mismatch: type=%zu size=%zu offset=%zu\n", e, n, off);
+          fprintf(stderr, "Mismatch: type=%zu size=%zu offset=%zu pattern=%d\n", e, n, off, pattern);
           return 1;
         }
+        if (pattern == 2) a[off + (n / 2) * e] ^= 0x80;
       }
     }
   }
@@ -56,7 +61,9 @@ int main(int argc, char** argv) {
   puts("simd,typesize,bytes,shuffle_us,unshuffle_us");
   for (size_t k = 0; k < 4; ++k) {
     if (!enabled[k]) continue;
-    if (check(forward[k], inverse[k])) return 1;
+    for (int pattern = 0; pattern < 3; ++pattern) {
+      if (check(forward[k], inverse[k], pattern)) return 1;
+    }
     for (size_t e = 1; e <= 16; e *= 2) {
       size_t n = bytes / (8 * e) * 8;
       double best[2] = {1e30, 1e30};

@@ -187,6 +187,52 @@ static char* test_routines(void) {
 }
 
 
+/* Constant byte planes and almost-constant planes with identical endpoints.
+ * In particular, a SIMD probe must not mistake an interior difference for a
+ * constant plane. Exercise every possible byte value, tails, and misalignment. */
+static char* test_constant_planes(void) {
+  bshuf_variant variants[8];
+  int nvariants = get_variants(variants);
+  const size_t sizes[] = {120, 128, 136, 248, 256, 264, 1016, 1024, 1032};
+  const size_t types[] = {1, 2, 4, 8, 16};
+  const size_t capacity = 1032 * 16;
+  uint8_t* input = malloc(capacity + 1);
+  uint8_t* ref = malloc(capacity + 1);
+  uint8_t* out = malloc(capacity + 1 + GUARD);
+  uint8_t* scratch = malloc(capacity + 1 + GUARD);
+  mu_assert("ERROR: allocation failed", input && ref && out && scratch);
+  for (unsigned value = 0; value < 256; ++value) {
+    size_t size = sizes[value % ARRAY_SIZE(sizes)];
+    size_t type = types[value % ARRAY_SIZE(types)], nbytes = size * type;
+    for (size_t i = 0; i < size; ++i) {
+      for (size_t p = 0; p < type; ++p) input[1 + i * type + p] = (uint8_t)(value + p);
+    }
+    for (int changed = 0; changed < 3; ++changed) {
+      if (changed == 1) input[1 + (size / 2) * type] ^= 0x80;
+      if (changed == 2) input[1 + (size - 17) * type + type - 1] ^= 0x01;
+      bshuf_trans_bit_elem_scal(input + 1, ref + 1, size, type, scratch + 1);
+      for (int v = 0; v < nvariants; ++v) {
+        memset(out, FILL, nbytes + 1 + GUARD);
+        memset(scratch, FILL, nbytes + 1 + GUARD);
+        int64_t rc = variants[v].trans(input + 1, out + 1, size, type, scratch + 1);
+        mu_assert("ERROR: constant-plane bitshuffle differs from scalar",
+                  rc == (int64_t)nbytes && memcmp(out + 1, ref + 1, nbytes) == 0);
+        mu_assert("ERROR: constant-plane bitshuffle overwrites guards",
+                  out[0] == FILL && scratch[0] == FILL &&
+                  guard_intact(out + 1, nbytes) && guard_intact(scratch + 1, nbytes));
+        rc = variants[v].untrans(ref + 1, out + 1, size, type, scratch + 1);
+        mu_assert("ERROR: constant-plane inverse differs from input",
+                  rc == (int64_t)nbytes && memcmp(out + 1, input + 1, nbytes) == 0);
+      }
+    }
+  }
+  free(input);
+  free(ref);
+  free(out);
+  free(scratch);
+  return EXIT_SUCCESS;
+}
+
 /* bitshuffle()/bitunshuffle() with a scratch agree with the public API (which
    allocates one), also for leftover elements and bytes */
 static char* test_entry_points(void) {
@@ -511,6 +557,7 @@ static char* test_lazy_chunks(void) {
 
 static char* all_tests(void) {
   mu_run_test(test_routines);
+  mu_run_test(test_constant_planes);
   mu_run_test(test_entry_points);
   mu_run_test(test_pipelines);
   mu_run_test(test_scratch_in_thread_context);
