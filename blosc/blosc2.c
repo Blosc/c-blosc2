@@ -5335,8 +5335,8 @@ static void t_blosc_do_job(void *ctxt)
   srcsize = context->srcsize;
   dest = context->dest;
 
-  /* Resize the temporaries if needed */
-  if (blocksize > thcontext->tmp_blocksize) {
+  /* Resize the temporaries if needed (on bytes: they depend on the typesize too) */
+  if ((size_t)4 * ebsize > thcontext->tmp_nbytes) {
     my_free(thcontext->tmp);
     thcontext->tmp_nbytes = (size_t)4 * ebsize;
     thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
@@ -5483,7 +5483,8 @@ static int ensure_thread_context_capacity(struct thread_context* thread_context,
   int32_t blocksize = context->blocksize;
   int32_t ebsize = blocksize + context->typesize * (int32_t)sizeof(int32_t);
 
-  if (blocksize <= thread_context->tmp_blocksize) {
+  /* Pool workers serve contexts with different typesizes: check on bytes */
+  if ((size_t)4 * ebsize <= thread_context->tmp_nbytes) {
     return 0;
   }
 
