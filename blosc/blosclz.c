@@ -23,6 +23,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
+
 /*
  * Give hints to the compiler for branch prediction optimization.
  * This is not necessary anymore with modern CPUs.
@@ -116,6 +120,7 @@ uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #endif
 
 
+#if !defined(__aarch64__) && !defined(_M_ARM64)
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -142,6 +147,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
+#endif
 
 
 /* Return the byte that starts to differ */
@@ -215,6 +221,81 @@ static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t
 #endif
 
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* Check long matches in cache-line-sized groups.  Reduce just once per group,
+ * then use the narrow loop to locate the first differing byte. */
+static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *ref) {
+  /* Most matches in floating-point byte deltas are short.  Avoid four vector
+   * comparisons for these; AArch64's little-endian word scan locates a mismatch
+   * without a byte-at-a-time loop. */
+  if (bound - ip >= 8) {
+    uint64_t a, b;
+    memcpy(&a, ip, sizeof(a));
+    memcpy(&b, ref, sizeof(b));
+    uint64_t diff = a ^ b;
+    if (diff) {
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(__AARCH64EB__)
+      return ip + (__builtin_ctzll(diff) >> 3) + 1;
+#else
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 8;
+    ref += 8;
+  }
+  while (bound - ip >= 64) {
+    uint8x16_t a = vceqq_u8(vld1q_u8(ip), vld1q_u8(ref));
+    uint8x16_t b = vceqq_u8(vld1q_u8(ip + 16), vld1q_u8(ref + 16));
+    uint8x16_t c = vceqq_u8(vld1q_u8(ip + 32), vld1q_u8(ref + 32));
+    uint8x16_t d = vceqq_u8(vld1q_u8(ip + 48), vld1q_u8(ref + 48));
+    if (vminvq_u8(vandq_u8(vandq_u8(a, b), vandq_u8(c, d))) != 255) {
+      break;
+    }
+    ip += 64;
+    ref += 64;
+  }
+  while (bound - ip >= 16) {
+    if (vminvq_u8(vceqq_u8(vld1q_u8(ip), vld1q_u8(ref))) != 255) {
+      while (*ref++ == *ip++) {}
+      return ip;
+    }
+    ip += 16;
+    ref += 16;
+  }
+  while (ip < bound && *ref++ == *ip++) {}
+  return ip;
+}
+
+static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *ref) {
+  uint8_t x = ip[-1];
+  uint8x16_t value = vdupq_n_u8(x);
+  while (bound - ip >= 64) {
+    uint8x16_t a = vceqq_u8(value, vld1q_u8(ref));
+    uint8x16_t b = vceqq_u8(value, vld1q_u8(ref + 16));
+    uint8x16_t c = vceqq_u8(value, vld1q_u8(ref + 32));
+    uint8x16_t d = vceqq_u8(value, vld1q_u8(ref + 48));
+    if (vminvq_u8(vandq_u8(vandq_u8(a, b), vandq_u8(c, d))) != 255) {
+      break;
+    }
+    ip += 64;
+    ref += 64;
+  }
+  while (bound - ip >= 16) {
+    if (vminvq_u8(vceqq_u8(value, vld1q_u8(ref))) != 255) {
+      while (*ref++ == x) ip++;
+      return ip;
+    }
+    ip += 16;
+    ref += 16;
+  }
+  /* Keep the original run byte: ref trails ip by one byte, so ip[-1] has
+   * not necessarily been checked when a vector iteration ends. */
+  while (ip < bound && *ref++ == x) ip++;
+  return ip;
+}
+#endif
+
 static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
   if (BLOSCLZ_UNLIKELY(run)) {
 #if defined(__AVX2__)
@@ -225,6 +306,8 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
     // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
     // ip = get_run_16(ip, ip_bound, ref);
     ip = get_run(ip, ip_bound, ref);
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    ip = get_run_neon(ip, ip_bound, ref);
 #else
     ip = get_run(ip, ip_bound, ref);
 #endif
@@ -236,6 +319,8 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
     ip = get_match_16(ip, ip_bound, ref);
 #elif defined(__SSE2__)
     ip = get_match_16(ip, ip_bound, ref);
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    ip = get_match_neon(ip, ip_bound, ref);
 #else
     ip = get_match(ip, ip_bound, ref);
 #endif
@@ -435,12 +520,17 @@ int blosclz_compress(const int clevel, const void* input, int length,
    * eventually discard those that are small (take too long to decompress).
    * This process is called _entropy probing_.
    */
-  unsigned ipshift = 4;
+  /* Level 1 favors the short periodic matches produced by synthetic ramps.
+   * Keep the established ratio/decompression tradeoff at higher levels. */
+  unsigned ipshift = clevel == 1 ? 3 : 4;
   // Minimum lengths for encoding (normally it is good to match the shift value)
-  unsigned minlen = 4;
+  unsigned minlen = clevel == 1 ? 3 : 4;
 
-  uint8_t hashlog_[10] = {0, HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG,
-                          HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG, HASH_LOG};
+  /* Grow the table gradually from 1 KB at level 1 to 64 KB at level 7.
+   * Smaller tables also bound the entropy probe, reducing low-level work on
+   * the small alphabets produced by filtered ramps. */
+  uint8_t hashlog_[10] = {0, HASH_LOG - 6, HASH_LOG - 5, HASH_LOG - 4, HASH_LOG - 3,
+                          HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
 
   // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
@@ -682,6 +772,14 @@ static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
   do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* The caller guarantees a distance and output slack of at least 16 bytes.
+ * Keep each load/store ordered so overlapping matches propagate correctly. */
+static inline void wild_copy_16(uint8_t *out, const uint8_t *from, uint8_t *end) {
+  do { memcpy(out, from, 16); out += 16; from += 16; } while (out < end);
+}
+#endif
+
 int blosclz_decompress(const void* input, int length, void* output, int maxout) {
   const uint8_t* ip = (const uint8_t*)input;
   const uint8_t* ip_limit = ip + length;
@@ -702,6 +800,22 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       const uint8_t* ref = op - ofs;
 
       if (len == 7 - 1) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+        /* Long runs encode their lengths as consecutive 255-byte extensions.
+         * Consume eight together, keeping an offset byte in reserve. */
+        while (ip_limit - ip >= 9) {
+          uint64_t extensions;
+          memcpy(&extensions, ip, sizeof(extensions));
+          if (extensions != UINT64_MAX) {
+            break;
+          }
+          if (BLOSCLZ_UNLIKELY(len > maxout - 8 * 255)) {
+            return 0;
+          }
+          len += 8 * 255;
+          ip += 8;
+        }
+#endif
         do {
           if (BLOSCLZ_UNLIKELY(ip + 1 >= ip_limit)) {
             return 0;
@@ -754,7 +868,13 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         memset(op, *ref, len);
         op += len;
       }
-      else if ((op - ref >= 8) && (op_limit - op >= len + 8)) {
+#if defined(__aarch64__) || defined(_M_ARM64)
+      else if ((op - ref >= 16) && (op_limit - op - len >= 16)) {
+        wild_copy_16(op, ref, op + len);
+        op += len;
+      }
+#endif
+      else if ((op - ref >= 8) && (op_limit - op - len >= 8)) {
         // copy with an overlap not larger than 8
         wild_copy(op, ref, op + len);
         op += len;
@@ -785,7 +905,21 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         return 0;
       }
 
-      memcpy(op, ip, ctrl); op += ctrl; ip += ctrl;
+#if defined(__aarch64__) || defined(_M_ARM64)
+      /* Fixed-size copies inline on ARM64.  Overcopy only within both buffers;
+       * subsequent tokens overwrite the extra output bytes. */
+      if (ctrl <= 16 && op_limit - op >= 16 && ip_limit - ip >= 16) {
+        memcpy(op, ip, 16);
+      }
+      else if (op_limit - op >= 32 && ip_limit - ip >= 32) {
+        memcpy(op, ip, 32);
+      }
+      else
+#endif
+      {
+        memcpy(op, ip, ctrl);
+      }
+      op += ctrl; ip += ctrl;
       // On GCC-6, fastcopy this is still faster than plain memcpy
       // However, using recent CLANG/LLVM 9.0, there is almost no difference
       // in performance.
