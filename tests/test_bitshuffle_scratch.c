@@ -9,7 +9,7 @@
   compression and decompression pipelines pass the thread_context's tmp4
   (which blosc_d() also reads the blocks of lazy chunks into), the public
   blosc2_bitshuffle()/blosc2_bitunshuffle() allocate one per call.  Checks
-  every bitshuffle routine that is built (CMake does not build the NEON one)
+   every bitshuffle routine that is built
   and supported by the CPU against the generic one with a scratch of exactly
   size * elem_size bytes followed by guard bytes and with guard bytes after
   the output (element counts leave every remainder of the vector loops), the
@@ -23,6 +23,9 @@
 #include "test_common.h"
 #include "shuffle.h"
 #include "bitshuffle-generic.h"
+#if defined(SHUFFLE_NEON_ENABLED) && (defined(__aarch64__) || defined(_M_ARM64))
+#include "bitshuffle-neon.h"
+#endif
 #if defined(SHUFFLE_SSE2_ENABLED)
 #include "bitshuffle-sse2.h"
 #endif
@@ -67,6 +70,11 @@ typedef struct {
 static int get_variants(bshuf_variant* variants) {
   int n = 0;
   variants[n++] = (bshuf_variant){"generic", bshuf_trans_bit_elem_scal, bshuf_untrans_bit_elem_scal};
+#if defined(SHUFFLE_NEON_ENABLED) && (defined(__aarch64__) || defined(_M_ARM64))
+  if (is_bshuf_NEON) {
+    variants[n++] = (bshuf_variant){"neon", bshuf_trans_bit_elem_NEON, bshuf_untrans_bit_elem_NEON};
+  }
+#endif
 #if defined(SHUFFLE_SSE2_ENABLED)
   if (is_bshuf_SSE && CPU_HAS("sse2")) {
     variants[n++] = (bshuf_variant){"sse2", bshuf_trans_bit_elem_SSE, bshuf_untrans_bit_elem_SSE};

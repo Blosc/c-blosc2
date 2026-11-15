@@ -19,6 +19,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Decode a single byte plane; also used by the AVX2 path. */
+BLOSC_NO_EXPORT int64_t
+bshuf_untrans_bit_byte_SSE(const void* in, void* out, const size_t size);
+
 /**
  * SSE2-accelerated bit(un)shuffle routines availability.
 */

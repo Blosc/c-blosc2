@@ -341,20 +341,19 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON if using NEON bitshuffle
+  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) {
     shuffle_implementation_t impl_neon;
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
-    //impl_neon.shuffle = (shuffle_func)shuffle_generic;
-    //impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
-    //impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_NEON;
-    //impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_NEON;
-    // The current bitshuffle optimized for NEON is not any faster
-    // (in fact, it is pretty much slower) than the scalar implementation.
-    // So, let's use the scalar one, which is pretty fast, at least on a M1 CPU.
+#if defined(BITSHUFFLE_NEON_ENABLED)
+    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_NEON;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_NEON;
+#else
+    // The optimized bitshuffle transpose requires AArch64; ARMv7 stays scalar.
     impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
     impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+#endif
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */

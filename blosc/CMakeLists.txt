@@ -219,9 +219,13 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
 endif()
 if(COMPILER_SUPPORT_NEON)
     message(STATUS "Adding run-time support for NEON")
-    # bitshuffle-neon.c does not offer better speed than generic on arm64 (Mac M1).
-    # Besides, it does not compile on raspberry pi (armv7l), so disable it.
-    list(APPEND SOURCES blosc/shuffle-neon.c)  # blosc/bitshuffle-neon.c)
+    list(APPEND SOURCES blosc/shuffle-neon.c)
+    # The bitshuffle transpose uses AArch64 zip1/zip2 instructions.  Keep
+    # ARMv7 builds on the generic bitshuffle implementation.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64|AARCH64)$")
+        list(APPEND SOURCES blosc/bitshuffle-neon.c)
+        set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS BITSHUFFLE_NEON_ENABLED)
+    endif()
 endif()
 if(COMPILER_SUPPORT_ALTIVEC)
     message(STATUS "Adding run-time support for ALTIVEC")

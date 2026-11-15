@@ -23,6 +23,9 @@
 #include "bitshuffle-avx2.h"
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
+#include "shuffle-avx2.h"
+#include "shuffle-sse2.h"
+#include <string.h>
 #include <stdlib.h>
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
@@ -64,7 +67,6 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
   size_t ii, kk;
   const char* in_b = (const char*) in;
   char* out_b = (char*) out;
-  int32_t* out_i32;
 
   size_t nbyte = elem_size * size;
 
@@ -78,8 +80,7 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
     for (kk = 0; kk < 8; kk++) {
       bt = _mm256_movemask_epi8(ymm);
       ymm = _mm256_slli_epi16(ymm, 1);
-      out_i32 = (int32_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
-      *out_i32 = bt;
+      memcpy(out_b + ((7 - kk) * nbyte + ii) / 8, &bt, sizeof(bt));
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -96,6 +97,21 @@ int64_t bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
 
   CHECK_MULT_EIGHT(size);
 
+  if ((elem_size == 1 || elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    const uint8_t* bytes = (const uint8_t*)in;
+    if (elem_size != 1) {
+      /* Keep the existing 128-bit byte-transpose stage; the bit stage below
+       * uses AVX2 and writes directly to the final rows. */
+      shuffle_sse2((int32_t)elem_size, (int32_t)(size * elem_size), in, tmp_buf);
+      bytes = (const uint8_t*)tmp_buf;
+    }
+    for (size_t j = 0; j < elem_size; ++j) {
+      count = bshuf_trans_bit_byte_AVX(bytes + j * size, (uint8_t*)out + j * size, size, 1);
+      CHECK_ERR(count);
+    }
+    return size * elem_size;
+  }
   count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size, tmp_buf);
   CHECK_ERR(count);
   count = bshuf_trans_bit_byte_AVX(out, tmp_buf, size, elem_size);
@@ -281,6 +297,15 @@ int64_t bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
 
   CHECK_MULT_EIGHT(size);
 
+  if (elem_size == 1) return bshuf_untrans_bit_byte_SSE(in, out, size);
+  if ((elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    for (size_t j = 0; j < elem_size; ++j) {
+      bshuf_untrans_bit_byte_SSE((const uint8_t*)in + j * size, (uint8_t*)tmp_buf + j * size, size);
+    }
+    unshuffle_avx2((int32_t)elem_size, (int32_t)(size * elem_size), tmp_buf, out);
+    return size * elem_size;
+  }
   count = bshuf_trans_byte_bitrow_AVX(in, tmp_buf, size, elem_size);
   CHECK_ERR(count);
   count =  bshuf_shuffle_bit_eightelem_AVX(tmp_buf, out, size, elem_size);

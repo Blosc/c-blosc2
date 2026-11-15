@@ -22,12 +22,27 @@
 
 #include "bitshuffle-neon.h"
 #include "bitshuffle-generic.h"
+#include "shuffle-neon.h"
+#include <string.h>
 #include <stdlib.h>
 
 /* Make sure NEON is available for the compilation target and compiler. */
 #if defined(__ARM_NEON)
 
 #include <arm_neon.h>
+
+/* Independent 8x8 bit transposes in the two 64-bit lanes.  Unlike an
+ * emulated movemask this never extracts individual bits into scalar registers. */
+static inline uint8x16_t trans_bit_8x8_NEON(uint8x16_t bytes) {
+    uint64x2_t x = vreinterpretq_u64_u8(bytes), t;
+    t = vandq_u64(veorq_u64(x, vshrq_n_u64(x, 7)), vdupq_n_u64(UINT64_C(0x00aa00aa00aa00aa)));
+    x = veorq_u64(x, veorq_u64(t, vshlq_n_u64(t, 7)));
+    t = vandq_u64(veorq_u64(x, vshrq_n_u64(x, 14)), vdupq_n_u64(UINT64_C(0x0000cccc0000cccc)));
+    x = veorq_u64(x, veorq_u64(t, vshlq_n_u64(t, 14)));
+    t = vandq_u64(veorq_u64(x, vshrq_n_u64(x, 28)), vdupq_n_u64(UINT64_C(0x00000000f0f0f0f0)));
+    x = veorq_u64(x, veorq_u64(t, vshlq_n_u64(t, 28)));
+    return vreinterpretq_u8_u64(x);
+}
 
 
 /* The next is useful for debugging purposes */
@@ -60,8 +75,8 @@ static void printmem(uint8_t* buf)
 int64_t bshuf_trans_byte_elem_NEON_16(const void* in, void* out, const size_t size) {
 
     size_t ii;
-    const char *in_b = (const char*) in;
-    char *out_b = (char*) out;
+    const int8_t *in_b = (const int8_t*) in;
+    int8_t *out_b = (int8_t*) out;
     int8x16_t a0, b0, a1, b1;
 
     for (ii=0; ii + 15 < size; ii += 16) {
@@ -93,10 +108,10 @@ int64_t bshuf_trans_byte_elem_NEON_16(const void* in, void* out, const size_t si
 int64_t bshuf_trans_byte_elem_NEON_32(const void* in, void* out, const size_t size) {
 
     size_t ii;
-    const char *in_b;
-    char *out_b;
-    in_b = (const char*) in;
-    out_b = (char*) out;
+    const int8_t *in_b;
+    int8_t *out_b;
+    in_b = (const int8_t*) in;
+    out_b = (int8_t*) out;
     int8x16_t a0, b0, c0, d0, a1, b1, c1, d1;
     int64x2_t a2, b2, c2, d2;
 
@@ -141,8 +156,8 @@ int64_t bshuf_trans_byte_elem_NEON_32(const void* in, void* out, const size_t si
 int64_t bshuf_trans_byte_elem_NEON_64(const void* in, void* out, const size_t size) {
 
     size_t ii;
-    const char* in_b = (const char*) in;
-    char* out_b = (char*) out;
+    const int8_t* in_b = (const int8_t*) in;
+    int8_t* out_b = (int8_t*) out;
     int8x16_t a0, b0, c0, d0, e0, f0, g0, h0;
     int8x16_t a1, b1, c1, d1, e1, f1, g1, h1;
 
@@ -282,10 +297,9 @@ int32_t move_byte_mask_neon(uint8x16_t input) {
 int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
          const size_t elem_size) {
 
-    size_t ii, kk;
-    const char* in_b = (const char*) in;
-    char* out_b = (char*) out;
-    uint16_t* out_ui16;
+    size_t ii;
+    const int8_t* in_b = (const int8_t*) in;
+    int8_t* out_b = (int8_t*) out;
 
     int64_t count;
 
@@ -293,17 +307,47 @@ int64_t bshuf_trans_bit_byte_NEON(const void* in, void* out, const size_t size,
 
     CHECK_MULT_EIGHT(nbyte);
 
-    int16x8_t xmm;
-    int32_t bt;
-
-    for (ii = 0; ii + 15 < nbyte; ii += 16) {
-        xmm = vld1q_s16((int16_t *) (in_b + ii));
-        for (kk = 0; kk < 8; kk++) {
-            bt = move_byte_mask_neon((uint8x16_t) xmm);
-            xmm = vshlq_n_s16(xmm, 1);
-            out_ui16 = (uint16_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
-            *out_ui16 = bt;
+    /* An entire 128-byte tile lets us replace 64 short scalar stores with
+     * eight vector stores.  First transpose bits in 64-bit lanes, then
+     * transpose the resulting eight rows of 16-bit bit pairs. */
+    for (ii = 0; ii + 127 < nbyte; ii += 128) {
+        uint8x16_t x[8], y[8];
+        for (size_t j = 0; j < 8; ++j) {
+            uint8x16_t v = trans_bit_8x8_NEON(vld1q_u8((const uint8_t*)in_b + ii + 16 * j));
+            x[j] = vzip1q_u8(v, vextq_u8(v, v, 8));
         }
+        for (size_t j = 0; j < 4; ++j) {
+            y[2*j] = vreinterpretq_u8_u16(vzip1q_u16(vreinterpretq_u16_u8(x[2*j]),
+                                                       vreinterpretq_u16_u8(x[2*j+1])));
+            y[2*j+1] = vreinterpretq_u8_u16(vzip2q_u16(vreinterpretq_u16_u8(x[2*j]),
+                                                         vreinterpretq_u16_u8(x[2*j+1])));
+        }
+        for (size_t j = 0; j < 2; ++j) {
+            for (size_t k = 0; k < 2; ++k) {
+                x[4*j+2*k] = vreinterpretq_u8_u32(vzip1q_u32(vreinterpretq_u32_u8(y[4*j+k]),
+                                                               vreinterpretq_u32_u8(y[4*j+k+2])));
+                x[4*j+2*k+1] = vreinterpretq_u8_u32(vzip2q_u32(vreinterpretq_u32_u8(y[4*j+k]),
+                                                                 vreinterpretq_u32_u8(y[4*j+k+2])));
+            }
+        }
+        for (size_t j = 0; j < 4; ++j) {
+            uint64x2_t a = vreinterpretq_u64_u8(x[j]), b = vreinterpretq_u64_u8(x[j+4]);
+            vst1q_u8((uint8_t*)out_b + (2*j*nbyte + ii) / 8,
+                     vreinterpretq_u8_u64(vzip1q_u64(a, b)));
+            vst1q_u8((uint8_t*)out_b + ((2*j+1)*nbyte + ii) / 8,
+                     vreinterpretq_u8_u64(vzip2q_u64(a, b)));
+        }
+    }
+    for (; ii + 15 < nbyte; ii += 16) {
+        uint8x16_t x = trans_bit_8x8_NEON(vld1q_u8((const uint8_t*)in_b + ii));
+        x = vzip1q_u8(x, vextq_u8(x, x, 8));
+#define STORE_BIT_ROW(k) do { \
+        uint16_t bits = vgetq_lane_u16(vreinterpretq_u16_u8(x), k); \
+        memcpy(out_b + ((k) * nbyte + ii) / 8, &bits, sizeof(bits)); \
+    } while (0)
+        STORE_BIT_ROW(0); STORE_BIT_ROW(1); STORE_BIT_ROW(2); STORE_BIT_ROW(3);
+        STORE_BIT_ROW(4); STORE_BIT_ROW(5); STORE_BIT_ROW(6); STORE_BIT_ROW(7);
+#undef STORE_BIT_ROW
     }
     count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
             nbyte - nbyte % 16);
@@ -319,24 +363,34 @@ int64_t bshuf_trans_bit_elem_NEON(const void* in, void* out, const size_t size,
 
     CHECK_MULT_EIGHT(size);
 
-    count = bshuf_trans_byte_elem_NEON(in, out, size, elem_size, tmp_buf);
-    CHECK_ERR(count);
-    count = bshuf_trans_bit_byte_NEON(out, tmp_buf, size, elem_size);
-    CHECK_ERR(count);
-    count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
-    return count;
+    if ((elem_size == 1 || elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+        && size <= INT32_MAX / elem_size) {
+        const uint8_t* bytes = (const uint8_t*)in;
+        if (elem_size != 1) {
+            /* Write the final bit rows directly, avoiding the bitrow reorder pass. */
+            shuffle_neon((int32_t)elem_size, (int32_t)(size * elem_size), in, tmp_buf);
+            bytes = (const uint8_t*)tmp_buf;
+        }
+        for (size_t j = 0; j < elem_size; ++j) {
+            count = bshuf_trans_bit_byte_NEON(bytes + j * size,
+                     (uint8_t*)out + j * size, size, 1);
+            CHECK_ERR(count);
+        }
+        return size * elem_size;
+    }
+    return bshuf_trans_bit_elem_scal(in, out, size, elem_size, tmp_buf);
 }
 
 
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
- * the bytes. */
-int64_t bshuf_trans_byte_bitrow_NEON(const void* in, void* out, const size_t size,
-         const size_t elem_size) {
+ * the bytes.  transpose_bits is only used with elem_size == 1 and fuses the
+ * final 8x8 bit transpose into each vector store. */
+static int64_t trans_byte_bitrow_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size, const bool transpose_bits) {
 
     size_t ii, jj;
-    const char* in_b = (const char*) in;
-    char* out_b = (char*) out;
+    const int8_t* in_b = (const int8_t*) in;
+    int8_t* out_b = (int8_t*) out;
 
     CHECK_MULT_EIGHT(size);
 
@@ -385,6 +439,16 @@ int64_t bshuf_trans_byte_bitrow_NEON(const void* in, void* out, const size_t siz
             g1 = (int8x16_t) vzip1q_s32 (vreinterpretq_s32_s8 (g0), vreinterpretq_s32_s8 (h0));
             h1 = (int8x16_t) vzip2q_s32 (vreinterpretq_s32_s8 (g0), vreinterpretq_s32_s8 (h0));
 
+            if (transpose_bits) {
+#define STORE_BYTES(v, k) vst1q_u8((uint8_t*)out + (jj + (k)) * 8, \
+                                      trans_bit_8x8_NEON(vreinterpretq_u8_s8(v)))
+                STORE_BYTES(a1, 0); STORE_BYTES(b1, 2);
+                STORE_BYTES(c1, 4); STORE_BYTES(d1, 6);
+                STORE_BYTES(e1, 8); STORE_BYTES(f1, 10);
+                STORE_BYTES(g1, 12); STORE_BYTES(h1, 14);
+#undef STORE_BYTES
+                continue;
+            }
             as = (int64x1_t *) &a1;
             bs = (int64x1_t *) &b1;
             cs = (int64x1_t *) &c1;
@@ -420,11 +484,21 @@ int64_t bshuf_trans_byte_bitrow_NEON(const void* in, void* out, const size_t siz
             out_b[jj * nrows + ii + 5] = in_b[(ii + 5)*nbyte_row + jj];
             out_b[jj * nrows + ii + 6] = in_b[(ii + 6)*nbyte_row + jj];
             out_b[jj * nrows + ii + 7] = in_b[(ii + 7)*nbyte_row + jj];
+            if (transpose_bits) {
+                uint64_t x, t;
+                memcpy(&x, out_b + jj * 8, 8);
+                TRANS_BIT_8X8(x, t);
+                memcpy(out_b + jj * 8, &x, 8);
+            }
         }
     }
     return size * elem_size;
 }
 
+int64_t bshuf_trans_byte_bitrow_NEON(const void* in, void* out, const size_t size,
+         const size_t elem_size) {
+    return trans_byte_bitrow_NEON(in, out, size, elem_size, false);
+}
 
 /* Shuffle bits within the bytes of eight element blocks. */
 int64_t bshuf_shuffle_bit_eightelem_NEON(const void* in, void* out, const size_t size,
@@ -434,7 +508,7 @@ int64_t bshuf_shuffle_bit_eightelem_NEON(const void* in, void* out, const size_t
 
     // With a bit of care, this could be written such that such that it is
     // in_buf = out_buf safe.
-    const char* in_b = (const char*) in;
+    const int8_t* in_b = (const int8_t*) in;
     uint16_t* out_ui16 = (uint16_t*) out;
 
     size_t ii, jj, kk;
@@ -467,15 +541,22 @@ int64_t bshuf_shuffle_bit_eightelem_NEON(const void* in, void* out, const size_t
 int64_t bshuf_untrans_bit_elem_NEON(const void* in, void* out, const size_t size,
          const size_t elem_size, void* tmp_buf) {
 
-    int64_t count;
-
     CHECK_MULT_EIGHT(size);
 
-    count = bshuf_trans_byte_bitrow_NEON(in, tmp_buf, size, elem_size);
-    CHECK_ERR(count);
-    count =  bshuf_shuffle_bit_eightelem_NEON(tmp_buf, out, size, elem_size);
-
-    return count;
+    if (elem_size == 1) {
+        return trans_byte_bitrow_NEON(in, out, size, 1, true);
+    }
+    if ((elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+        && size <= INT32_MAX / elem_size) {
+        for (size_t j = 0; j < elem_size; ++j) {
+            /* Fuse bitrow gathering and bit transpose into one byte plane. */
+            trans_byte_bitrow_NEON((const uint8_t*)in + j * size,
+                                   (uint8_t*)tmp_buf + j * size, size, 1, true);
+        }
+        unshuffle_neon((int32_t)elem_size, (int32_t)(size * elem_size), tmp_buf, out);
+        return size * elem_size;
+    }
+    return bshuf_untrans_bit_elem_scal(in, out, size, elem_size, tmp_buf);
 }
 
 const bool is_bshuf_NEON = true;
