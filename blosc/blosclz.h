@@ -19,7 +19,7 @@
 
 #include "context.h"
 
-#define BLOSCLZ_VERSION_STRING "2.5.3"
+#define BLOSCLZ_VERSION_STRING "2.6.0"
 
 /* Per-thread hash table reused across (independent) blocks, avoiding the
  * table memsets and the 64 KB stack frame.  Must be zero-initialized. */

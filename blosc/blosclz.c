@@ -538,20 +538,12 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
                                         int maxout, uint32_t htab[], blosclz_state* state, const int tagged) {
   uint8_t* ibase = (uint8_t*)input;
 
-  /* When we go back in a match (shift), we obtain quite different compression properties.
-   * It looks like 4 is more useful in combination with bitshuffle and small typesizes
-   * Fallback to 4 because it provides more consistent results for large cratios.
-   * UPDATE: new experiments show that using a value of 3 is a bit better, at least for ERA5.
-   * UPDATE 2: go back to 4, as they seem to provide better cratios in general.
-   *
-   * In this block we also check cratios for the beginning of the buffers and
-   * eventually discard those that are small (take too long to decompress).
-   * This process is called _entropy probing_.
-   */
-  /* Level 1 favors the short periodic matches produced by synthetic ramps.
-   * Keep the established ratio/decompression tradeoff at higher levels. */
-  unsigned ipshift = clevel == 1 ? 3 : 4;
-  // Minimum lengths for encoding (normally it is good to match the shift value)
+  /* Keep match coverage and boundary positioning consistent across levels.
+   * A shift of 4 truncates matches further and can disrupt periodic byte deltas,
+   * reducing both compression ratio and speed on floating-point ramps. */
+  unsigned ipshift = 3;
+  /* Retain the higher-level minimum: accepting more short matches can prevent
+   * finding longer matches and increase decompression work. */
   unsigned minlen = clevel == 1 ? 3 : 4;
 
   /* Grow the table gradually from 1 KB at level 1 to 64 KB at level 7.
@@ -698,16 +690,7 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
     htab[hval] = (uint32_t) (ip++ - ibase) + base;
-    if (clevel == 9) {
-      // In some situations, including a second hash proves to be useful,
-      // but not in others.  Activating here in max clevel only.
-      seq >>= 8U;
-      HASH_FUNCTION(hval, seq, hashlog)
-      htab[hval] = (uint32_t) (ip++ - ibase) + base;
-    }
-    else {
-      ip++;
-    }
+    ip++;
 
     if (BLOSCLZ_UNLIKELY(op_limit - op < 1))
       goto out;
