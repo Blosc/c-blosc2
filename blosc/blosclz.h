@@ -21,6 +21,17 @@
 
 #define BLOSCLZ_VERSION_STRING "2.5.3"
 
+/* Per-thread hash table reused across (independent) blocks, avoiding the
+ * table memsets and the 64 KB stack frame.  Must be zero-initialized. */
+typedef struct {
+  uint32_t base;    /* entries below base are stale (from previous blocks) */
+  uint32_t tagged;  /* use base tags instead of clearing (hint from last probe) */
+  uint32_t htab[1U << 14];
+} blosclz_state;
+
+int blosclz_compress_state(int clevel, const void* input, int length,
+                           void* output, int maxout, blosclz_state* state);
+
 /**
   Compress a block of data in the input buffer and returns the size of
   compressed block. The size of input buffer is specified by

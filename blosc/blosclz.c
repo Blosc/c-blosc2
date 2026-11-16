@@ -401,8 +401,20 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 }
 
 
+/* Hash entries are stored as position + base.  Entries below base belong to
+ * a previous pass and read as position 0, exactly like a zeroed table.  With
+ * no state, base is always 0 and the table is memset as usual. */
+#define HTAB_GET(entry, base) (tagged ? ((entry) >= (base) ? (entry) - (base) : 0) : (entry))
+
+#if defined(_MSC_VER)
+#define BLOSCLZ_ALWAYS_INLINE static __forceinline
+#else
+#define BLOSCLZ_ALWAYS_INLINE static inline __attribute__((always_inline))
+#endif
+
 // Get a guess for the compressed size of a buffer
-static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, uint32_t htab[], int8_t hashlog) {
+BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, uint32_t htab[],
+                                        int8_t hashlog, uint32_t base, const int tagged) {
   uint8_t* ip = ibase;
   int32_t oc = 0;
   const uint16_t hashlen = (1U << (uint8_t)hashlog);
@@ -414,8 +426,6 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, ui
   uint8_t* ip_bound = ibase + limit - 1;
   uint8_t* ip_limit = ibase + limit - 12;
 
-  // Initialize the hash table to distances of 0
-  memset(htab, 0, hashlen * sizeof(uint32_t));
 
   /* we start with literal copy */
   copy = 4;
@@ -430,13 +440,13 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, ui
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
-    ref = ibase + htab[hval];
+    ref = ibase + HTAB_GET(htab[hval], base);
 
     /* calculate distance to the match */
     distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
-    htab[hval] = (uint32_t) (anchor - ibase);
+    htab[hval] = (uint32_t) (anchor - ibase) + base;
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL2(ip, anchor, copy)
@@ -493,7 +503,7 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, ui
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
-    htab[hval] = (uint32_t)(ip++ - ibase);
+    htab[hval] = (uint32_t)(ip++ - ibase) + base;
     ip++;
     /* assuming literal copy */
     oc++;
@@ -504,11 +514,29 @@ static double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, ui
 }
 
 
-int blosclz_compress(const int clevel, const void* input, int length,
-                     void* output, int maxout, blosc2_context* ctx) {
-  BLOSC_UNUSED_PARAM(ctx);
+
+BLOSCLZ_ALWAYS_INLINE uint32_t htab_reset(uint32_t htab[], uint8_t hashlog, blosclz_state* state, int span,
+                                          const int tagged) {
+  if (!tagged) {
+    memset(htab, 0, (1U << hashlog) * sizeof(uint32_t));
+    /* untagged entries (< span) must look stale to the next tagged pass */
+    if (state != NULL && state->base < (uint32_t)span) {
+      state->base = (uint32_t)span;
+    }
+    return 0;
+  }
+  if (state->base > UINT32_MAX - (uint32_t)span) {
+    memset(state->htab, 0, sizeof(state->htab));
+    state->base = 0;
+  }
+  uint32_t base = state->base;
+  state->base += (uint32_t)span;
+  return base;
+}
+
+BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int length, void* output,
+                                        int maxout, uint32_t htab[], blosclz_state* state, const int tagged) {
   uint8_t* ibase = (uint8_t*)input;
-  uint32_t htab[1U << (uint8_t)HASH_LOG];
 
   /* When we go back in a match (shift), we obtain quite different compression properties.
    * It looks like 4 is more useful in combination with bitshuffle and small typesizes
@@ -550,7 +578,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
   // Start probing somewhere inside the buffer
   int shift = length - maxlen;
   // Actual entropy probing!
-  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift, htab, hashlog);
+  uint32_t base = htab_reset(htab, hashlog, state, maxlen, tagged);
+  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift, htab, hashlog, base, tagged);
+  if (state != NULL) {
+    /* Tagged lookups cost a bit per hash probe; they only pay off when skipping
+     * the (large) table clear matters, i.e. on very compressible data. */
+    state->tagged = clevel >= 4 && cratio >= 8.0;
+  }
   // discard probes with small compression ratios (too expensive)
   double cratio_[10] = {0, 2, 1.5, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
   if (cratio < cratio_[clevel]) {
@@ -572,7 +606,7 @@ int blosclz_compress(const int clevel, const void* input, int length,
   }
 
   // Initialize the hash table
-  memset(htab, 0, (1U << hashlog) * sizeof(uint32_t));
+  base = htab_reset(htab, hashlog, state, length, tagged);
 
   /* we start with literal copy */
   copy = 4;
@@ -591,13 +625,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* find potential match */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
-    ref = ibase + htab[hval];
+    ref = ibase + HTAB_GET(htab[hval], base);
 
     /* calculate distance to the match */
     distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
-    htab[hval] = (uint32_t) (anchor - ibase);
+    htab[hval] = (uint32_t) (anchor - ibase) + base;
 
     if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
       LITERAL(ip, op, op_limit, anchor, copy)
@@ -663,13 +697,13 @@ int blosclz_compress(const int clevel, const void* input, int length,
     /* update the hash at match boundary */
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
-    htab[hval] = (uint32_t) (ip++ - ibase);
+    htab[hval] = (uint32_t) (ip++ - ibase) + base;
     if (clevel == 9) {
       // In some situations, including a second hash proves to be useful,
       // but not in others.  Activating here in max clevel only.
       seq >>= 8U;
       HASH_FUNCTION(hval, seq, hashlog)
-      htab[hval] = (uint32_t) (ip++ - ibase);
+      htab[hval] = (uint32_t) (ip++ - ibase) + base;
     }
     else {
       ip++;
@@ -706,6 +740,21 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
   out:
   return 0;
+}
+
+int blosclz_compress(const int clevel, const void* input, int length,
+                     void* output, int maxout, blosc2_context* ctx) {
+  BLOSC_UNUSED_PARAM(ctx);
+  uint32_t htab[1U << HASH_LOG];
+  return compress_impl(clevel, input, length, output, maxout, htab, NULL, 0);
+}
+
+int blosclz_compress_state(const int clevel, const void* input, int length,
+                           void* output, int maxout, blosclz_state* state) {
+  if (state->tagged) {
+    return compress_impl(clevel, input, length, output, maxout, state->htab, state, 1);
+  }
+  return compress_impl(clevel, input, length, output, maxout, state->htab, state, 0);
 }
 
 // See https://habr.com/en/company/yandex/blog/457612/

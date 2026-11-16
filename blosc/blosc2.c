@@ -1657,8 +1657,14 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
       cbytes = (int32_t)neblock;
     }
     else if (context->compcode == BLOSC_BLOSCLZ) {
-      cbytes = blosclz_compress(context->clevel, _src + j * neblock,
-                                (int)neblock, dest, maxout, context);
+      if (thread_context->blosclz_state == NULL) {
+        thread_context->blosclz_state = calloc(1, sizeof(blosclz_state));
+      }
+      cbytes = thread_context->blosclz_state != NULL ?
+               blosclz_compress_state(context->clevel, _src + j * neblock, (int)neblock,
+                                      dest, maxout, thread_context->blosclz_state) :
+               blosclz_compress(context->clevel, _src + j * neblock, (int)neblock,
+                                dest, maxout, context);
     }
     else if (context->compcode == BLOSC_LZ4) {
       cbytes = lz4_wrap_compress((char*)_src + j * neblock, (size_t)neblock,
@@ -2579,6 +2585,7 @@ static int init_thread_context(struct thread_context* thread_context, blosc2_con
   thread_context->owner_pool = NULL;
   thread_context->tid = tid;
   thread_context->serial = false;
+  thread_context->blosclz_state = NULL;
 
   int32_t blocksize = context != NULL ? context->blocksize : 0;
   int32_t typesize = context != NULL ? context->typesize : 0;
@@ -2618,6 +2625,7 @@ create_thread_context(blosc2_context* context, int32_t tid) {
 /* free members of thread_context, but not thread_context itself */
 static void destroy_thread_context(struct thread_context* thread_context) {
   my_free(thread_context->tmp);
+  free(thread_context->blosclz_state);
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     ZSTD_freeCCtx(thread_context->zstd_cctx);
@@ -6723,7 +6731,8 @@ static tmp_cache_t *tmp_cache_get(bool create) {
 #if !defined(_WIN32)
 /* Bytes held by a thread_context: temporaries and codec state */
 static size_t thread_context_nbytes(const struct thread_context* thread_context) {
-  size_t nbytes = thread_context->tmp_nbytes;
+  size_t nbytes = thread_context->tmp_nbytes +
+                  (thread_context->blosclz_state != NULL ? sizeof(blosclz_state) : 0);
 #if defined(HAVE_ZSTD)
   if (thread_context->zstd_cctx != NULL) {
     nbytes += ZSTD_sizeof_CCtx(thread_context->zstd_cctx);

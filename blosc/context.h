@@ -158,6 +158,7 @@ struct thread_context {
   void* lz4_cstream;   /* LZ4_stream_t* pre-loaded with dict; NULL when no dict active */
   void* lz4hc_cstream; /* LZ4_streamHC_t* pre-loaded with dict; NULL when no dict active */
   uint32_t my_job_seq;  /* last job_seq processed; used by BLOSC_BACKEND_PER_CONTEXT on Windows */
+  void* blosclz_state;  /* blosclz_state*, lazily allocated */
 };
 
 static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
