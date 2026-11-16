@@ -618,6 +618,22 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
     seq = BLOSCLZ_READU32(ip);
     HASH_FUNCTION(hval, seq, hashlog)
     ref = ibase + HTAB_GET(htab[hval], base);
+    /* With no pending literals, try the position following the previous
+     * occurrence of ip[-1..2].  Its alignment can break a chain of short
+     * matches on periodic data even when the ordinary candidate also matches.
+     * Read the old entry before updating it, then reload the ordinary candidate:
+     * the two hashes can share a slot. */
+    if (copy == 0 && ip > ibase + 4 && ip_bound - ip >= 8) {
+      uint32_t prevhash;
+      HASH_FUNCTION(prevhash, BLOSCLZ_READU32(ip - 1), hashlog)
+      const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
+      htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
+      ref = ibase + HTAB_GET(htab[hval], base);
+      if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
+          memcmp(candidate, ip, 8) == 0) {
+        ref = candidate;
+      }
+    }
 
     /* calculate distance to the match */
     distance = (unsigned int)(anchor - ref);
@@ -686,11 +702,9 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
       }
     }
 
-    /* update the hash at match boundary */
-    seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, hashlog)
-    htab[hval] = (uint32_t) (ip++ - ibase) + base;
-    ip++;
+    /* Advance past the biased match length.  Update the boundary hashes on
+     * the next iteration, preserving the old ip-1 entry for the extra candidate. */
+    ip += 2;
 
     if (BLOSCLZ_UNLIKELY(op_limit - op < 1))
       goto out;
