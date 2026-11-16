@@ -1335,8 +1335,9 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     int32_t output_typesize_actual = (preparams.output_typesize > 0) ? preparams.output_typesize : typesize;
     int32_t output_size = nelems * output_typesize_actual;  // output size in bytes
     preparams.output_typesize = output_typesize_actual;  // ensure it's set
-    /* Set unwritten values to zero */
-    if (!output_is_disposable) {
+    /* Legacy callbacks may leave bytes unwritten or accumulate into the output.
+     * Only audited full-write callbacks may bypass this initialization. */
+    if (!output_is_disposable && !context->prefilter_full_write) {
       memset(_dest, 0, output_size);
     }
     preparams.input = _src;
@@ -7362,6 +7363,15 @@ int blosc2_ctx_get_dparams(blosc2_context *ctx, blosc2_dparams *dparams) {
   dparams->postparams = ctx->postparams;
   dparams->typesize = ctx->typesize;
 
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+
+int blosc2_set_prefilter_full_write(blosc2_context *ctx, bool enabled) {
+  if (ctx == NULL || !ctx->do_compress || (enabled && ctx->prefilter == NULL)) {
+    return BLOSC2_ERROR_INVALID_PARAM;
+  }
+  ctx->prefilter_full_write = enabled;
   return BLOSC2_ERROR_SUCCESS;
 }
 

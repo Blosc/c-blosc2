@@ -112,6 +112,7 @@ struct blosc2_context_s {
   blosc2_pthread_mutex_t jobs_mutex;    /* guards job_seq, end_threads, active_workers */
   blosc2_pthread_cond_t jobs_ready;     /* workers sleep here between jobs */
   blosc2_pthread_cond_t jobs_done;      /* main sleeps here until job completes */
+  bool prefilter_full_write;           /* prefilter initializes every physical output byte */
   // Add new fields here to avoid breaking the ABI.
 };
 

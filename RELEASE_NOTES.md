@@ -1,8 +1,14 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.6.2 to 3.6.3
+Changes from 3.6.2 to 3.7.0
 ===========================
+
+* Add a context-level full-write opt-in for prefilters, avoiding output zeroing
+  only when the callback initializes every physical output byte. B2ND slice
+  gathering uses it for fully overwritten blocks while preserving old contents
+  or clearing partial/padding blocks. Existing prefilters retain zero-initialization;
+  public parameter struct layouts and the compressed format are unchanged.
 
 * Reuse worker-local LZ4 compression state for independent blocks when using
   bundled LZ4; external LZ4 retains its existing compressor entry point.

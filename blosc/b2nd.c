@@ -1127,9 +1127,8 @@ typedef struct {
   const int64_t *blocks_in_chunk;
   const int64_t *blockshape;  // that of the array, in 64 bits
   // A write of a chunk that is only partly overwritten: blocks start from the
-  // old contents, decompressed into the compressor input.  Otherwise blocks
-  // start as zeros (the prefilter output comes zeroed), which is what padding
-  // must hold.
+  // old contents, decompressed into the compressor input.  Otherwise partial
+  // and padding blocks start as zeros, which is what padding must hold.
   bool keep_old;
 } slice_chunk_t;
 
@@ -1321,8 +1320,12 @@ static int slice_gather_prefilter(blosc2_prefilter_params *params) {
   }
   block_overlap_t overlap;
   bool overlaps = block_slice_overlap(c, params->nblock, &overlap);
-  if (c->keep_old && !(overlaps && overlap.whole_block)) {
-    memcpy(params->output, params->input, (size_t) params->output_size);
+  if (!(overlaps && overlap.whole_block)) {
+    if (c->keep_old) {
+      memcpy(params->output, params->input, (size_t) params->output_size);
+    } else {
+      memset(params->output, 0, (size_t) params->output_size);
+    }
   }
   if (!overlaps) {
     return 0;
@@ -1353,16 +1356,21 @@ static int compress_update_chunk(b2nd_array_t *array, int64_t nchunk, const uint
   blosc2_context *cctx = array->sc->cctx;
   blosc2_prefilter_params params;
   blosc2_prefilter_params *saved_preparams = cctx->preparams;
+  bool saved_full_write = cctx->prefilter_full_write;
   if (gather != NULL) {
     memset(&params, 0, sizeof(params));
     params.user_data = gather;
     cctx->prefilter = slice_gather_prefilter;
     cctx->preparams = &params;
+    /* The gather callback copies old contents or clears partial/padding blocks;
+     * a whole-block slice copy needs no preliminary memset. */
+    cctx->prefilter_full_write = true;
   }
   int brc = blosc2_compress_ctx(cctx, src, nbytes, chunk, chunk_nbytes);
   if (gather != NULL) {
     cctx->prefilter = NULL;
     cctx->preparams = saved_preparams;
+    cctx->prefilter_full_write = saved_full_write;
   }
   if (brc < 0) {
     blosc2_tmp_free(chunk, chunk_capacity);

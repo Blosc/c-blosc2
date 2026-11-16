@@ -82,10 +82,10 @@ extern "C" {
 
 /* Version numbers */
 #define BLOSC2_VERSION_MAJOR    3  /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    6  /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  3  /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MINOR    7  /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  0  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.6.3.dev"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_STRING   "3.7.0.dev"  /* string version.  Sync with above! */
 #define BLOSC2_VERSION_DATE     "$Date:: 2026-11-12 #$"    /* date version year-month-day */
 
 
@@ -1352,6 +1352,25 @@ static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL, 8};
  * @sa #blosc2_compress
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
+
+/**
+ * @brief Opt a compression context's prefilter out of output zero-initialization.
+ * @since 3.7.0
+ *
+ * With @p enabled true, the prefilter must initialize every byte of
+ * `params->output[0..params->output_size)` on each successful call whose output
+ * is retained, including padding and skipped blocks. It must not rely on the
+ * output's previous contents. This does not make the output disposable.
+ *
+ * The default is false, preserving zero-initialization for existing callbacks.
+ * Configure this only while the context is idle. The setting is context-local:
+ * it is not copied by blosc2_ctx_get_cparams() and must be reapplied after
+ * recreating a context. Disabling it restores the default behavior.
+ *
+ * @return 0 on success; BLOSC2_ERROR_INVALID_PARAM for a NULL or decompression
+ * context, or when enabling the setting without a prefilter.
+ */
+BLOSC_EXPORT int blosc2_set_prefilter_full_write(blosc2_context *ctx, bool enabled);
 
 /**
  * @brief Create a context for *_ctx() decompression functions.

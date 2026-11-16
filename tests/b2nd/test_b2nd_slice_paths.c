@@ -16,6 +16,7 @@
    buffers larger than the slice, one and several threads. */
 
 #include "test_common.h"
+#include "context.h"
 
 #define NSLICES 6
 
@@ -72,6 +73,44 @@ static bool check_slice(int8_t ndim, const int64_t *shape, const uint32_t *ref,
     }
   }
   return true;
+}
+
+/* Check the stored block layout too: logical reads hide unwritten padding. */
+static bool check_physical(const b2nd_array_t *array, const uint32_t *ref) {
+  uint32_t *raw = malloc((size_t)array->sc->chunksize);
+  if (raw == NULL) {
+    return false;
+  }
+  bool ok = true;
+  for (int64_t chunk = 0; ok && chunk < array->sc->nchunks; ++chunk) {
+    if (blosc2_schunk_decompress_chunk(array->sc, chunk, raw, array->sc->chunksize) !=
+        array->sc->chunksize) {
+      ok = false;
+      break;
+    }
+    for (int64_t k = 0; k < array->extchunknitems; ++k) {
+      int64_t chunk_index = chunk, block_index = k / array->blocknitems;
+      int64_t lane = k % array->blocknitems, pos[B2ND_MAX_DIM];
+      bool padding = false;
+      for (int d = array->ndim - 1; d >= 0; --d) {
+        int64_t nchunks = (array->shape[d] + array->chunkshape[d] - 1) / array->chunkshape[d];
+        int64_t nblocks = array->extchunkshape[d] / array->blockshape[d];
+        int64_t local = (block_index % nblocks) * array->blockshape[d] + lane % array->blockshape[d];
+        pos[d] = (chunk_index % nchunks) * array->chunkshape[d] + local;
+        padding |= local >= array->chunkshape[d] || pos[d] >= array->shape[d];
+        chunk_index /= nchunks;
+        block_index /= nblocks;
+        lane /= array->blockshape[d];
+      }
+      uint32_t expected = padding ? 0 : ref[c_index(array->ndim, array->shape, pos)];
+      if (raw[k] != expected) {
+        ok = false;
+        break;
+      }
+    }
+  }
+  free(raw);
+  return ok;
 }
 
 CUTEST_TEST_SETUP(slice_paths) {
@@ -146,6 +185,22 @@ CUTEST_TEST_TEST(slice_paths) {
   b2nd_array_t *array;
   B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &array, ref, nitems * typesize));
 
+  /* A compression failure must not leave the temporary gather callback or its
+   * initialization opt-in attached to the shared compression context. */
+  if (!params.delta) {
+    blosc2_context *cctx = array->sc->cctx;
+    int saved_compcode = cctx->compcode;
+    blosc2_prefilter_params *saved_preparams = cctx->preparams;
+    cctx->compcode = -1;
+    int rc = b2nd_set_slice_cbuffer(ref, shapes.shape, nitems * typesize,
+                                  shapes.start[1], shapes.stop[1], array);
+    cctx->compcode = saved_compcode;
+    CUTEST_ASSERT("invalid codec did not fail the slice write", rc < 0);
+    CUTEST_ASSERT("failed gather leaked its prefilter", cctx->prefilter == NULL);
+    CUTEST_ASSERT("failed gather leaked its parameters", cctx->preparams == saved_preparams);
+    CUTEST_ASSERT("failed gather leaked its full-write opt-in", !cctx->prefilter_full_write);
+  }
+
   for (int s = 0; s < NSLICES; ++s) {
     const int64_t *start = shapes.start[s];
     const int64_t *stop = shapes.stop[s];
@@ -178,6 +233,8 @@ CUTEST_TEST_TEST(slice_paths) {
       big[k] = (uint32_t) (k * 13 + s + 3);
     }
     B2ND_TEST_ASSERT(b2nd_set_slice_cbuffer(big, bigshape, nbig * typesize, start, stop, array));
+    CUTEST_ASSERT("gather leaked its full-write opt-in",
+                  !array->sc->cctx->prefilter_full_write);
     for (int64_t k = 0; k < n; ++k) {
       int64_t pos[B2ND_MAX_DIM];
       int64_t bpos[B2ND_MAX_DIM];
@@ -195,6 +252,7 @@ CUTEST_TEST_TEST(slice_paths) {
     B2ND_TEST_ASSERT(b2nd_to_cbuffer(array, all, nitems * typesize));
     CUTEST_ASSERT("set_slice is wrong",
                   check_slice(ndim, shapes.shape, ref, zeros, shapes.shape, shapes.shape, all));
+    CUTEST_ASSERT("set_slice left incorrect physical data or padding", check_physical(array, ref));
     free(all);
   }
 
