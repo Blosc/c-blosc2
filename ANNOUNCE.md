@@ -1,14 +1,19 @@
-# Announcing C-Blosc2 3.6.2
+# Announcing C-Blosc2 3.7.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a maintenance release that updates the bundled LZ4 codec from
-version 1.10.0 to 1.11.1.
+C-Blosc2 3.7.0 speeds up compression and decompression and improves the
+handling of special-value and lazy chunks.
 
-Key highlights include:
-
-- **Update bundled LZ4**: Upgraded internal LZ4 sources to version 1.11.1.
+- Faster SIMD shuffle and bitshuffle, with fused SHUFFLE+BYTEDELTA enabled
+  by default.
+- BloscLZ 2.6.0 improves matching on periodic data and decoding on ARM64.
+  Bundled LZ4 reuses worker compression state.
+- The new `blosc2_set_prefilter_full_write()` lets prefilters that write every
+  output byte skip zero-initialization.
+- Chunk decoding validates special-value buffer sizes and resizes worker
+  scratch buffers when element widths grow.
 
 For more info, see the release notes in:
 

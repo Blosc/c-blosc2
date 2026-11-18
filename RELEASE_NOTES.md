@@ -4,17 +4,25 @@ Release notes for C-Blosc2
 Changes from 3.6.2 to 3.7.0
 ===========================
 
-* Add a context-level full-write opt-in for prefilters, avoiding output zeroing
-  only when the callback initializes every physical output byte. B2ND slice
-  gathering uses it for fully overwritten blocks while preserving old contents
-  or clearing partial/padding blocks. Existing prefilters retain zero-initialization;
-  public parameter struct layouts and the compressed format are unchanged.
-
-* Reuse worker-local LZ4 compression state for independent blocks when using
-  bundled LZ4; external LZ4 retains its existing compressor entry point.
-* Reduce dynamic block-scheduling lock acquisitions by claiming the next block
-  while reserving compressed output, preserving cancellation and error handling.
-  Public APIs and prefilter zero-initialization are unchanged.
+* **Faster shuffle and bitshuffle**. Speed up shuffle and unshuffle for 2-, 4-,
+  8-, and 16-byte elements on NEON, SSE2, and AVX2. Accelerate bitshuffle and
+  bitunshuffle with SIMD, including a bitshuffle fast path for constant
+  byte-plane prefixes. Enable fused SHUFFLE+BYTEDELTA by default and extend
+  it to SSSE3 and 2-byte groups.
+* **BloscLZ 2.6.0**. Improve match finding on periodic filtered data, reuse
+  worker-local hash tables, and speed up decoding on ARM64.
+* **Less worker setup and synchronization**. Reuse compression state for
+  independent blocks with bundled LZ4, and claim the next block while reserving
+  compressed output to reduce scheduler lock acquisitions.
+* **Full-write prefilters**. The new `blosc2_set_prefilter_full_write()` lets a
+  compression context skip zero-initializing prefilter output when the callback
+  writes every byte it returns, including padding. Existing prefilters still
+  receive zeroed output by default. B2ND slice gathering uses the opt-in for
+  fully overwritten blocks.
+* **Safer chunk decoding**. Validate the stored size of special-value chunks
+  against the supplied buffer even when the lazy flag is set (#881). Size
+  worker scratch buffers for both the block size and element width, and handle
+  allocation failures so later jobs can retry (#882).
 
 Changes from 3.6.1 to 3.6.2
 ===========================

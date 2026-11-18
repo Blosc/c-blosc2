@@ -19,6 +19,8 @@ using the global lock.
 
 .. doxygenfunction:: blosc2_create_cctx
 
+.. doxygenfunction:: blosc2_set_prefilter_full_write
+
 .. doxygenfunction:: blosc2_create_dctx
 
 .. doxygenfunction:: blosc2_free_ctx
