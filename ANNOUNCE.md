@@ -3,13 +3,14 @@ A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-C-Blosc2 3.7.0 speeds up compression and decompression and improves the
-handling of special-value and lazy chunks.
+We have put considerable love in speeding up compression and decompression,
+specially for SIMD instructions in existing filters.  We also improved the
+handling of special-value and lazy chunks and did some fixes too.
 
 - Faster SIMD shuffle and bitshuffle, with fused SHUFFLE+BYTEDELTA enabled
   by default.
-- BloscLZ 2.6.0 improves matching on periodic data and adds decoder fast paths
-  on ARM64 and AMD64. Bundled LZ4 reuses worker compression state.
+- New BloscLZ 2.6.0 improves matching on periodic data and adds decoder fast
+  paths on ARM64 and AMD64. Bundled LZ4 reuses worker compression state.
 - The new `blosc2_set_prefilter_full_write()` lets prefilters that write every
   output byte skip zero-initialization.
 - Chunk decoding validates special-value buffer sizes and resizes worker
