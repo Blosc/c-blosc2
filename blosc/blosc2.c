@@ -2688,10 +2688,8 @@ static int check_nthreads(blosc2_context* context, bool start_backend) {
   return context->nthreads;
 }
 
-/* Make the temporaries of `thread_context` big enough for the blocks of
-   `context`.  They only grow: the serial thread_context of an OS thread serves
-   contexts with different block sizes and typesizes, so the check is on bytes
-   (one block plus 4 * typesize per region), not on the block size alone. */
+/* Scratch capacity depends on both block size and typesize: each region
+   holds one block plus 4 * typesize bytes. */
 static int fit_thread_context(struct thread_context* thread_context, blosc2_context* context) {
   int32_t ebsize = context->blocksize + context->typesize * (int32_t)sizeof(int32_t);
   if ((size_t)4 * ebsize <= thread_context->tmp_nbytes) {
@@ -5324,15 +5322,14 @@ static void t_blosc_do_job(void *ctxt)
   srcsize = context->srcsize;
   dest = context->dest;
 
-  /* Resize the temporaries if needed (on bytes: they depend on the typesize too) */
-  if ((size_t)4 * ebsize > thcontext->tmp_nbytes) {
-    my_free(thcontext->tmp);
-    thcontext->tmp_nbytes = (size_t)4 * ebsize;
-    thcontext->tmp = my_malloc(thcontext->tmp_nbytes);
-    thcontext->tmp2 = thcontext->tmp + ebsize;
-    thcontext->tmp3 = thcontext->tmp2 + ebsize;
-    thcontext->tmp4 = thcontext->tmp3 + ebsize;
-    thcontext->tmp_blocksize = blocksize;
+  if (fit_thread_context(thcontext, context) < 0) {
+    blosc2_pthread_mutex_lock(&context->count_mutex);
+    context->thread_giveup_code = BLOSC2_ERROR_MEMORY_ALLOC;
+    blosc2_pthread_mutex_unlock(&context->count_mutex);
+    if (!compress) {
+      delta_release_dref(context);
+    }
+    return;
   }
 
   tmp = thcontext->tmp;
@@ -5468,26 +5465,6 @@ static void t_blosc_do_job(void *ctxt)
 
 #else  /* !_WIN32 */
 
-static int ensure_thread_context_capacity(struct thread_context* thread_context, blosc2_context* context) {
-  int32_t blocksize = context->blocksize;
-  int32_t ebsize = blocksize + context->typesize * (int32_t)sizeof(int32_t);
-
-  /* Pool workers serve contexts with different typesizes: check on bytes */
-  if ((size_t)4 * ebsize <= thread_context->tmp_nbytes) {
-    return 0;
-  }
-
-  my_free(thread_context->tmp);
-  thread_context->tmp_nbytes = (size_t)4 * ebsize;
-  thread_context->tmp = my_malloc(thread_context->tmp_nbytes);
-  BLOSC_ERROR_NULL(thread_context->tmp, BLOSC2_ERROR_MEMORY_ALLOC);
-  thread_context->tmp2 = thread_context->tmp + ebsize;
-  thread_context->tmp3 = thread_context->tmp2 + ebsize;
-  thread_context->tmp4 = thread_context->tmp3 + ebsize;
-  thread_context->tmp_blocksize = blocksize;
-  return 0;
-}
-
 static int32_t claim_job_block(struct blosc_job_group *job) {
   int32_t nblock_;
   blosc2_pthread_mutex_lock(&job->mutex);
@@ -5533,7 +5510,7 @@ static void t_blosc_do_job(void *ctxt) {
   srcsize = context->srcsize;
   dest = context->dest;
 
-  if (ensure_thread_context_capacity(thcontext, context) < 0) {
+  if (fit_thread_context(thcontext, context) < 0) {
     blosc2_pthread_mutex_lock(&job->mutex);
     job->giveup_code = BLOSC2_ERROR_MEMORY_ALLOC;
     blosc2_pthread_mutex_unlock(&job->mutex);
