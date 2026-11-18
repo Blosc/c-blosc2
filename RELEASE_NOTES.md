@@ -10,7 +10,7 @@ Changes from 3.6.2 to 3.7.0
   byte-plane prefixes. Enable fused SHUFFLE+BYTEDELTA by default and extend
   it to SSSE3 and 2-byte groups.
 * **BloscLZ 2.6.0**. Improve match finding on periodic filtered data, reuse
-  worker-local hash tables, and speed up decoding on ARM64.
+  worker-local hash tables, and enable decoder fast paths on ARM64 and AMD64.
 * **Less worker setup and synchronization**. Reuse compression state for
   independent blocks with bundled LZ4, and claim the next block while reserving
   compressed output to reduce scheduler lock acquisitions.

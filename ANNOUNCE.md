@@ -8,8 +8,8 @@ handling of special-value and lazy chunks.
 
 - Faster SIMD shuffle and bitshuffle, with fused SHUFFLE+BYTEDELTA enabled
   by default.
-- BloscLZ 2.6.0 improves matching on periodic data and decoding on ARM64.
-  Bundled LZ4 reuses worker compression state.
+- BloscLZ 2.6.0 improves matching on periodic data and adds decoder fast paths
+  on ARM64 and AMD64. Bundled LZ4 reuses worker compression state.
 - The new `blosc2_set_prefilter_full_write()` lets prefilters that write every
   output byte skip zero-initialization.
 - Chunk decoding validates special-value buffer sizes and resizes worker

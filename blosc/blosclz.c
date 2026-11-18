@@ -818,7 +818,11 @@ static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
   do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
 
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__x86_64__) || defined(_M_X64)
+#define BLOSCLZ_WIDE_DECODE
+#endif
+
+#ifdef BLOSCLZ_WIDE_DECODE
 /* The caller guarantees a distance and output slack of at least 16 bytes.
  * Keep each load/store ordered so overlapping matches propagate correctly. */
 static inline void wild_copy_16(uint8_t *out, const uint8_t *from, uint8_t *end) {
@@ -846,7 +850,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       const uint8_t* ref = op - ofs;
 
       if (len == 7 - 1) {
-#if defined(__aarch64__) || defined(_M_ARM64)
+#ifdef BLOSCLZ_WIDE_DECODE
         /* Long runs encode their lengths as consecutive 255-byte extensions.
          * Consume eight together, keeping an offset byte in reserve. */
         while (ip_limit - ip >= 9) {
@@ -914,7 +918,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         memset(op, *ref, len);
         op += len;
       }
-#if defined(__aarch64__) || defined(_M_ARM64)
+#ifdef BLOSCLZ_WIDE_DECODE
       else if ((op - ref >= 16) && (op_limit - op - len >= 16)) {
         wild_copy_16(op, ref, op + len);
         op += len;
@@ -951,8 +955,8 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         return 0;
       }
 
-#if defined(__aarch64__) || defined(_M_ARM64)
-      /* Fixed-size copies inline on ARM64.  Overcopy only within both buffers;
+#ifdef BLOSCLZ_WIDE_DECODE
+      /* Fixed-size copies can inline.  Overcopy only within both buffers;
        * subsequent tokens overwrite the extra output bytes. */
       if (ctrl <= 16 && op_limit - op >= 16 && ip_limit - ip >= 16) {
         memcpy(op, ip, 16);
