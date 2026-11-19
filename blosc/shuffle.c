@@ -396,7 +396,7 @@ static void set_host_implementation(void) {
     host_shuffle_bytedelta_forward = shuffle_bytedelta_ssse3_forward;
     host_shuffle_bytedelta_backward = shuffle_bytedelta_ssse3_backward;
   }
-#elif defined(__aarch64__) || defined(_M_ARM64)
+#elif defined(SHUFFLE_BYTEDELTA_NEON_ENABLED) && (defined(__aarch64__) || defined(_M_ARM64))
   host_shuffle_bytedelta_forward = shuffle_bytedelta_neon_forward;
   host_shuffle_bytedelta_backward = shuffle_bytedelta_neon_backward;
 #endif

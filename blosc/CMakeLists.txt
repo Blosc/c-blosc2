@@ -232,6 +232,9 @@ if(COMPILER_SUPPORT_ALTIVEC)
     list(APPEND SOURCES blosc/shuffle-altivec.c blosc/bitshuffle-altivec.c)
 endif()
 list(APPEND SOURCES blosc/shuffle.c)
+if(BUILD_PLUGINS)
+    set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_BYTEDELTA_NEON_ENABLED)
+endif()
 
 # Based on the target architecture and hardware features supported
 # by the C compiler, set hardware architecture optimization flags

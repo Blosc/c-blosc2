@@ -67,6 +67,13 @@ jobs:
             arch: arm64
             compiler: gcc
 
+          - name: Ubuntu GCC AARCH64 No Plugins
+            os: ubuntu-24.04-arm
+            compiler: gcc
+            cmake-args: >-
+              -D BUILD_PLUGINS=OFF -D BUILD_STATIC=OFF
+              -D CMAKE_SHARED_LINKER_FLAGS=-Wl,--no-undefined
+
           - name: Ubuntu Clang
             os: ubuntu-latest
             compiler: clang
