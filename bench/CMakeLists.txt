@@ -17,6 +17,7 @@ set(SOURCES_CFRAME create_frame.c)
 set(SOURCES_SFRAME sframe_bench.c)
 set(SOURCES_GET_SPARSE get_sparse.c)
 set(SOURCES_FRAME_LOCK frame_lock_bench.c)
+set(SOURCES_DICT_STORE dict_store_bench.c)
 
 add_subdirectory(b2nd)
 

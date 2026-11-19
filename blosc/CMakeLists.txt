@@ -11,6 +11,9 @@ add_definitions(-DUSING_CMAKE)
 
 set(version_string ${BLOSC2_VERSION_MAJOR}.${BLOSC2_VERSION_MINOR}.${BLOSC2_VERSION_PATCH})
 
+# Utils include directory
+list(APPEND BLOSC_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/utils" )
+
 # targets
 if(BUILD_SHARED)
     add_library(blosc2_shared SHARED)
@@ -190,6 +193,13 @@ list(APPEND SOURCES
     blosc/blosc2-stdio.c
     blosc/b2nd.c
     blosc/b2nd_utils.c
+    blosc/dict-store/dict-store.c
+    blosc/utils/ziputils.c
+    blosc/utils/miniz.c
+    blosc/utils/hash.c
+    blosc/utils/string_manipulation.c
+    blosc/utils/filesystem.c
+    blosc/utils/key.c
 )
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
@@ -223,14 +233,14 @@ list(APPEND SOURCES blosc/shuffle.c)
 if(COMPILER_SUPPORT_SSE2)
     include(CheckCCompilerFlag)
     # Probe for SSSE3 flags for various compilers
-    check_c_compiler_flag("-mssse3" COMPILER_HAS_mssse3) 
+    check_c_compiler_flag("-mssse3" COMPILER_HAS_mssse3)
     check_c_compiler_flag("/arch:SSSE3" COMPILER_HAS_arch_SSSE3)
-    if(COMPILER_HAS_mssse3) 
-        set(SSSE3_FLAG "-mssse3") 
-    elseif(COMPILER_HAS_arch_SSSE3) 
-        set(SSSE3_FLAG "/arch:SSSE3") 
-    else() 
-        set(SSSE3_FLAG "") 
+    if(COMPILER_HAS_mssse3)
+        set(SSSE3_FLAG "-mssse3")
+    elseif(COMPILER_HAS_arch_SSSE3)
+        set(SSSE3_FLAG "/arch:SSSE3")
+    else()
+        set(SSSE3_FLAG "")
     endif()
     if(MSVC)
         # MSVC targets SSE2 by default on 64-bit configurations, but not 32-bit configurations.
@@ -244,8 +254,8 @@ if(COMPILER_SUPPORT_SSE2)
                 shuffle-sse2.c bitshuffle-sse2.c blosclz.c fastcopy.c
                 PROPERTIES COMPILE_OPTIONS -msse2)
     endif()
-    if(SSSE3_FLAG) 
-        set_source_files_properties( ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}" COMPILE_DEFINITIONS "HAVE_SSSE3=1" ) 
+    if(SSSE3_FLAG)
+        set_source_files_properties( ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}" COMPILE_DEFINITIONS "HAVE_SSSE3=1" )
     endif()
 
     # Define a symbol for the shuffle-dispatch implementation
