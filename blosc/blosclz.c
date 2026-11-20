@@ -16,12 +16,21 @@
 
 #include "blosclz.h"
 #include "fastcopy.h"
+#include "shuffle.h"
 #include "blosc2/blosc2-common.h"
 
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+
+#if defined(_MSC_VER)
+#include <intrin.h>
+#endif
+
+#if defined(__AVX2__)
+#include <immintrin.h>
+#endif
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
@@ -65,62 +74,337 @@
   (v) = ((s) * 2654435761U) >> (32U - (h)); \
 }
 
-
-#if defined(__AVX2__)
-static uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-    uint8_t x = ip[-1];
-
-    while (ip < (ip_bound - (sizeof(__m256i)))) {
-        __m256i value, value2, cmp;
-        /* Broadcast the value for every byte in a 256-bit register */
-        memset(&value, x, sizeof(__m256i));
-        value2 = _mm256_loadu_si256((__m256i *)ref);
-        cmp = _mm256_cmpeq_epi64(value, value2);
-        if ((unsigned)_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
-            /* Return the byte that starts to differ */
-            while (*ref++ == x) ip++;
-            return ip;
-        }
-        else {
-            ip += sizeof(__m256i);
-            ref += sizeof(__m256i);
-        }
-    }
-    /* Look into the remainder */
-    while ((ip < ip_bound) && (*ref++ == x)) ip++;
-    return ip;
-}
+#if defined(_MSC_VER)
+#define BLOSCLZ_ALWAYS_INLINE static __forceinline
+#else
+#define BLOSCLZ_ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
 
-#if defined(__SSE2__)
-uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-  uint8_t x = ip[-1];
+#if defined(__GNUC__) || defined(__clang__)
+static inline unsigned blosclz_ctz32(uint32_t v) {
+  return (unsigned)__builtin_ctz(v);
+}
+static inline unsigned blosclz_ctz64(uint64_t v) {
+  return (unsigned)__builtin_ctzll(v);
+}
+#define BLOSCLZ_HAVE_CTZ32 1
+#define BLOSCLZ_HAVE_CTZ64 1
+#elif defined(_MSC_VER)
+static inline unsigned blosclz_ctz32(uint32_t v) {
+  unsigned long idx;
+  _BitScanForward(&idx, v);
+  return (unsigned)idx;
+}
+#define BLOSCLZ_HAVE_CTZ32 1
+#if defined(_M_X64) || defined(_M_ARM64)
+static inline unsigned blosclz_ctz64(uint64_t v) {
+  unsigned long idx;
+  _BitScanForward64(&idx, v);
+  return (unsigned)idx;
+}
+#define BLOSCLZ_HAVE_CTZ64 1
+#endif
+#endif
 
-  while (ip < (ip_bound - sizeof(__m128i))) {
-    __m128i value, value2, cmp;
-    /* Broadcast the value for every byte in a 128-bit register */
-    memset(&value, x, sizeof(__m128i));
-    value2 = _mm_loadu_si128((__m128i *)ref);
-    cmp = _mm_cmpeq_epi32(value, value2);
-    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Return the byte that starts to differ */
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__) && !defined(BLOSCLZ_BUILD_AVX2)
+int blosclz_compress_avx2(const int clevel, const void* input, int length,
+                          void* output, int maxout, blosc2_context* ctx);
+int blosclz_compress_state_avx2(const int clevel, const void* input, int length,
+                                void* output, int maxout, blosclz_state* state);
+#endif
+
+#if defined(__AVX2__)
+BLOSCLZ_ALWAYS_INLINE uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  uint8_t x = ip[-1];
+  /* Broadcast the run byte across all 32 lanes once outside the loop */
+  const __m256i value = _mm256_set1_epi8((char)x);
+  /* Scan long runs in 128-byte (4x32B) groups with a single reduction */
+  while (ip_bound - ip >= 128) {
+    __m256i cmp0 = _mm256_cmpeq_epi8(value, _mm256_loadu_si256((const __m256i *)ref));
+    __m256i cmp1 = _mm256_cmpeq_epi8(value, _mm256_loadu_si256((const __m256i *)(ref + 32)));
+    __m256i cmp2 = _mm256_cmpeq_epi8(value, _mm256_loadu_si256((const __m256i *)(ref + 64)));
+    __m256i cmp3 = _mm256_cmpeq_epi8(value, _mm256_loadu_si256((const __m256i *)(ref + 96)));
+    __m256i eq01 = _mm256_and_si256(cmp0, cmp1);
+    __m256i eq23 = _mm256_and_si256(cmp2, cmp3);
+    if ((uint32_t)_mm256_movemask_epi8(_mm256_and_si256(eq01, eq23)) != 0xFFFFFFFFU) {
+      /* Pinpoint the first differing byte directly from the compare vectors */
+      if ((uint32_t)_mm256_movemask_epi8(eq01) != 0xFFFFFFFFU) {
+        uint32_t m0 = (uint32_t)_mm256_movemask_epi8(cmp0);
+        if (m0 != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+          return ip + blosclz_ctz32(~m0);
+#else
+          while (*ref++ == x) ip++;
+          return ip;
+#endif
+        }
+        uint32_t m1 = (uint32_t)_mm256_movemask_epi8(cmp1);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 32 + blosclz_ctz32(~m1);
+#else
+        ip += 32;
+        ref += 32;
+        while (*ref++ == x) ip++;
+        return ip;
+#endif
+      }
+      uint32_t m2 = (uint32_t)_mm256_movemask_epi8(cmp2);
+      if (m2 != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 64 + blosclz_ctz32(~m2);
+#else
+        ip += 64;
+        ref += 64;
+        while (*ref++ == x) ip++;
+        return ip;
+#endif
+      }
+      uint32_t m3 = (uint32_t)_mm256_movemask_epi8(cmp3);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + 96 + blosclz_ctz32(~m3);
+#else
+      ip += 96;
+      ref += 96;
       while (*ref++ == x) ip++;
       return ip;
+#endif
     }
-    else {
-      ip += sizeof(__m128i);
-      ref += sizeof(__m128i);
-    }
+    ip += 128;
+    ref += 128;
   }
-  /* Look into the remainder */
+  /* Narrow 32-byte and 16-byte vector tails */
+  while (ip_bound - ip >= 32) {
+    __m256i cmp = _mm256_cmpeq_epi8(value, _mm256_loadu_si256((const __m256i *)ref));
+    uint32_t mask = (uint32_t)_mm256_movemask_epi8(cmp);
+    if (mask != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 32;
+    ref += 32;
+  }
+  if (ip_bound - ip >= 16) {
+    __m128i cmp = _mm_cmpeq_epi8(_mm256_castsi256_si128(value),
+                                 _mm_loadu_si128((const __m128i *)ref));
+    uint32_t mask = (uint32_t)_mm_movemask_epi8(cmp);
+    if (mask != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 16;
+    ref += 16;
+  }
+  /* Keep the original run byte: ref trails ip by one byte, so ip[-1] has
+   * not necessarily been checked when a vector iteration ends. */
   while ((ip < ip_bound) && (*ref++ == x)) ip++;
   return ip;
 }
 
+BLOSCLZ_ALWAYS_INLINE uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  /* Most matches in floating-point byte deltas are short. Avoid wide vector
+   * comparisons for these; a little-endian 64-bit scan locates a mismatch
+   * without a byte-at-a-time loop. */
+  if (ip_bound - ip >= 8) {
+    uint64_t a, b;
+    memcpy(&a, ip, sizeof(a));
+    memcpy(&b, ref, sizeof(b));
+    uint64_t diff = a ^ b;
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64)
+      return ip + (blosclz_ctz64(diff) >> 3) + 1;
+#else
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 8;
+    ref += 8;
+  }
+  /* Scan long matches in 128-byte (4x32B) groups with a single reduction */
+  while (ip_bound - ip >= 128) {
+    __m256i cmp0 = _mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i *)ip),
+                                     _mm256_loadu_si256((const __m256i *)ref));
+    __m256i cmp1 = _mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i *)(ip + 32)),
+                                     _mm256_loadu_si256((const __m256i *)(ref + 32)));
+    __m256i cmp2 = _mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i *)(ip + 64)),
+                                     _mm256_loadu_si256((const __m256i *)(ref + 64)));
+    __m256i cmp3 = _mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i *)(ip + 96)),
+                                     _mm256_loadu_si256((const __m256i *)(ref + 96)));
+    __m256i eq01 = _mm256_and_si256(cmp0, cmp1);
+    __m256i eq23 = _mm256_and_si256(cmp2, cmp3);
+    if ((uint32_t)_mm256_movemask_epi8(_mm256_and_si256(eq01, eq23)) != 0xFFFFFFFFU) {
+      /* Pinpoint the first mismatch (+1 matches the scalar post-increment contract) */
+      if ((uint32_t)_mm256_movemask_epi8(eq01) != 0xFFFFFFFFU) {
+        uint32_t m0 = (uint32_t)_mm256_movemask_epi8(cmp0);
+        if (m0 != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+          return ip + blosclz_ctz32(~m0) + 1;
+#else
+          while (*ref++ == *ip++) {}
+          return ip;
+#endif
+        }
+        uint32_t m1 = (uint32_t)_mm256_movemask_epi8(cmp1);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 32 + blosclz_ctz32(~m1) + 1;
+#else
+        ip += 32;
+        ref += 32;
+        while (*ref++ == *ip++) {}
+        return ip;
+#endif
+      }
+      uint32_t m2 = (uint32_t)_mm256_movemask_epi8(cmp2);
+      if (m2 != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 64 + blosclz_ctz32(~m2) + 1;
+#else
+        ip += 64;
+        ref += 64;
+        while (*ref++ == *ip++) {}
+        return ip;
+#endif
+      }
+      uint32_t m3 = (uint32_t)_mm256_movemask_epi8(cmp3);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + 96 + blosclz_ctz32(~m3) + 1;
+#else
+      ip += 96;
+      ref += 96;
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 128;
+    ref += 128;
+  }
+  /* Narrow 32-byte, 16-byte, and scalar tails */
+  while (ip_bound - ip >= 32) {
+    __m256i cmp = _mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i *)ip),
+                                    _mm256_loadu_si256((const __m256i *)ref));
+    uint32_t mask = (uint32_t)_mm256_movemask_epi8(cmp);
+    if (mask != 0xFFFFFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask) + 1;
+#else
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 32;
+    ref += 32;
+  }
+  if (ip_bound - ip >= 16) {
+    __m128i cmp = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ip),
+                                 _mm_loadu_si128((const __m128i *)ref));
+    uint32_t mask = (uint32_t)_mm_movemask_epi8(cmp);
+    if (mask != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask) + 1;
+#else
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 16;
+    ref += 16;
+  }
+  while ((ip < ip_bound) && (*ref++ == *ip++)) {}
+  return ip;
+}
+#endif
+
+#if defined(__SSE2__) && !defined(__AVX2__)
+BLOSCLZ_ALWAYS_INLINE uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  uint8_t x = ip[-1];
+  /* Broadcast the run byte across all 16 lanes once outside the loop */
+  const __m128i value = _mm_set1_epi8((char)x);
+  /* Scan long runs in 64-byte (4x16B) groups with a single reduction */
+  while (ip_bound - ip >= 64) {
+    __m128i cmp0 = _mm_cmpeq_epi8(value, _mm_loadu_si128((const __m128i *)ref));
+    __m128i cmp1 = _mm_cmpeq_epi8(value, _mm_loadu_si128((const __m128i *)(ref + 16)));
+    __m128i cmp2 = _mm_cmpeq_epi8(value, _mm_loadu_si128((const __m128i *)(ref + 32)));
+    __m128i cmp3 = _mm_cmpeq_epi8(value, _mm_loadu_si128((const __m128i *)(ref + 48)));
+    __m128i eq01 = _mm_and_si128(cmp0, cmp1);
+    __m128i eq23 = _mm_and_si128(cmp2, cmp3);
+    if (_mm_movemask_epi8(_mm_and_si128(eq01, eq23)) != 0xFFFF) {
+      /* Pinpoint the first differing byte directly from the compare vectors */
+      if (_mm_movemask_epi8(eq01) != 0xFFFF) {
+        uint32_t m0 = (uint32_t)_mm_movemask_epi8(cmp0);
+        if (m0 != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+          return ip + blosclz_ctz32(~m0);
+#else
+          while (*ref++ == x) ip++;
+          return ip;
+#endif
+        }
+        uint32_t m1 = (uint32_t)_mm_movemask_epi8(cmp1);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 16 + blosclz_ctz32(~m1);
+#else
+        ip += 16;
+        ref += 16;
+        while (*ref++ == x) ip++;
+        return ip;
+#endif
+      }
+      uint32_t m2 = (uint32_t)_mm_movemask_epi8(cmp2);
+      if (m2 != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 32 + blosclz_ctz32(~m2);
+#else
+        ip += 32;
+        ref += 32;
+        while (*ref++ == x) ip++;
+        return ip;
+#endif
+      }
+      uint32_t m3 = (uint32_t)_mm_movemask_epi8(cmp3);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + 48 + blosclz_ctz32(~m3);
+#else
+      ip += 48;
+      ref += 48;
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 64;
+    ref += 64;
+  }
+  /* Narrow 16-byte vector tail */
+  while (ip_bound - ip >= 16) {
+    __m128i cmp = _mm_cmpeq_epi8(value, _mm_loadu_si128((const __m128i *)ref));
+    uint32_t mask = (uint32_t)_mm_movemask_epi8(cmp);
+    if (mask != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 16;
+    ref += 16;
+  }
+  /* Keep the original run byte: ref trails ip by one byte, so ip[-1] has
+   * not necessarily been checked when a vector iteration ends. */
+  while ((ip < ip_bound) && (*ref++ == x)) ip++;
+  return ip;
+}
 #endif
 
 
-#if !defined(__aarch64__) && !defined(_M_ARM64)
+#if !defined(__aarch64__) && !defined(_M_ARM64) && !defined(__SSE2__) && !defined(__AVX2__)
 static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
   int64_t value, value2;
@@ -150,6 +434,7 @@ static uint8_t *get_run(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref
 #endif
 
 
+#if !defined(BLOSCLZ_BUILD_AVX2)
 /* Return the byte that starts to differ */
 uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
 #if !defined(BLOSC_STRICT_ALIGN)
@@ -169,50 +454,102 @@ uint8_t *get_match(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
   return ip;
 }
-
-
-#if defined(__SSE2__)
-static uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-  __m128i value, value2, cmp;
-
-  while (ip < (ip_bound - sizeof(__m128i))) {
-    value = _mm_loadu_si128((__m128i *) ip);
-    value2 = _mm_loadu_si128((__m128i *) ref);
-    cmp = _mm_cmpeq_epi32(value, value2);
-    if (_mm_movemask_epi8(cmp) != 0xFFFF) {
-      /* Return the byte that starts to differ */
-      while (*ref++ == *ip++) {}
-      return ip;
-    }
-    else {
-      ip += sizeof(__m128i);
-      ref += sizeof(__m128i);
-    }
-  }
-  /* Look into the remainder */
-  while ((ip < ip_bound) && (*ref++ == *ip++)) {}
-  return ip;
-}
 #endif
 
 
-#if defined(__AVX2__)
-static uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
-
-  while (ip < (ip_bound - sizeof(__m256i))) {
-    __m256i value, value2, cmp;
-    value = _mm256_loadu_si256((__m256i *) ip);
-    value2 = _mm256_loadu_si256((__m256i *)ref);
-    cmp = _mm256_cmpeq_epi64(value, value2);
-    if ((unsigned)_mm256_movemask_epi8(cmp) != 0xFFFFFFFF) {
-      /* Return the byte that starts to differ */
+#if defined(__SSE2__) && !defined(__AVX2__)
+BLOSCLZ_ALWAYS_INLINE uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
+  /* Most matches in floating-point byte deltas are short. Avoid wide vector
+   * comparisons for these; a little-endian 64-bit scan locates a mismatch
+   * without a byte-at-a-time loop. */
+  if (ip_bound - ip >= 8) {
+    uint64_t a, b;
+    memcpy(&a, ip, sizeof(a));
+    memcpy(&b, ref, sizeof(b));
+    uint64_t diff = a ^ b;
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64)
+      return ip + (blosclz_ctz64(diff) >> 3) + 1;
+#else
       while (*ref++ == *ip++) {}
       return ip;
+#endif
     }
-    else {
-      ip += sizeof(__m256i);
-      ref += sizeof(__m256i);
+    ip += 8;
+    ref += 8;
+  }
+  /* Scan long matches in 64-byte (4x16B) groups with a single reduction */
+  while (ip_bound - ip >= 64) {
+    __m128i cmp0 = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ip),
+                                  _mm_loadu_si128((const __m128i *)ref));
+    __m128i cmp1 = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)(ip + 16)),
+                                  _mm_loadu_si128((const __m128i *)(ref + 16)));
+    __m128i cmp2 = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)(ip + 32)),
+                                  _mm_loadu_si128((const __m128i *)(ref + 32)));
+    __m128i cmp3 = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)(ip + 48)),
+                                  _mm_loadu_si128((const __m128i *)(ref + 48)));
+    __m128i eq01 = _mm_and_si128(cmp0, cmp1);
+    __m128i eq23 = _mm_and_si128(cmp2, cmp3);
+    if (_mm_movemask_epi8(_mm_and_si128(eq01, eq23)) != 0xFFFF) {
+      /* Pinpoint the first mismatch (+1 matches the scalar post-increment contract) */
+      if (_mm_movemask_epi8(eq01) != 0xFFFF) {
+        uint32_t m0 = (uint32_t)_mm_movemask_epi8(cmp0);
+        if (m0 != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+          return ip + blosclz_ctz32(~m0) + 1;
+#else
+          while (*ref++ == *ip++) {}
+          return ip;
+#endif
+        }
+        uint32_t m1 = (uint32_t)_mm_movemask_epi8(cmp1);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 16 + blosclz_ctz32(~m1) + 1;
+#else
+        ip += 16;
+        ref += 16;
+        while (*ref++ == *ip++) {}
+        return ip;
+#endif
+      }
+      uint32_t m2 = (uint32_t)_mm_movemask_epi8(cmp2);
+      if (m2 != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+        return ip + 32 + blosclz_ctz32(~m2) + 1;
+#else
+        ip += 32;
+        ref += 32;
+        while (*ref++ == *ip++) {}
+        return ip;
+#endif
+      }
+      uint32_t m3 = (uint32_t)_mm_movemask_epi8(cmp3);
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + 48 + blosclz_ctz32(~m3) + 1;
+#else
+      ip += 48;
+      ref += 48;
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
     }
+    ip += 64;
+    ref += 64;
+  }
+  while (ip_bound - ip >= 16) {
+    __m128i cmp = _mm_cmpeq_epi8(_mm_loadu_si128((const __m128i *)ip),
+                                 _mm_loadu_si128((const __m128i *)ref));
+    uint32_t mask = (uint32_t)_mm_movemask_epi8(cmp);
+    if (mask != 0xFFFFU) {
+#if defined(BLOSCLZ_HAVE_CTZ32)
+      return ip + blosclz_ctz32(~mask) + 1;
+#else
+      while (*ref++ == *ip++) {}
+      return ip;
+#endif
+    }
+    ip += 16;
+    ref += 16;
   }
   /* Look into the remainder */
   while ((ip < ip_bound) && (*ref++ == *ip++)) {}
@@ -296,16 +633,12 @@ static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *r
 }
 #endif
 
-static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
+static inline uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
   if (BLOSCLZ_UNLIKELY(run)) {
 #if defined(__AVX2__)
-    // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
-    // ip = get_run_32(ip, ip_bound, ref);
-    ip = get_run(ip, ip_bound, ref);
+    ip = get_run_32(ip, ip_bound, ref);
 #elif defined(__SSE2__)
-    // Extensive experiments on AMD Ryzen3 say that regular get_run is faster
-    // ip = get_run_16(ip, ip_bound, ref);
-    ip = get_run(ip, ip_bound, ref);
+    ip = get_run_16(ip, ip_bound, ref);
 #elif defined(__aarch64__) || defined(_M_ARM64)
     ip = get_run_neon(ip, ip_bound, ref);
 #else
@@ -314,9 +647,7 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   }
   else {
 #if defined(__AVX2__)
-    // Extensive experiments on AMD Ryzen3 say that regular get_match_16 is faster
-    // ip = get_match_32(ip, ip_bound, ref);
-    ip = get_match_16(ip, ip_bound, ref);
+    ip = get_match_32(ip, ip_bound, ref);
 #elif defined(__SSE2__)
     ip = get_match_16(ip, ip_bound, ref);
 #elif defined(__aarch64__) || defined(_M_ARM64)
@@ -328,7 +659,6 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
 
   return ip;
 }
-
 
 #define LITERAL(ip, op, op_limit, anchor, copy) {       \
   if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 2))          \
@@ -400,17 +730,10 @@ static uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* 
   *(op)++ = (uint8_t)((distance) & 255U);                   \
 }
 
-
 /* Hash entries are stored as position + base.  Entries below base belong to
  * a previous pass and read as position 0, exactly like a zeroed table.  With
  * no state, base is always 0 and the table is memset as usual. */
 #define HTAB_GET(entry, base) (tagged ? ((entry) >= (base) ? (entry) - (base) : 0) : (entry))
-
-#if defined(_MSC_VER)
-#define BLOSCLZ_ALWAYS_INLINE static __forceinline
-#else
-#define BLOSCLZ_ALWAYS_INLINE static inline __attribute__((always_inline))
-#endif
 
 // Get a guess for the compressed size of a buffer
 BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, uint32_t htab[],
@@ -512,7 +835,6 @@ BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, 
   double ic = (double)(ip - ibase);
   return ic / (double)oc;
 }
-
 
 
 BLOSCLZ_ALWAYS_INLINE uint32_t htab_reset(uint32_t htab[], uint8_t hashlog, blosclz_state* state, int span,
@@ -739,8 +1061,66 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
   return 0;
 }
 
+#if defined(BLOSCLZ_BUILD_AVX2)
+
+#if defined(__AVX2__)
+int blosclz_compress_avx2(const int clevel, const void* input, int length,
+                          void* output, int maxout, blosc2_context* ctx) {
+  BLOSC_UNUSED_PARAM(ctx);
+  uint32_t htab[1U << HASH_LOG];
+  return compress_impl(clevel, input, length, output, maxout, htab, NULL, 0);
+}
+
+int blosclz_compress_state_avx2(const int clevel, const void* input, int length,
+                                void* output, int maxout, blosclz_state* state) {
+  if (state->tagged) {
+    return compress_impl(clevel, input, length, output, maxout, state->htab, state, 1);
+  }
+  return compress_impl(clevel, input, length, output, maxout, state->htab, state, 0);
+}
+
+/* Check whether [ip, ip_bound) is a constant-byte stream (128 B/iter AVX2) */
+bool blosc_get_run_avx2(const uint8_t* ip, const uint8_t* ip_bound) {
+  uint8_t x = *ip;
+  /* Broadcast the reference byte across all 32 lanes */
+  const __m256i vx = _mm256_set1_epi8((char)x);
+  while (ip_bound - ip >= 128) {
+    const __m256i* p = (const __m256i*)ip;
+    __m256i eq01 = _mm256_and_si256(_mm256_cmpeq_epi8(_mm256_loadu_si256(p), vx),
+                                    _mm256_cmpeq_epi8(_mm256_loadu_si256(p + 1), vx));
+    __m256i eq23 = _mm256_and_si256(_mm256_cmpeq_epi8(_mm256_loadu_si256(p + 2), vx),
+                                    _mm256_cmpeq_epi8(_mm256_loadu_si256(p + 3), vx));
+    if ((uint32_t)_mm256_movemask_epi8(_mm256_and_si256(eq01, eq23)) != 0xFFFFFFFFU) {
+      return false;
+    }
+    ip += 128;
+  }
+  /* Check remaining 32-byte vectors and scalar tail */
+  while (ip_bound - ip >= 32) {
+    if ((uint32_t)_mm256_movemask_epi8(_mm256_cmpeq_epi8(_mm256_loadu_si256((const __m256i*)ip), vx)) != 0xFFFFFFFFU) {
+      return false;
+    }
+    ip += 32;
+  }
+  while (ip < ip_bound) {
+    if (*ip != x) {
+      return false;
+    }
+    ip++;
+  }
+  return true;
+}
+#endif /* defined(__AVX2__) */
+
+#else /* !defined(BLOSCLZ_BUILD_AVX2) */
+
 int blosclz_compress(const int clevel, const void* input, int length,
                      void* output, int maxout, blosc2_context* ctx) {
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
+  if (blosc_cpu_has_avx2()) {
+    return blosclz_compress_avx2(clevel, input, length, output, maxout, ctx);
+  }
+#endif
   BLOSC_UNUSED_PARAM(ctx);
   uint32_t htab[1U << HASH_LOG];
   return compress_impl(clevel, input, length, output, maxout, htab, NULL, 0);
@@ -748,6 +1128,11 @@ int blosclz_compress(const int clevel, const void* input, int length,
 
 int blosclz_compress_state(const int clevel, const void* input, int length,
                            void* output, int maxout, blosclz_state* state) {
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
+  if (blosc_cpu_has_avx2()) {
+    return blosclz_compress_state_avx2(clevel, input, length, output, maxout, state);
+  }
+#endif
   if (state->tagged) {
     return compress_impl(clevel, input, length, output, maxout, state->htab, state, 1);
   }
@@ -983,3 +1368,5 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
 
   return (int)(op - (uint8_t*)output);
 }
+
+#endif /* !defined(BLOSCLZ_BUILD_AVX2) */

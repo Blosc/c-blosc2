@@ -210,7 +210,8 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     endif()
     if(COMPILER_SUPPORT_AVX2)
         message(STATUS "Adding run-time support for AVX2")
-        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c)
+        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c
+             blosc/shuffle-bytedelta-avx2.c blosc/blosclz-avx2.c)
     endif()
     if(COMPILER_SUPPORT_AVX512)
         message(STATUS "Adding run-time support for AVX512")
@@ -290,11 +291,11 @@ endif()
 if(COMPILER_SUPPORT_AVX2)
     if(MSVC)
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c
+                shuffle-avx2.c bitshuffle-avx2.c shuffle-bytedelta-avx2.c blosclz-avx2.c
                 PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
     else()
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c
+                shuffle-avx2.c bitshuffle-avx2.c shuffle-bytedelta-avx2.c blosclz-avx2.c
                 PROPERTIES COMPILE_OPTIONS -mavx2)
     endif()
 
@@ -303,7 +304,10 @@ if(COMPILER_SUPPORT_AVX2)
     # compiled without AVX2 support (for portability).
     set_property(
             SOURCE shuffle.c
-            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
+            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED SHUFFLE_BYTEDELTA_AVX2_ENABLED)
+    set_property(
+            SOURCE blosclz.c blosc2.c
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSCLZ_AVX2_ENABLED)
 endif()
 if(COMPILER_SUPPORT_AVX512)
     if(MSVC)

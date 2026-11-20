@@ -25,6 +25,8 @@ int shuffle_bytedelta_neon_forward(const uint8_t* input, uint8_t* output, int32_
 int shuffle_bytedelta_neon_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
 int shuffle_bytedelta_ssse3_forward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
 int shuffle_bytedelta_ssse3_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_avx2_forward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
+int shuffle_bytedelta_avx2_backward(const uint8_t* input, uint8_t* output, int32_t length, int typesize);
 
 int bytedelta_forward(const uint8_t* input, uint8_t* output, int32_t length, uint8_t meta,
                       blosc2_cparams* cparams, uint8_t id);

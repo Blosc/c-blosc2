@@ -387,15 +387,26 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 static shuffle_implementation_t host_implementation;
 static shuffle_bytedelta_func host_shuffle_bytedelta_forward;
 static shuffle_bytedelta_func host_shuffle_bytedelta_backward;
+static int host_has_avx2;
 
 static void set_host_implementation(void) {
   host_implementation = get_shuffle_implementation();
+#if defined(SHUFFLE_AVX512_ENABLED) || defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)
+  blosc_cpu_features cpu_features = blosc_get_cpu_features();
+  host_has_avx2 = (cpu_features & BLOSC_HAVE_AVX2) != 0;
+#if defined(SHUFFLE_BYTEDELTA_AVX2_ENABLED)
+  if (cpu_features & BLOSC_HAVE_AVX2) {
+    host_shuffle_bytedelta_forward = shuffle_bytedelta_avx2_forward;
+    host_shuffle_bytedelta_backward = shuffle_bytedelta_avx2_backward;
+  }
+#endif
 #if defined(SHUFFLE_BYTEDELTA_SSSE3_ENABLED)
   /* SSSE3 needs only the legacy XMM state, not AVX/XSAVE or YMM support. */
-  if (blosc_get_cpu_features() & BLOSC_HAVE_SSSE3) {
+  if (host_shuffle_bytedelta_forward == NULL && (cpu_features & BLOSC_HAVE_SSSE3)) {
     host_shuffle_bytedelta_forward = shuffle_bytedelta_ssse3_forward;
     host_shuffle_bytedelta_backward = shuffle_bytedelta_ssse3_backward;
   }
+#endif
 #elif defined(SHUFFLE_BYTEDELTA_NEON_ENABLED) && (defined(__aarch64__) || defined(_M_ARM64))
   host_shuffle_bytedelta_forward = shuffle_bytedelta_neon_forward;
   host_shuffle_bytedelta_backward = shuffle_bytedelta_neon_backward;
@@ -432,6 +443,11 @@ static void init_shuffle_implementation(void) {
 int shuffle_bytedelta_available(void) {
   init_shuffle_implementation();
   return host_shuffle_bytedelta_forward != NULL;
+}
+
+int blosc_cpu_has_avx2(void) {
+  init_shuffle_implementation();
+  return host_has_avx2;
 }
 
 int shuffle_bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {

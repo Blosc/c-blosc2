@@ -41,4 +41,9 @@ BLOSC_NO_EXPORT int32_t
                  const void* src, void* dest, void* tmp,
                  const uint8_t format_version);
 
+/**
+  Runtime AVX2 capability query initialized with the shuffle dispatcher.
+ */
+BLOSC_NO_EXPORT int blosc_cpu_has_avx2(void);
+
 #endif /* BLOSC_SHUFFLE_H */

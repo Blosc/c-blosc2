@@ -1453,10 +1453,15 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
 }
 
 
+#if defined(BLOSCLZ_AVX2_ENABLED)
+bool blosc_get_run_avx2(const uint8_t* ip, const uint8_t* ip_bound);
+#endif
+
 // Optimized version for detecting runs.  It compares 64 bytes per iteration
-// with SSE2 or NEON, then 8 bytes values wherever possible.  Besides being
-// faster, the wide loop keeps the speed independent of where the code lands:
-// the 8-byte loop alone ran about 2x slower when it crossed a 64-byte boundary.
+// with SSE2 or NEON (128 bytes with AVX2), then 8 bytes values wherever possible.
+// Besides being faster, the wide loop keeps the speed independent of where the
+// code lands: the 8-byte loop alone ran about 2x slower when it crossed a
+// 64-byte boundary.
 static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
   uint8_t x = *ip;
   int64_t value, value2;
@@ -1469,6 +1474,11 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
     if (value != value2) {
       return false;
     }
+  }
+#endif
+#if defined(BLOSCLZ_AVX2_ENABLED)
+  if (ip_bound - ip >= 128 && blosc_cpu_has_avx2()) {
+    return blosc_get_run_avx2(ip, ip_bound);
   }
 #endif
 #if defined(BLOSC_RUN_SSE2)
