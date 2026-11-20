@@ -3520,10 +3520,12 @@ static int write_compression_header(blosc2_context* context, bool extended_heade
 
 static int blosc_compress_context(blosc2_context* context) {
   int ntbytes = 0;
-  blosc_timestamp_t last, current;
+  blosc_timestamp_t last = {0}, current;
   bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
 
-  blosc_set_timestamp(&last);
+  if (context->tuner_params != NULL) {
+    blosc_set_timestamp(&last);
+  }
 
   if (!memcpyed) {
     /* Do the actual compression */
