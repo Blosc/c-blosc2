@@ -1622,9 +1622,13 @@ static int get_coffsets_nbytes(blosc2_frame_s *frame, int32_t header_len, int64_
   int rc;
   int64_t off_pos = header_len;
   if (!frame->sframe) {
-    if (cbytes < INT64_MAX - header_len) {
-      off_pos += cbytes;
+    // Reject, rather than ignore, a cbytes that cannot be added to header_len:
+    // reading the offsets at header_len would land on the data chunks
+    if (cbytes < 0 || cbytes > INT64_MAX - header_len) {
+      BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
+      return BLOSC2_ERROR_INVALID_HEADER;
     }
+    off_pos += cbytes;
   }
 
   if (off_pos < 0 || off_pos > INT64_MAX - BLOSC_EXTENDED_HEADER_LENGTH ||
@@ -2477,11 +2481,15 @@ uint8_t* get_coffsets(blosc2_frame_s *frame, int32_t header_len, int64_t cbytes,
     }
     return frame->coffsets;
   }
+  // The offsets chunk follows the data chunks, so a cbytes that cannot be added to
+  // header_len must be rejected: every later "chunk ends before cbytes" check
+  // relies on header_len + cbytes being a real position in the frame
+  if (cbytes < 0 || cbytes > INT64_MAX - header_len) {
+    BLOSC_TRACE_ERROR("Invalid compressed size in frame header.");
+    return NULL;
+  }
   if (frame->cframe != NULL) {
-    int64_t off_pos = header_len;
-    if (cbytes < INT64_MAX - header_len) {
-      off_pos += cbytes;
-    }
+    int64_t off_pos = header_len + cbytes;
     // Check that there is enough room to read Blosc header
     if (off_pos < 0 || off_pos > INT64_MAX - BLOSC_EXTENDED_HEADER_LENGTH ||
         off_pos + BLOSC_EXTENDED_HEADER_LENGTH > frame->len) {
