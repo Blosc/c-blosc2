@@ -81,21 +81,27 @@
 #endif
 
 #if defined(__GNUC__) || defined(__clang__)
+/* 32-bit ctz is only used by x86 movemask paths; guard to avoid unused warnings on ARM64 */
+#if defined(__SSE2__) || defined(__AVX2__)
 static inline unsigned blosclz_ctz32(uint32_t v) {
   return (unsigned)__builtin_ctz(v);
 }
+#define BLOSCLZ_HAVE_CTZ32 1
+#endif
 static inline unsigned blosclz_ctz64(uint64_t v) {
   return (unsigned)__builtin_ctzll(v);
 }
-#define BLOSCLZ_HAVE_CTZ32 1
 #define BLOSCLZ_HAVE_CTZ64 1
 #elif defined(_MSC_VER)
+/* 32-bit ctz is only used by x86 movemask paths; guard to avoid unused warnings on ARM64 */
+#if defined(__SSE2__) || defined(__AVX2__)
 static inline unsigned blosclz_ctz32(uint32_t v) {
   unsigned long idx;
   _BitScanForward(&idx, v);
   return (unsigned)idx;
 }
 #define BLOSCLZ_HAVE_CTZ32 1
+#endif
 #if defined(_M_X64) || defined(_M_ARM64)
 static inline unsigned blosclz_ctz64(uint64_t v) {
   unsigned long idx;
@@ -559,6 +565,11 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *get_match_16(uint8_t *ip, const uint8_t *ip_bound
 
 
 #if defined(__aarch64__) || defined(_M_ARM64)
+/* Reduce 4x32-bit lanes instead of 16x8-bit lanes (umaxv.4s is faster than uminv.16b) */
+static inline bool blosclz_neon_any_nonzero(uint8x16_t v) {
+  return vmaxvq_u32(vreinterpretq_u32_u8(v)) != 0;
+}
+
 /* Check long matches in cache-line-sized groups.  Reduce just once per group,
  * then use the narrow loop to locate the first differing byte. */
 static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *ref) {
@@ -571,8 +582,8 @@ static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t 
     memcpy(&b, ref, sizeof(b));
     uint64_t diff = a ^ b;
     if (diff) {
-#if (defined(__GNUC__) || defined(__clang__)) && !defined(__AARCH64EB__)
-      return ip + (__builtin_ctzll(diff) >> 3) + 1;
+#if defined(BLOSCLZ_HAVE_CTZ64) && !defined(__AARCH64EB__)
+      return ip + (blosclz_ctz64(diff) >> 3) + 1;
 #else
       while (*ref++ == *ip++) {}
       return ip;
@@ -582,18 +593,22 @@ static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t 
     ref += 8;
   }
   while (bound - ip >= 64) {
-    uint8x16_t a = vceqq_u8(vld1q_u8(ip), vld1q_u8(ref));
-    uint8x16_t b = vceqq_u8(vld1q_u8(ip + 16), vld1q_u8(ref + 16));
-    uint8x16_t c = vceqq_u8(vld1q_u8(ip + 32), vld1q_u8(ref + 32));
-    uint8x16_t d = vceqq_u8(vld1q_u8(ip + 48), vld1q_u8(ref + 48));
-    if (vminvq_u8(vandq_u8(vandq_u8(a, b), vandq_u8(c, d))) != 255) {
+    /* Accumulate bytewise differences via XOR+OR to test 64 bytes with one 32-bit max reduction */
+    uint8x16_t d0 = veorq_u8(vld1q_u8(ip), vld1q_u8(ref));
+    uint8x16_t d1 = veorq_u8(vld1q_u8(ip + 16), vld1q_u8(ref + 16));
+    uint8x16_t d2 = veorq_u8(vld1q_u8(ip + 32), vld1q_u8(ref + 32));
+    uint8x16_t d3 = veorq_u8(vld1q_u8(ip + 48), vld1q_u8(ref + 48));
+    uint8x16_t d01 = vorrq_u8(d0, d1);
+    uint8x16_t d23 = vorrq_u8(d2, d3);
+    if (blosclz_neon_any_nonzero(vorrq_u8(d01, d23))) {
       break;
     }
     ip += 64;
     ref += 64;
   }
   while (bound - ip >= 16) {
-    if (vminvq_u8(vceqq_u8(vld1q_u8(ip), vld1q_u8(ref))) != 255) {
+    /* Test 16 bytes for any difference via XOR and 4-lane u32 reduction */
+    if (blosclz_neon_any_nonzero(veorq_u8(vld1q_u8(ip), vld1q_u8(ref)))) {
       while (*ref++ == *ip++) {}
       return ip;
     }
@@ -608,18 +623,22 @@ static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *r
   uint8_t x = ip[-1];
   uint8x16_t value = vdupq_n_u8(x);
   while (bound - ip >= 64) {
-    uint8x16_t a = vceqq_u8(value, vld1q_u8(ref));
-    uint8x16_t b = vceqq_u8(value, vld1q_u8(ref + 16));
-    uint8x16_t c = vceqq_u8(value, vld1q_u8(ref + 32));
-    uint8x16_t d = vceqq_u8(value, vld1q_u8(ref + 48));
-    if (vminvq_u8(vandq_u8(vandq_u8(a, b), vandq_u8(c, d))) != 255) {
+    /* Accumulate differences from the run byte via XOR+OR with one 32-bit max reduction */
+    uint8x16_t d0 = veorq_u8(value, vld1q_u8(ref));
+    uint8x16_t d1 = veorq_u8(value, vld1q_u8(ref + 16));
+    uint8x16_t d2 = veorq_u8(value, vld1q_u8(ref + 32));
+    uint8x16_t d3 = veorq_u8(value, vld1q_u8(ref + 48));
+    uint8x16_t d01 = vorrq_u8(d0, d1);
+    uint8x16_t d23 = vorrq_u8(d2, d3);
+    if (blosclz_neon_any_nonzero(vorrq_u8(d01, d23))) {
       break;
     }
     ip += 64;
     ref += 64;
   }
   while (bound - ip >= 16) {
-    if (vminvq_u8(vceqq_u8(value, vld1q_u8(ref))) != 255) {
+    /* Check 16-byte tail chunks via XOR and 4-lane u32 reduction before scalar scan */
+    if (blosclz_neon_any_nonzero(veorq_u8(value, vld1q_u8(ref)))) {
       while (*ref++ == x) ip++;
       return ip;
     }

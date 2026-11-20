@@ -1495,14 +1495,48 @@ static bool get_run(const uint8_t* ip, const uint8_t* ip_bound) {
     ip += 64;
   }
 #elif defined(BLOSC_RUN_NEON)
-  const uint8x16_t vx = vdupq_n_u8(x);
-  while (ip_bound - ip >= 64) {
-    uint8x16_t diff01 = vorrq_u8(veorq_u8(vld1q_u8(ip), vx), veorq_u8(vld1q_u8(ip + 16), vx));
-    uint8x16_t diff23 = vorrq_u8(veorq_u8(vld1q_u8(ip + 32), vx), veorq_u8(vld1q_u8(ip + 48), vx));
-    if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(diff01, diff23))) != 0) {
-      return false;
+  if (x == 0) {
+    while (ip_bound - ip >= 128) {
+      uint8x16_t d01 = vorrq_u8(vld1q_u8(ip), vld1q_u8(ip + 16));
+      uint8x16_t d23 = vorrq_u8(vld1q_u8(ip + 32), vld1q_u8(ip + 48));
+      uint8x16_t d45 = vorrq_u8(vld1q_u8(ip + 64), vld1q_u8(ip + 80));
+      uint8x16_t d67 = vorrq_u8(vld1q_u8(ip + 96), vld1q_u8(ip + 112));
+      if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(vorrq_u8(d01, d23),
+                                                  vorrq_u8(d45, d67)))) != 0) {
+        return false;
+      }
+      ip += 128;
     }
-    ip += 64;
+    if (ip_bound - ip >= 64) {
+      uint8x16_t d01 = vorrq_u8(vld1q_u8(ip), vld1q_u8(ip + 16));
+      uint8x16_t d23 = vorrq_u8(vld1q_u8(ip + 32), vld1q_u8(ip + 48));
+      if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(d01, d23))) != 0) {
+        return false;
+      }
+      ip += 64;
+    }
+  }
+  else {
+    const uint8x16_t vx = vdupq_n_u8(x);
+    while (ip_bound - ip >= 128) {
+      uint8x16_t d01 = vorrq_u8(veorq_u8(vld1q_u8(ip), vx), veorq_u8(vld1q_u8(ip + 16), vx));
+      uint8x16_t d23 = vorrq_u8(veorq_u8(vld1q_u8(ip + 32), vx), veorq_u8(vld1q_u8(ip + 48), vx));
+      uint8x16_t d45 = vorrq_u8(veorq_u8(vld1q_u8(ip + 64), vx), veorq_u8(vld1q_u8(ip + 80), vx));
+      uint8x16_t d67 = vorrq_u8(veorq_u8(vld1q_u8(ip + 96), vx), veorq_u8(vld1q_u8(ip + 112), vx));
+      if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(vorrq_u8(d01, d23),
+                                                  vorrq_u8(d45, d67)))) != 0) {
+        return false;
+      }
+      ip += 128;
+    }
+    if (ip_bound - ip >= 64) {
+      uint8x16_t d01 = vorrq_u8(veorq_u8(vld1q_u8(ip), vx), veorq_u8(vld1q_u8(ip + 16), vx));
+      uint8x16_t d23 = vorrq_u8(veorq_u8(vld1q_u8(ip + 32), vx), veorq_u8(vld1q_u8(ip + 48), vx));
+      if (vmaxvq_u32(vreinterpretq_u32_u8(vorrq_u8(d01, d23))) != 0) {
+        return false;
+      }
+      ip += 64;
+    }
   }
 #endif
   while (ip < (ip_bound - 8)) {
