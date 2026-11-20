@@ -1652,11 +1652,11 @@ typedef enum {
 
 
 /* Compress @p src (@p nbytes) with the super-chunk's context and append, insert or update the
-   chunk at @p nchunk (ignored for appends).  A frame writes its own copy of the chunk, so it is
-   lent a buffer that this thread reuses for its next chunk (see schunk_scratch_malloc()): no
-   allocation per chunk, and no fresh pages (with glibc, a chunk-sized malloc is usually a new
-   mmap()) to fault in while compressing.  A plain super-chunk keeps the chunk itself, which is
-   a malloc'ed buffer then, shrunk to fit. */
+   chunk at @p nchunk (ignored for appends).  Always compresses into a reusable thread-local
+   scratch buffer (see blosc2_tmp_malloc()) so repeated chunks avoid allocating and faulting
+   fresh multi-megabyte VM pages.  A frame stores its own copy; compressible plain chunks
+   (cbytes < nbytes / 2) are lent so the schunk allocates an exact cbytes buffer directly instead
+   of shrinking a multi-megabyte buffer via realloc(). */
 static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, const void *src,
                                      int32_t nbytes, chunk_write_op op, const char *func_name) {
   if (nbytes < 0 || nbytes > BLOSC2_MAX_BUFFERSIZE) {
@@ -1669,7 +1669,7 @@ static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, cons
   bool in_frame = schunk->frame != NULL;
   int32_t dest_nbytes = nbytes + BLOSC2_MAX_OVERHEAD;
   size_t capacity;
-  uint8_t *chunk = schunk_scratch_malloc(schunk, dest_nbytes, &capacity);
+  uint8_t *chunk = blosc2_tmp_malloc((size_t)dest_nbytes, &capacity);
   BLOSC_ERROR_NULL(chunk, BLOSC2_ERROR_MEMORY_ALLOC);
   // Prefilters read the number of the chunk being compressed
   int64_t old_current_nchunk = schunk->current_nchunk;
@@ -1681,7 +1681,8 @@ static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, cons
     BLOSC_TRACE_ERROR("Cannot compress the buffer in %s.", func_name);
     return cbytes < 0 ? cbytes : BLOSC2_ERROR_WRITE_BUFFER;
   }
-  chunk_handover how = in_frame ? CHUNK_LENT : CHUNK_GIVEN;
+  bool lend = in_frame || (cbytes < nbytes / 2);
+  chunk_handover how = lend ? CHUNK_LENT : CHUNK_GIVEN;
   int64_t nchunks;
   switch (op) {
     case WRITE_APPEND:
@@ -1694,8 +1695,8 @@ static int64_t schunk_compress_store(blosc2_schunk *schunk, int64_t nchunk, cons
       nchunks = schunk_update_chunk_locked(schunk, nchunk, chunk, how);
       break;
   }
-  // A frame wrote a copy of the chunk, and a failed store leaves it to us
-  if (in_frame || nchunks < 0) {
+  // A lent buffer stays in the thread-local cache; a failed store leaves it to us
+  if (lend || nchunks < 0) {
     blosc2_tmp_free(chunk, capacity);
   }
   if (nchunks < 0) {
