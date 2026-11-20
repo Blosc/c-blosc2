@@ -222,9 +222,10 @@ struct blosc_shared_pool {
 // Forward declarations
 static int init_callback_threads(blosc2_context *context);
 static int release_thread_backend(blosc2_context *context);
-static int attach_shared_pool(blosc2_context *context);
 #if defined(_WIN32)
 static int init_threadpool(blosc2_context *context);
+#else
+static int attach_shared_pool(blosc2_context *context);
 #endif
 static int parallel_blosc(blosc2_context* context);
 
@@ -5791,7 +5792,6 @@ static void wait_job_completion(struct blosc_job_group *job) {
   }
   blosc2_pthread_mutex_unlock(&job->mutex);
 }
-#endif
 
 static void* shared_pool_worker(void* arg) {
   struct thread_context* thcontext = (struct thread_context*)arg;
@@ -6052,7 +6052,17 @@ static int attach_shared_pool(blosc2_context *context) {
   return 0;
 }
 
-#if defined(_WIN32)
+#else  /* _WIN32 */
+
+static struct blosc_shared_pool *unlink_unused_pools_locked(int keep) {
+  BLOSC_UNUSED_PARAM(keep);
+  return NULL;
+}
+
+static void destroy_shared_pools(struct blosc_shared_pool *pool) {
+  BLOSC_UNUSED_PARAM(pool);
+}
+
 /* Per-context worker thread for Windows (BLOSC_BACKEND_PER_CONTEXT).
  * Sleeps between jobs using a job_seq counter; wakes when main increments
  * job_seq and broadcasts jobs_ready.  The last worker to finish signals
