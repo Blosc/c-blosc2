@@ -56,6 +56,22 @@ enum {
     B2_DS_B2D,               /**< A .b2d directory holding one file per key. */
 };
 
+typedef enum {
+    B2_DS_VALUE_LOCAL,
+    B2_DS_VALUE_REMOTE
+}b2_ds_value_tag;
+
+typedef struct {
+    b2_ds_value_tag tag;
+    union {
+        blosc2_schunk* schunk; // Local
+        struct {
+            uint8_t* urlbase;
+            uint8_t* path;
+        }remote;
+    };
+}b2_ds_item;
+
 /** @name Alloc / Free API */
 /** @{ */
 

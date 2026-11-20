@@ -200,6 +200,7 @@ list(APPEND SOURCES
     blosc/utils/string_manipulation.c
     blosc/utils/filesystem.c
     blosc/utils/key.c
+    blosc/utils/hash_map
 )
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
