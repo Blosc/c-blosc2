@@ -278,7 +278,7 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
+  if ((int32_t) zfpsize >= input_len || (int32_t) zfpsize > output_len) {
     BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
     free(aux_out);
     return 0;
@@ -577,7 +577,7 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
+  if ((int32_t) zfpsize >= input_len || (int32_t) zfpsize > output_len) {
     BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
     free(aux_out);
     return 0;
@@ -887,7 +887,7 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
+  if ((int32_t) zfpsize >= input_len || (int32_t) zfpsize > output_len) {
     BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
     free(aux_out);
     return 0;
