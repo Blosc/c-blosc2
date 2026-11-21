@@ -198,6 +198,7 @@ struct blosc_job_queue_entry {
 
 struct blosc_shared_pool {
   int16_t nthreads;
+  int32_t num_workers;               /* worker threads spawned (nthreads - 1; caller runs tid 0) */
   int32_t shutdown;
   int32_t context_refs;
   int32_t active_jobs;
@@ -5897,23 +5898,25 @@ static int create_shared_pool(int16_t nthreads, struct blosc_shared_pool **pool_
 #if !defined(_WIN32)
   bool attr_inited = false;
 #endif
+  int32_t num_workers = nthreads > 1 ? nthreads - 1 : 1;
   struct blosc_shared_pool *pool = (struct blosc_shared_pool *)my_malloc(sizeof(*pool));
   BLOSC_ERROR_NULL(pool, BLOSC2_ERROR_MEMORY_ALLOC);
   memset(pool, 0, sizeof(*pool));
   pool->nthreads = nthreads;
+  pool->num_workers = num_workers;
   blosc2_pthread_mutex_init(&pool->mutex, NULL);
   blosc2_pthread_cond_init(&pool->work_cv, NULL);
-  pool->threads = (blosc2_pthread_t*)my_malloc(nthreads * sizeof(blosc2_pthread_t));
+  pool->threads = (blosc2_pthread_t*)my_malloc((size_t)num_workers * sizeof(blosc2_pthread_t));
   if (pool->threads == NULL) { rc = BLOSC2_ERROR_MEMORY_ALLOC; goto error; }
-  pool->thread_contexts = (struct thread_context*)my_malloc((size_t)nthreads * sizeof(struct thread_context));
+  pool->thread_contexts = (struct thread_context*)my_malloc((size_t)num_workers * sizeof(struct thread_context));
   if (pool->thread_contexts == NULL) { rc = BLOSC2_ERROR_MEMORY_ALLOC; goto error; }
-  memset(pool->thread_contexts, 0, (size_t)nthreads * sizeof(struct thread_context));
+  memset(pool->thread_contexts, 0, (size_t)num_workers * sizeof(struct thread_context));
 #if !defined(_WIN32)
   pthread_attr_init(&pool->ct_attr);
   pthread_attr_setdetachstate(&pool->ct_attr, PTHREAD_CREATE_JOINABLE);
   attr_inited = true;
 #endif
-  for (int32_t tid = 0; tid < nthreads; ++tid) {
+  for (int32_t tid = 0; tid < num_workers; ++tid) {
     rc = init_thread_context(pool->thread_contexts + tid, NULL, tid);
     if (rc < 0) {
       goto error;
@@ -5980,7 +5983,7 @@ static void destroy_shared_pool(struct blosc_shared_pool *pool) {
   blosc2_pthread_cond_broadcast(&pool->work_cv);
   blosc2_pthread_mutex_unlock(&pool->mutex);
 
-  for (int32_t t = 0; t < pool->nthreads; ++t) {
+  for (int32_t t = 0; t < pool->num_workers; ++t) {
     blosc2_pthread_join(pool->threads[t], &status);
   }
 #if !defined(_WIN32)
@@ -6314,9 +6317,11 @@ static int parallel_blosc(blosc2_context* context) {
           pool->fast_job = &job;
           pool->fast_workers = workers;
           __atomic_store_n(&pool->fast_remaining, pool_workers, __ATOMIC_SEQ_CST);
-          if (__atomic_load_n(&pool->sleeping_workers, __ATOMIC_SEQ_CST) > 0) {
+          if (__atomic_load_n(&pool->sleeping_workers, __ATOMIC_SEQ_CST) > 0 &&
+              __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0) {
             blosc2_pthread_mutex_lock(&pool->mutex);
-            bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0;
+            bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0 &&
+                        __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0;
             blosc2_pthread_mutex_unlock(&pool->mutex);
             if (wake) {
               blosc2_pthread_cond_broadcast(&pool->work_cv);
