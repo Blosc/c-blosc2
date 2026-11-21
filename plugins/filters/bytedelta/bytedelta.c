@@ -108,30 +108,16 @@ static inline void load_planes16(const uint8_t *input, bytes16 *planes, int type
   }
 }
 
-static inline void store_planes16(uint8_t *output, const bytes16 *planes, int typesize) {
-  if (typesize == 2) {
-    uint8x16x2_t values;
-    values.val[0] = planes[0];
-    values.val[1] = planes[1];
-    vst2q_u8(output, values);
-    return;
-  }
-  uint8x16x4_t lo;
-  if (typesize == 4) {
-    for (int p = 0; p < 4; p++) {
-      lo.val[p] = planes[p];
-    }
-    vst4q_u8(output, lo);
-  }
-  else {
-    uint8x16x4_t hi;
-    for (int p = 0; p < 4; p++) {
-      lo.val[p] = vzip1q_u8(planes[p], planes[p + 4]);
-      hi.val[p] = vzip2q_u8(planes[p], planes[p + 4]);
-    }
-    vst4q_u8(output, lo);
-    vst4q_u8(output + 64, hi);
-  }
+static inline bytes16 dup_lane1_u64(bytes16 v) {
+  return vreinterpretq_u8_u64(vdupq_laneq_u64(vreinterpretq_u64_u8(v), 1));
+}
+
+static inline bytes16 dup_lane3_u32(bytes16 v) {
+  return vreinterpretq_u8_u32(vdupq_laneq_u32(vreinterpretq_u32_u8(v), 3));
+}
+
+static inline bytes16 dup_lane7_u16(bytes16 v) {
+  return vreinterpretq_u8_u16(vdupq_laneq_u16(vreinterpretq_u16_u8(v), 7));
 }
 #endif
 
@@ -223,42 +209,193 @@ int shuffle_bytedelta_neon_backward(const uint8_t *input, uint8_t *output, int32
   }
   int count = length / typesize;
   int vector_count = count / 16 * 16;
-  bytes16 previous[8], planes[8];
-  for (int p = 0; p < typesize; p++) {
-    previous[p] = simd_zero();
-  }
+  bytes16 zero = simd_zero();
+  /* Transpose into interleaved records first, then run a record-parallel byte
+   * prefix sum across lanes. This cuts SIMD ALU ops nearly in half compared to
+   * per-plane 16-byte Kogge-Stone prefix sums and avoids ST4 stores. */
+  bytes16 carry_vec = zero;
   if (typesize == 2) {
-    for (int i = 0; i < vector_count; i += 16) {
-      for (int p = 0; p < 2; p++) {
-        bytes16 delta = simd_load(input + p * count + i);
-        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
-        previous[p] = planes[p];
-      }
-      store_planes16(output + i * 2, planes, 2);
+    int i = 0;
+    for (; i + 32 <= vector_count; i += 32) {
+      bytes16 p0a = simd_load(input + i);
+      bytes16 p0b = simd_load(input + i + 16);
+      bytes16 p1a = simd_load(input + count + i);
+      bytes16 p1b = simd_load(input + count + i + 16);
+
+      bytes16 e0 = vtrn1q_u8(p0a, p1a);
+      bytes16 o0 = vtrn2q_u8(p0a, p1a);
+      bytes16 e1 = vtrn1q_u8(p0b, p1b);
+      bytes16 o1 = vtrn2q_u8(p0b, p1b);
+
+      o0 = vaddq_u8(o0, e0);
+      o1 = vaddq_u8(o1, e1);
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 14));
+      o1 = vaddq_u8(o1, vextq_u8(zero, o1, 14));
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 12));
+      o1 = vaddq_u8(o1, vextq_u8(zero, o1, 12));
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 8));
+      o1 = vaddq_u8(o1, vextq_u8(zero, o1, 8));
+      e0 = vaddq_u8(e0, vextq_u8(zero, o0, 14));
+      e1 = vaddq_u8(e1, vextq_u8(zero, o1, 14));
+
+      e0 = vaddq_u8(e0, carry_vec);
+      o0 = vaddq_u8(o0, carry_vec);
+      bytes16 c0 = dup_lane7_u16(o0);
+      e1 = vaddq_u8(e1, c0);
+      o1 = vaddq_u8(o1, c0);
+      carry_vec = dup_lane7_u16(o1);
+
+      uint16_t *dst = (uint16_t *)(void *)(output + i * 2);
+      uint16x8x2_t q0 = {{ vreinterpretq_u16_u8(e0), vreinterpretq_u16_u8(o0) }};
+      uint16x8x2_t q1 = {{ vreinterpretq_u16_u8(e1), vreinterpretq_u16_u8(o1) }};
+      vst2q_u16(dst, q0);
+      vst2q_u16(dst + 16, q1);
+    }
+    for (; i < vector_count; i += 16) {
+      bytes16 p0 = simd_load(input + i);
+      bytes16 p1 = simd_load(input + count + i);
+      bytes16 e0 = vtrn1q_u8(p0, p1);
+      bytes16 o0 = vtrn2q_u8(p0, p1);
+
+      o0 = vaddq_u8(o0, e0);
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 14));
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 12));
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 8));
+      e0 = vaddq_u8(e0, vextq_u8(zero, o0, 14));
+
+      e0 = vaddq_u8(e0, carry_vec);
+      o0 = vaddq_u8(o0, carry_vec);
+      carry_vec = dup_lane7_u16(o0);
+
+      uint16x8x2_t q0 = {{ vreinterpretq_u16_u8(e0), vreinterpretq_u16_u8(o0) }};
+      vst2q_u16((uint16_t *)(void *)(output + i * 2), q0);
     }
   }
   else if (typesize == 4) {
     for (int i = 0; i < vector_count; i += 16) {
-      for (int p = 0; p < 4; p++) {
-        bytes16 delta = simd_load(input + p * count + i);
-        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
-        previous[p] = planes[p];
-      }
-      store_planes16(output + i * 4, planes, 4);
+      bytes16 p0 = simd_load(input + 0 * count + i);
+      bytes16 p1 = simd_load(input + 1 * count + i);
+      bytes16 p2 = simd_load(input + 2 * count + i);
+      bytes16 p3 = simd_load(input + 3 * count + i);
+
+      uint16x8_t a0 = vreinterpretq_u16_u8(vzip1q_u8(p0, p1));
+      uint16x8_t a1 = vreinterpretq_u16_u8(vzip2q_u8(p0, p1));
+      uint16x8_t a2 = vreinterpretq_u16_u8(vzip1q_u8(p2, p3));
+      uint16x8_t a3 = vreinterpretq_u16_u8(vzip2q_u8(p2, p3));
+
+      bytes16 e0 = vreinterpretq_u8_u16(vtrn1q_u16(a0, a2));
+      bytes16 o0 = vreinterpretq_u8_u16(vtrn2q_u16(a0, a2));
+      bytes16 e1 = vreinterpretq_u8_u16(vtrn1q_u16(a1, a3));
+      bytes16 o1 = vreinterpretq_u8_u16(vtrn2q_u16(a1, a3));
+
+      o0 = vaddq_u8(o0, e0);
+      o1 = vaddq_u8(o1, e1);
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 12));
+      o1 = vaddq_u8(o1, vextq_u8(zero, o1, 12));
+      o0 = vaddq_u8(o0, vextq_u8(zero, o0, 8));
+      o1 = vaddq_u8(o1, vextq_u8(zero, o1, 8));
+      e0 = vaddq_u8(e0, vextq_u8(zero, o0, 12));
+      e1 = vaddq_u8(e1, vextq_u8(zero, o1, 12));
+
+      e0 = vaddq_u8(e0, carry_vec);
+      o0 = vaddq_u8(o0, carry_vec);
+      bytes16 c0 = dup_lane3_u32(o0);
+      e1 = vaddq_u8(e1, c0);
+      o1 = vaddq_u8(o1, c0);
+      carry_vec = dup_lane3_u32(o1);
+
+      uint32_t *dst = (uint32_t *)(void *)(output + i * 4);
+      uint32x4x2_t q0 = {{ vreinterpretq_u32_u8(e0), vreinterpretq_u32_u8(o0) }};
+      uint32x4x2_t q1 = {{ vreinterpretq_u32_u8(e1), vreinterpretq_u32_u8(o1) }};
+      vst2q_u32(dst, q0);
+      vst2q_u32(dst + 8, q1);
     }
   }
   else {
     for (int i = 0; i < vector_count; i += 16) {
-      for (int p = 0; p < 8; p++) {
-        bytes16 delta = simd_load(input + p * count + i);
-        planes[p] = simd_add(simd_prefix_sum(delta), simd_duplane15(previous[p]));
-        previous[p] = planes[p];
-      }
-      store_planes16(output + i * 8, planes, 8);
+      bytes16 p0 = simd_load(input + 0 * count + i);
+      bytes16 p1 = simd_load(input + 1 * count + i);
+      bytes16 p2 = simd_load(input + 2 * count + i);
+      bytes16 p3 = simd_load(input + 3 * count + i);
+      bytes16 p4 = simd_load(input + 4 * count + i);
+      bytes16 p5 = simd_load(input + 5 * count + i);
+      bytes16 p6 = simd_load(input + 6 * count + i);
+      bytes16 p7 = simd_load(input + 7 * count + i);
+
+      uint16x8_t a0 = vreinterpretq_u16_u8(vzip1q_u8(p0, p1));
+      uint16x8_t a1 = vreinterpretq_u16_u8(vzip2q_u8(p0, p1));
+      uint16x8_t a2 = vreinterpretq_u16_u8(vzip1q_u8(p2, p3));
+      uint16x8_t a3 = vreinterpretq_u16_u8(vzip2q_u8(p2, p3));
+      uint16x8_t a4 = vreinterpretq_u16_u8(vzip1q_u8(p4, p5));
+      uint16x8_t a5 = vreinterpretq_u16_u8(vzip2q_u8(p4, p5));
+      uint16x8_t a6 = vreinterpretq_u16_u8(vzip1q_u8(p6, p7));
+      uint16x8_t a7 = vreinterpretq_u16_u8(vzip2q_u8(p6, p7));
+
+      uint32x4_t b0 = vreinterpretq_u32_u16(vzip1q_u16(a0, a2));
+      uint32x4_t b1 = vreinterpretq_u32_u16(vzip2q_u16(a0, a2));
+      uint32x4_t b2 = vreinterpretq_u32_u16(vzip1q_u16(a1, a3));
+      uint32x4_t b3 = vreinterpretq_u32_u16(vzip2q_u16(a1, a3));
+      uint32x4_t b4 = vreinterpretq_u32_u16(vzip1q_u16(a4, a6));
+      uint32x4_t b5 = vreinterpretq_u32_u16(vzip2q_u16(a4, a6));
+      uint32x4_t b6 = vreinterpretq_u32_u16(vzip1q_u16(a5, a7));
+      uint32x4_t b7 = vreinterpretq_u32_u16(vzip2q_u16(a5, a7));
+
+      bytes16 r0 = vreinterpretq_u8_u32(vzip1q_u32(b0, b4));
+      bytes16 r1 = vreinterpretq_u8_u32(vzip2q_u32(b0, b4));
+      bytes16 r2 = vreinterpretq_u8_u32(vzip1q_u32(b1, b5));
+      bytes16 r3 = vreinterpretq_u8_u32(vzip2q_u32(b1, b5));
+      bytes16 r4 = vreinterpretq_u8_u32(vzip1q_u32(b2, b6));
+      bytes16 r5 = vreinterpretq_u8_u32(vzip2q_u32(b2, b6));
+      bytes16 r6 = vreinterpretq_u8_u32(vzip1q_u32(b3, b7));
+      bytes16 r7 = vreinterpretq_u8_u32(vzip2q_u32(b3, b7));
+
+      r0 = vaddq_u8(r0, vextq_u8(zero, r0, 8));
+      r1 = vaddq_u8(r1, vextq_u8(zero, r1, 8));
+      r2 = vaddq_u8(r2, vextq_u8(zero, r2, 8));
+      r3 = vaddq_u8(r3, vextq_u8(zero, r3, 8));
+      r4 = vaddq_u8(r4, vextq_u8(zero, r4, 8));
+      r5 = vaddq_u8(r5, vextq_u8(zero, r5, 8));
+      r6 = vaddq_u8(r6, vextq_u8(zero, r6, 8));
+      r7 = vaddq_u8(r7, vextq_u8(zero, r7, 8));
+
+      r1 = vaddq_u8(r1, dup_lane1_u64(r0));
+      r3 = vaddq_u8(r3, dup_lane1_u64(r2));
+      r5 = vaddq_u8(r5, dup_lane1_u64(r4));
+      r7 = vaddq_u8(r7, dup_lane1_u64(r6));
+
+      bytes16 d1 = dup_lane1_u64(r1);
+      bytes16 d5 = dup_lane1_u64(r5);
+      r2 = vaddq_u8(r2, d1);
+      r3 = vaddq_u8(r3, d1);
+      r6 = vaddq_u8(r6, d5);
+      r7 = vaddq_u8(r7, d5);
+
+      r0 = vaddq_u8(r0, carry_vec);
+      r1 = vaddq_u8(r1, carry_vec);
+      r2 = vaddq_u8(r2, carry_vec);
+      r3 = vaddq_u8(r3, carry_vec);
+      bytes16 d3 = dup_lane1_u64(r3);
+      r4 = vaddq_u8(r4, d3);
+      r5 = vaddq_u8(r5, d3);
+      r6 = vaddq_u8(r6, d3);
+      r7 = vaddq_u8(r7, d3);
+      carry_vec = dup_lane1_u64(r7);
+
+      uint8_t *dst = output + i * 8;
+      simd_store(dst + 0, r0);
+      simd_store(dst + 16, r1);
+      simd_store(dst + 32, r2);
+      simd_store(dst + 48, r3);
+      simd_store(dst + 64, r4);
+      simd_store(dst + 80, r5);
+      simd_store(dst + 96, r6);
+      simd_store(dst + 112, r7);
     }
   }
+  uint8_t tail_carry[16];
+  simd_store(tail_carry, carry_vec);
   for (int p = 0; p < typesize; p++) {
-    uint8_t carry = simd_get_last(previous[p]);
+    uint8_t carry = tail_carry[p];
     for (int i = vector_count; i < count; i++) {
       carry = (uint8_t)(carry + input[p * count + i]);
       output[i * typesize + p] = carry;
