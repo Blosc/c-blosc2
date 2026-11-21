@@ -1213,6 +1213,139 @@ static unsigned char* copy_match_16(unsigned char *op, const unsigned char *matc
 }
 #endif
 
+#if defined(__aarch64__) || defined(_M_ARM64)
+/* ARM64 NEON match copier: uses 64B/32B/16B vector copies with exact
+ * overlapping 16B tails (so end-of-stream matches need no slack and do not
+ * fall back to scalar copy_match), inline NEON short RLE fills, and 16B
+ * doubling for 8..15-byte overlap distances. */
+BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
+    uint8_t *op, const uint8_t *ref, int32_t len, uint8_t *op_limit) {
+  ptrdiff_t dist = op - ref;
+  uint8_t *end = op + len;
+
+  if (dist >= 16) {
+    if (len <= 16 && op_limit - op >= 16) {
+      vst1q_u8(op, vld1q_u8(ref));
+      return end;
+    }
+    if (dist >= 32) {
+      if (len <= 32 && op_limit - op >= 32) {
+        uint8x16_t v0 = vld1q_u8(ref);
+        uint8x16_t v1 = vld1q_u8(ref + 16);
+        vst1q_u8(op, v0);
+        vst1q_u8(op + 16, v1);
+        return end;
+      }
+      if (len >= 16) {
+        uint8_t *cur = op;
+        const uint8_t *src = ref;
+        while (cur + 64 <= end) {
+          uint8x16_t v0 = vld1q_u8(src);
+          uint8x16_t v1 = vld1q_u8(src + 16);
+          vst1q_u8(cur, v0);
+          vst1q_u8(cur + 16, v1);
+          uint8x16_t v2 = vld1q_u8(src + 32);
+          uint8x16_t v3 = vld1q_u8(src + 48);
+          vst1q_u8(cur + 32, v2);
+          vst1q_u8(cur + 48, v3);
+          cur += 64;
+          src += 64;
+        }
+        if (cur + 32 <= end) {
+          uint8x16_t v0 = vld1q_u8(src);
+          uint8x16_t v1 = vld1q_u8(src + 16);
+          vst1q_u8(cur, v0);
+          vst1q_u8(cur + 16, v1);
+          cur += 32;
+          src += 32;
+        }
+        if (cur + 16 <= end) {
+          vst1q_u8(cur, vld1q_u8(src));
+          cur += 16;
+        }
+        if (cur < end) {
+          vst1q_u8(end - 16, vld1q_u8(ref + len - 16));
+        }
+        return end;
+      }
+      return copy_match(op, ref, (unsigned)len);
+    }
+    /* 16 <= dist < 32 */
+    if (len >= 16) {
+      uint8_t *cur = op;
+      const uint8_t *src = ref;
+      while (cur + 32 <= end) {
+        vst1q_u8(cur, vld1q_u8(src));
+        vst1q_u8(cur + 16, vld1q_u8(src + 16));
+        cur += 32;
+        src += 32;
+      }
+      if (cur + 16 <= end) {
+        vst1q_u8(cur, vld1q_u8(src));
+        cur += 16;
+      }
+      if (cur < end) {
+        vst1q_u8(end - 16, vld1q_u8(ref + len - 16));
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
+  }
+
+  if (dist == 1) {
+    if (len <= 32 && op_limit - op >= 32) {
+      uint8x16_t v = vdupq_n_u8(*ref);
+      vst1q_u8(op, v);
+      if (len > 16) {
+        vst1q_u8(op + 16, v);
+      }
+      return end;
+    }
+    memset(op, *ref, (size_t)len);
+    return end;
+  }
+
+  if (dist >= 8) {
+    if (len <= dist && op_limit - op >= 16) {
+      vst1q_u8(op, vld1q_u8(ref));
+      return end;
+    }
+    if (len <= 16 && op_limit - op >= 16) {
+      memcpy(op, ref, 8);
+      memcpy(op + 8, ref + 8, 8);
+      return end;
+    }
+    if (len > 16) {
+      /* Seed first dist bytes so wide_dist = 2 * dist >= 16. */
+      vst1q_u8(op, vld1q_u8(ref));
+      uint8_t *cur = op + dist;
+      const uint8_t *src = ref;
+      ptrdiff_t wide_dist = dist * 2;
+      while (cur + 16 <= end) {
+        vst1q_u8(cur, vld1q_u8(src));
+        cur += 16;
+        src += 16;
+      }
+      if (cur < end) {
+        if (cur > op + dist) {
+          vst1q_u8(end - 16, vld1q_u8(end - 16 - wide_dist));
+        }
+        else {
+          while (cur < end) {
+            *cur++ = *src++;
+          }
+        }
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
+  }
+
+  return copy_match(op, ref, (unsigned)len);
+}
+#endif
+
+#if !defined(__aarch64__) && !defined(_M_ARM64)
 // LZ4 wildCopy which can reach excellent copy bandwidth (even if insecure)
 static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
   uint8_t* d = out;
@@ -1221,12 +1354,13 @@ static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
 
   do { memcpy(d,s,8); d+=8; s+=8; } while (d<e);
 }
+#endif
 
 #if defined(__aarch64__) || defined(_M_ARM64) || defined(__x86_64__) || defined(_M_X64)
 #define BLOSCLZ_WIDE_DECODE
 #endif
 
-#ifdef BLOSCLZ_WIDE_DECODE
+#if defined(BLOSCLZ_WIDE_DECODE) && !defined(__aarch64__) && !defined(_M_ARM64)
 /* The caller guarantees a distance and output slack of at least 16 bytes.
  * Keep each load/store ordered so overlapping matches propagate correctly. */
 static inline void wild_copy_16(uint8_t *out, const uint8_t *from, uint8_t *end) {
@@ -1317,6 +1451,9 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       ctrl = *ip++;
 
       ref--;
+#if defined(__aarch64__) || defined(_M_ARM64)
+      op = blosclz_copy_match_neon(op, ref, len, op_limit);
+#else
       if (ref == op - 1) {
         /* optimized copy for a run */
         memset(op, *ref, len);
@@ -1348,6 +1485,7 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         }
 #endif
       }
+#endif
     }
     else {
       // literal
