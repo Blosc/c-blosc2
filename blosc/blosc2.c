@@ -1374,7 +1374,6 @@ uint8_t* pipeline_forward(struct thread_context* thread_context, const int32_t b
     if (context->prefilter(&preparams) != 0) {
       if (output_is_disposable) {
         // Output is going to be discarded; no more filters are required
-        BLOSC_TRACE_INFO("Output is disposable");
         return _dest;
       }
       BLOSC_TRACE_ERROR("Execution of prefilter function failed");
@@ -1651,7 +1650,6 @@ static int blosc_c(struct thread_context* thread_context, int32_t bsize,
 
       if (!vlblocks && context->header_overhead == BLOSC_EXTENDED_HEADER_LENGTH && output_is_disposable) {
         // Simulate a run of 0s
-        BLOSC_TRACE_INFO("Output is disposable, simulating a run of 0s");
         memset(dest - 4, 0, sizeof(int32_t));
         continue;
       }
