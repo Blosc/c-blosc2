@@ -852,6 +852,10 @@ BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, 
     ip++;
     /* assuming literal copy */
     oc++;
+    /* Stop probing early once a 256-byte prefix already confirms strong compressibility */
+    if (ip - ibase >= 256 && (ip - ibase) >= (ptrdiff_t)oc * 3) {
+      break;
+    }
   }
 
   double ic = (double)(ip - ibase);
@@ -890,10 +894,10 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
    * finding longer matches and increase decompression work. */
   unsigned minlen = clevel == 1 ? 3 : 4;
 
-  /* Grow the table gradually from 1 KB at level 1 to 64 KB at level 7.
-   * Smaller tables also bound the entropy probe, reducing low-level work on
-   * the small alphabets produced by filtered ramps. */
-  uint8_t hashlog_[10] = {0, HASH_LOG - 6, HASH_LOG - 5, HASH_LOG - 4, HASH_LOG - 3,
+  /* Keep at least an 8 KB (2048-entry) hash table at low levels so periodic
+   * shuffled byte streams (periods > 256 B) do not collapse in entropy probing,
+   * then grow to 64 KB at level 7. */
+  uint8_t hashlog_[10] = {0, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3,
                           HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
 
@@ -917,12 +921,11 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
   uint32_t base = htab_reset(htab, hashlog, state, maxlen, tagged);
   double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift, htab, hashlog, base, tagged);
   if (state != NULL) {
-    /* Tagged lookups cost a bit per hash probe; they only pay off when skipping
-     * the (large) table clear matters, i.e. on very compressible data. */
-    state->tagged = clevel >= 4 && cratio >= 8.0;
+    /* Tagged lookups skip clearing the >= 8 KB table between compressible streams. */
+    state->tagged = hashlog >= 11 && cratio >= 3.0;
   }
   // discard probes with small compression ratios (too expensive)
-  double cratio_[10] = {0, 2, 1.5, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
+  double cratio_[10] = {0, 1.5, 1.3, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
   if (cratio < cratio_[clevel]) {
       goto out;
   }
