@@ -13,12 +13,6 @@
 #include <immintrin.h>
 #include <string.h>
 
-/* Split-store low 128-bit lane to `lo` and high 128-bit lane to `hi` */
-static inline void storeu2_128(void *hi, void *lo, __m256i v) {
-  _mm_storeu_si128((__m128i *)lo, _mm256_castsi256_si128(v));
-  _mm_storeu_si128((__m128i *)hi, _mm256_extracti128_si256(v, 1));
-}
-
 /* Forward SHUFFLE + BYTEDELTA:
  * Per-byte delta commutes with byte-plane transposition because subtraction is
  * modulo 256 per byte lane:
@@ -88,52 +82,19 @@ static inline void transpose_store_8(uint8_t *output, int count, int i, const __
   }
 }
 
-/* Inverse transpose: interleave N 32-byte planes back into 32 contiguous records */
-static inline void store_planes32(uint8_t *output, const __m256i *planes, int typesize) {
-  if (typesize == 2) {
-    __m256i lo = _mm256_unpacklo_epi8(planes[0], planes[1]);
-    __m256i hi = _mm256_unpackhi_epi8(planes[0], planes[1]);
-    _mm256_storeu_si256((__m256i *)output, _mm256_permute2x128_si256(lo, hi, 0x20));
-    _mm256_storeu_si256((__m256i *)(output + 32), _mm256_permute2x128_si256(lo, hi, 0x31));
-  }
-  else if (typesize == 4) {
-    __m256i a[4];
-    a[0] = _mm256_unpacklo_epi8(planes[0], planes[1]);
-    a[1] = _mm256_unpackhi_epi8(planes[0], planes[1]);
-    a[2] = _mm256_unpacklo_epi8(planes[2], planes[3]);
-    a[3] = _mm256_unpackhi_epi8(planes[2], planes[3]);
-    storeu2_128(output + 64, output, _mm256_unpacklo_epi16(a[0], a[2]));
-    storeu2_128(output + 80, output + 16, _mm256_unpackhi_epi16(a[0], a[2]));
-    storeu2_128(output + 96, output + 32, _mm256_unpacklo_epi16(a[1], a[3]));
-    storeu2_128(output + 112, output + 48, _mm256_unpackhi_epi16(a[1], a[3]));
-  }
-  else {
-    __m256i a[8], b[8];
-    for (int p = 0; p < 4; p++) {
-      a[p * 2] = _mm256_unpacklo_epi8(planes[p * 2], planes[p * 2 + 1]);
-      a[p * 2 + 1] = _mm256_unpackhi_epi8(planes[p * 2], planes[p * 2 + 1]);
-    }
-    for (int p = 0; p < 2; p++) {
-      b[p * 2] = _mm256_unpacklo_epi16(a[p], a[p + 2]);
-      b[p * 2 + 1] = _mm256_unpackhi_epi16(a[p], a[p + 2]);
-      b[p * 2 + 4] = _mm256_unpacklo_epi16(a[p + 4], a[p + 6]);
-      b[p * 2 + 5] = _mm256_unpackhi_epi16(a[p + 4], a[p + 6]);
-    }
-    for (int p = 0; p < 4; p++) {
-      storeu2_128(output + 128 + p * 32, output + p * 32,
-                  _mm256_unpacklo_epi32(b[p], b[p + 4]));
-      storeu2_128(output + 128 + p * 32 + 16, output + p * 32 + 16,
-                  _mm256_unpackhi_epi32(b[p], b[p + 4]));
-    }
-  }
+/* Record-parallel byte prefix sum helpers for backward SHUFFLE + BYTEDELTA.
+ * Transposing into interleaved records first lets us run a tree prefix sum
+ * across complete records in parallel, eliminating per-plane 32-byte Kogge-Stone
+ * loops and reducing carry state from N registers (which spilled on typesize=8)
+ * down to a single 128-bit register. */
+static inline __m256i dup_hi64_256(__m256i v) {
+  /* Broadcast the upper 64-bit record of each 128-bit lane across that lane. */
+  return _mm256_unpackhi_epi64(v, v);
 }
 
-/* Kogge-Stone inclusive byte prefix sum independently within each 128-bit lane */
-static inline __m256i prefix_sum_inlane32(__m256i value) {
-  value = _mm256_add_epi8(value, _mm256_slli_si256(value, 1));
-  value = _mm256_add_epi8(value, _mm256_slli_si256(value, 2));
-  value = _mm256_add_epi8(value, _mm256_slli_si256(value, 4));
-  return _mm256_add_epi8(value, _mm256_slli_si256(value, 8));
+static inline __m256i dup_hi32_256(__m256i v) {
+  /* Broadcast the top 32-bit record of each 128-bit lane across that lane. */
+  return _mm256_shuffle_epi32(v, 0xff);
 }
 
 static int forward2_avx2(const uint8_t *input, uint8_t *output, int32_t length) {
@@ -240,46 +201,259 @@ static int forward8_avx2(const uint8_t *input, uint8_t *output, int32_t length) 
   return 1;
 }
 
-/* Decouple the cross-tile carry chain from the in-lane prefix sum:
- * ps_full and tile_sum depend only on the current tile, so carry[p] advances
- * via a single 1-cycle vpaddb per tile instead of waiting on vextracti128 +
- * vpshufb + vbroadcasti128. */
-#define DEFINE_BACKWARD_AVX2(N) \
-static int backward##N##_avx2(const uint8_t *input, uint8_t *output, int32_t length) { \
-  int count = length / N, vector_count = count / 32 * 32; \
-  const __m256i mask15 = _mm256_set1_epi8(15); \
-  const __m128i mask15_128 = _mm_set1_epi8(15); \
-  __m128i carry128[N]; \
-  __m256i planes[N]; \
-  for (int p = 0; p < N; p++) carry128[p] = _mm_setzero_si128(); \
-  for (int i = 0; i < vector_count; i += 32) { \
-    for (int p = 0; p < N; p++) { \
-      __m256i delta = _mm256_loadu_si256((const __m256i *)(input + p * count + i)); \
-      __m256i ps = prefix_sum_inlane32(delta); \
-      __m256i lo_carry = _mm256_shuffle_epi8( \
-          _mm256_permute2x128_si256(ps, ps, 0x08), mask15); \
-      __m256i ps_full = _mm256_add_epi8(ps, lo_carry); \
-      __m128i tile_sum = _mm_shuffle_epi8(_mm256_extracti128_si256(ps_full, 1), mask15_128); \
-      planes[p] = _mm256_add_epi8(ps_full, _mm256_broadcastsi128_si256(carry128[p])); \
-      carry128[p] = _mm_add_epi8(carry128[p], tile_sum); \
-    } \
-    store_planes32(output + i * N, planes, N); \
-  } \
-  for (int p = 0; p < N; p++) { \
-    uint8_t carry = (uint8_t)(_mm_cvtsi128_si32(carry128[p]) & 0xff); \
-    for (int i = vector_count; i < count; i++) { \
-      carry = (uint8_t)(carry + input[p * count + i]); \
-      output[i * N + p] = carry; \
-    } \
-  } \
-  memcpy(output + count * N, input + count * N, (size_t)(length % N)); \
-  return 1; \
+static int backward2_avx2(const uint8_t *input, uint8_t *output, int32_t length) {
+  int count = length / 2, vector_count = count / 32 * 32;
+  /* Shuffle mask broadcasting the 8th 16-bit record (bytes 14..15) in each 128-bit lane. */
+  const __m256i mask_hi16 = _mm256_setr_epi8(
+      14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15,
+      14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15, 14, 15);
+  const __m128i mask_hi16_128 = _mm256_castsi256_si128(mask_hi16);
+  __m128i carry128 = _mm_setzero_si128();
+  for (int i = 0; i < vector_count; i += 32) {
+    /* Load 32 delta bytes from each of the 2 byte planes. */
+    __m256i p0 = _mm256_loadu_si256((const __m256i *)(input + i));
+    __m256i p1 = _mm256_loadu_si256((const __m256i *)(input + count + i));
+
+    /* Interleave into 2-byte records: lo lanes hold 0..7 and 8..15, hi lanes 16..23 and 24..31. */
+    __m256i r0 = _mm256_unpacklo_epi8(p0, p1);
+    __m256i r1 = _mm256_unpackhi_epi8(p0, p1);
+
+    /* Kogge-Stone prefix sum across the 8 interleaved 2-byte records in each 128-bit lane. */
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 2));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 2));
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 4));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 4));
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 8));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 8));
+
+    /* Propagate each 8-record half-lane total from r0 into r1. */
+    r1 = _mm256_add_epi8(r1, _mm256_shuffle_epi8(r0, mask_hi16));
+
+    /* Build per-lane tile carry [carry, carry + sum_lo] and advance running carry128. */
+    __m128i sum_lo = _mm_shuffle_epi8(_mm256_castsi256_si128(r1), mask_hi16_128);
+    __m128i sum_hi = _mm_shuffle_epi8(_mm256_extracti128_si256(r1, 1), mask_hi16_128);
+    __m128i carry_hi = _mm_add_epi8(carry128, sum_lo);
+    __m256i tile_carry = _mm256_inserti128_si256(_mm256_castsi128_si256(carry128), carry_hi, 1);
+    carry128 = _mm_add_epi8(carry128, _mm_add_epi8(sum_lo, sum_hi));
+
+    /* Apply incoming cross-tile and cross-lane carry to all 32 records. */
+    r0 = _mm256_add_epi8(r0, tile_carry);
+    r1 = _mm256_add_epi8(r1, tile_carry);
+
+    /* Reorder lanes into two contiguous 32-byte stores (records 0..15, then 16..31). */
+    uint8_t *dst = output + i * 2;
+    _mm256_storeu_si256((__m256i *)dst, _mm256_permute2x128_si256(r0, r1, 0x20));
+    _mm256_storeu_si256((__m256i *)(dst + 32), _mm256_permute2x128_si256(r0, r1, 0x31));
+  }
+  /* Scalar tail for remaining <32 records and any incomplete trailing bytes. */
+  uint8_t tail_carry[16];
+  _mm_storeu_si128((__m128i *)tail_carry, carry128);
+  for (int p = 0; p < 2; p++) {
+    uint8_t carry = tail_carry[p];
+    for (int i = vector_count; i < count; i++) {
+      carry = (uint8_t)(carry + input[p * count + i]);
+      output[i * 2 + p] = carry;
+    }
+  }
+  memcpy(output + count * 2, input + count * 2, (size_t)(length % 2));
+  return 1;
 }
 
-DEFINE_BACKWARD_AVX2(2)
-DEFINE_BACKWARD_AVX2(4)
-DEFINE_BACKWARD_AVX2(8)
-#undef DEFINE_BACKWARD_AVX2
+static int backward4_avx2(const uint8_t *input, uint8_t *output, int32_t length) {
+  int count = length / 4, vector_count = count / 32 * 32;
+  __m128i carry128 = _mm_setzero_si128();
+  for (int i = 0; i < vector_count; i += 32) {
+    /* Load 32 delta bytes from each of the 4 byte planes. */
+    __m256i p0 = _mm256_loadu_si256((const __m256i *)(input + 0 * count + i));
+    __m256i p1 = _mm256_loadu_si256((const __m256i *)(input + 1 * count + i));
+    __m256i p2 = _mm256_loadu_si256((const __m256i *)(input + 2 * count + i));
+    __m256i p3 = _mm256_loadu_si256((const __m256i *)(input + 3 * count + i));
+
+    /* Stage 1 & 2 in-lane transpose: interleave 4 planes into 4-byte records in r0..r3. */
+    __m256i a0 = _mm256_unpacklo_epi8(p0, p1);
+    __m256i a1 = _mm256_unpackhi_epi8(p0, p1);
+    __m256i a2 = _mm256_unpacklo_epi8(p2, p3);
+    __m256i a3 = _mm256_unpackhi_epi8(p2, p3);
+
+    __m256i r0 = _mm256_unpacklo_epi16(a0, a2);
+    __m256i r1 = _mm256_unpackhi_epi16(a0, a2);
+    __m256i r2 = _mm256_unpacklo_epi16(a1, a3);
+    __m256i r3 = _mm256_unpackhi_epi16(a1, a3);
+
+    /* Prefix sum across the 4 interleaved 4-byte records within each 128-bit lane. */
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 4));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 4));
+    r2 = _mm256_add_epi8(r2, _mm256_slli_si256(r2, 4));
+    r3 = _mm256_add_epi8(r3, _mm256_slli_si256(r3, 4));
+
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 8));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 8));
+    r2 = _mm256_add_epi8(r2, _mm256_slli_si256(r2, 8));
+    r3 = _mm256_add_epi8(r3, _mm256_slli_si256(r3, 8));
+
+    /* Tree-reduce quad totals across r0..r3 to get full 16-record local sums per lane. */
+    r1 = _mm256_add_epi8(r1, dup_hi32_256(r0));
+    r3 = _mm256_add_epi8(r3, dup_hi32_256(r2));
+    __m256i d1 = dup_hi32_256(r1);
+    __m256i r3_local = _mm256_add_epi8(r3, d1);
+
+    /* Build per-lane tile carry [carry, carry + sum_lo] and advance running carry128. */
+    __m128i sum_lo = _mm_shuffle_epi32(_mm256_castsi256_si128(r3_local), 0xff);
+    __m128i sum_hi = _mm_shuffle_epi32(_mm256_extracti128_si256(r3_local, 1), 0xff);
+    __m128i carry_hi = _mm_add_epi8(carry128, sum_lo);
+    __m256i tile_carry = _mm256_inserti128_si256(_mm256_castsi128_si256(carry128), carry_hi, 1);
+    carry128 = _mm_add_epi8(carry128, _mm_add_epi8(sum_lo, sum_hi));
+
+    /* Fold tile_carry with d1 for r2 and apply carries to all 4 vectors. */
+    __m256i d1c = _mm256_add_epi8(d1, tile_carry);
+    r0 = _mm256_add_epi8(r0, tile_carry);
+    r1 = _mm256_add_epi8(r1, tile_carry);
+    r2 = _mm256_add_epi8(r2, d1c);
+    r3 = _mm256_add_epi8(r3_local, tile_carry);
+
+    /* Reorder lanes into four contiguous 32-byte stores (records 0..31). */
+    uint8_t *dst = output + i * 4;
+    _mm256_storeu_si256((__m256i *)(dst + 0), _mm256_permute2x128_si256(r0, r1, 0x20));
+    _mm256_storeu_si256((__m256i *)(dst + 32), _mm256_permute2x128_si256(r2, r3, 0x20));
+    _mm256_storeu_si256((__m256i *)(dst + 64), _mm256_permute2x128_si256(r0, r1, 0x31));
+    _mm256_storeu_si256((__m256i *)(dst + 96), _mm256_permute2x128_si256(r2, r3, 0x31));
+  }
+  /* Scalar tail for remaining <32 records and any incomplete trailing bytes. */
+  uint8_t tail_carry[16];
+  _mm_storeu_si128((__m128i *)tail_carry, carry128);
+  for (int p = 0; p < 4; p++) {
+    uint8_t carry = tail_carry[p];
+    for (int i = vector_count; i < count; i++) {
+      carry = (uint8_t)(carry + input[p * count + i]);
+      output[i * 4 + p] = carry;
+    }
+  }
+  memcpy(output + count * 4, input + count * 4, (size_t)(length % 4));
+  return 1;
+}
+
+static int backward8_avx2(const uint8_t *input, uint8_t *output, int32_t length) {
+  int count = length / 8, vector_count = count / 32 * 32;
+  __m128i carry128 = _mm_setzero_si128();
+  for (int i = 0; i < vector_count; i += 32) {
+    /* Load 32 delta bytes from each of the 8 byte planes. */
+    __m256i p0 = _mm256_loadu_si256((const __m256i *)(input + 0 * count + i));
+    __m256i p1 = _mm256_loadu_si256((const __m256i *)(input + 1 * count + i));
+    __m256i p2 = _mm256_loadu_si256((const __m256i *)(input + 2 * count + i));
+    __m256i p3 = _mm256_loadu_si256((const __m256i *)(input + 3 * count + i));
+    __m256i p4 = _mm256_loadu_si256((const __m256i *)(input + 4 * count + i));
+    __m256i p5 = _mm256_loadu_si256((const __m256i *)(input + 5 * count + i));
+    __m256i p6 = _mm256_loadu_si256((const __m256i *)(input + 6 * count + i));
+    __m256i p7 = _mm256_loadu_si256((const __m256i *)(input + 7 * count + i));
+
+    /* Stage 1 (8-bit), Stage 2 (16-bit), Stage 3 (32-bit) in-lane transpose into 8-byte records. */
+    __m256i a0 = _mm256_unpacklo_epi8(p0, p1);
+    __m256i a1 = _mm256_unpackhi_epi8(p0, p1);
+    __m256i a2 = _mm256_unpacklo_epi8(p2, p3);
+    __m256i a3 = _mm256_unpackhi_epi8(p2, p3);
+    __m256i a4 = _mm256_unpacklo_epi8(p4, p5);
+    __m256i a5 = _mm256_unpackhi_epi8(p4, p5);
+    __m256i a6 = _mm256_unpacklo_epi8(p6, p7);
+    __m256i a7 = _mm256_unpackhi_epi8(p6, p7);
+
+    __m256i b0 = _mm256_unpacklo_epi16(a0, a2);
+    __m256i b1 = _mm256_unpackhi_epi16(a0, a2);
+    __m256i b2 = _mm256_unpacklo_epi16(a1, a3);
+    __m256i b3 = _mm256_unpackhi_epi16(a1, a3);
+    __m256i b4 = _mm256_unpacklo_epi16(a4, a6);
+    __m256i b5 = _mm256_unpackhi_epi16(a4, a6);
+    __m256i b6 = _mm256_unpacklo_epi16(a5, a7);
+    __m256i b7 = _mm256_unpackhi_epi16(a5, a7);
+
+    __m256i r0 = _mm256_unpacklo_epi32(b0, b4);
+    __m256i r1 = _mm256_unpackhi_epi32(b0, b4);
+    __m256i r2 = _mm256_unpacklo_epi32(b1, b5);
+    __m256i r3 = _mm256_unpackhi_epi32(b1, b5);
+    __m256i r4 = _mm256_unpacklo_epi32(b2, b6);
+    __m256i r5 = _mm256_unpackhi_epi32(b2, b6);
+    __m256i r6 = _mm256_unpacklo_epi32(b3, b7);
+    __m256i r7 = _mm256_unpackhi_epi32(b3, b7);
+
+    /* Prefix sum depth 1: combine adjacent pairs of 8-byte records within each 128-bit lane. */
+    r0 = _mm256_add_epi8(r0, _mm256_slli_si256(r0, 8));
+    r1 = _mm256_add_epi8(r1, _mm256_slli_si256(r1, 8));
+    r2 = _mm256_add_epi8(r2, _mm256_slli_si256(r2, 8));
+    r3 = _mm256_add_epi8(r3, _mm256_slli_si256(r3, 8));
+    r4 = _mm256_add_epi8(r4, _mm256_slli_si256(r4, 8));
+    r5 = _mm256_add_epi8(r5, _mm256_slli_si256(r5, 8));
+    r6 = _mm256_add_epi8(r6, _mm256_slli_si256(r6, 8));
+    r7 = _mm256_add_epi8(r7, _mm256_slli_si256(r7, 8));
+
+    /* Prefix sum depth 2: combine pairs into 4-record groups. */
+    r1 = _mm256_add_epi8(r1, dup_hi64_256(r0));
+    r3 = _mm256_add_epi8(r3, dup_hi64_256(r2));
+    r5 = _mm256_add_epi8(r5, dup_hi64_256(r4));
+    r7 = _mm256_add_epi8(r7, dup_hi64_256(r6));
+
+    /* Prefix sum depth 3: combine 4-record groups into 8-record halves. */
+    __m256i d1 = dup_hi64_256(r1);
+    __m256i d5 = dup_hi64_256(r5);
+    r2 = _mm256_add_epi8(r2, d1);
+    r3 = _mm256_add_epi8(r3, d1);
+    r6 = _mm256_add_epi8(r6, d5);
+    r7 = _mm256_add_epi8(r7, d5);
+
+    /* Prefix sum depth 4: compute 16-record local totals in r7_local before applying carries. */
+    __m256i d3 = dup_hi64_256(r3);
+    __m256i r7_local = _mm256_add_epi8(r7, d3);
+
+    /* Build per-lane tile carry [carry, carry + sum_lo] and advance running carry128. */
+    __m128i r7_lo = _mm256_castsi256_si128(r7_local);
+    __m128i r7_hi = _mm256_extracti128_si256(r7_local, 1);
+    __m128i sum_lo = _mm_unpackhi_epi64(r7_lo, r7_lo);
+    __m128i sum_hi = _mm_unpackhi_epi64(r7_hi, r7_hi);
+    __m128i carry_hi = _mm_add_epi8(carry128, sum_lo);
+    __m256i tile_carry = _mm256_inserti128_si256(_mm256_castsi128_si256(carry128), carry_hi, 1);
+    carry128 = _mm_add_epi8(carry128, _mm_add_epi8(sum_lo, sum_hi));
+
+    /* Fold tile_carry with d3 for r4..r6 to save vector adds, then finalize r0..r7. */
+    __m256i d3c = _mm256_add_epi8(d3, tile_carry);
+    r0 = _mm256_add_epi8(r0, tile_carry);
+    r1 = _mm256_add_epi8(r1, tile_carry);
+    r2 = _mm256_add_epi8(r2, tile_carry);
+    r3 = _mm256_add_epi8(r3, tile_carry);
+    r4 = _mm256_add_epi8(r4, d3c);
+    r5 = _mm256_add_epi8(r5, d3c);
+    r6 = _mm256_add_epi8(r6, d3c);
+    r7 = _mm256_add_epi8(r7_local, tile_carry);
+
+    /* Split-store low 128-bit lanes (records 0..15) and high lanes (16..31) without vperm2i128. */
+    uint8_t *dst = output + i * 8;
+    _mm_storeu_si128((__m128i *)(dst + 0), _mm256_castsi256_si128(r0));
+    _mm_storeu_si128((__m128i *)(dst + 16), _mm256_castsi256_si128(r1));
+    _mm_storeu_si128((__m128i *)(dst + 32), _mm256_castsi256_si128(r2));
+    _mm_storeu_si128((__m128i *)(dst + 48), _mm256_castsi256_si128(r3));
+    _mm_storeu_si128((__m128i *)(dst + 64), _mm256_castsi256_si128(r4));
+    _mm_storeu_si128((__m128i *)(dst + 80), _mm256_castsi256_si128(r5));
+    _mm_storeu_si128((__m128i *)(dst + 96), _mm256_castsi256_si128(r6));
+    _mm_storeu_si128((__m128i *)(dst + 112), _mm256_castsi256_si128(r7));
+    _mm_storeu_si128((__m128i *)(dst + 128), _mm256_extracti128_si256(r0, 1));
+    _mm_storeu_si128((__m128i *)(dst + 144), _mm256_extracti128_si256(r1, 1));
+    _mm_storeu_si128((__m128i *)(dst + 160), _mm256_extracti128_si256(r2, 1));
+    _mm_storeu_si128((__m128i *)(dst + 176), _mm256_extracti128_si256(r3, 1));
+    _mm_storeu_si128((__m128i *)(dst + 192), _mm256_extracti128_si256(r4, 1));
+    _mm_storeu_si128((__m128i *)(dst + 208), _mm256_extracti128_si256(r5, 1));
+    _mm_storeu_si128((__m128i *)(dst + 224), _mm256_extracti128_si256(r6, 1));
+    _mm_storeu_si128((__m128i *)(dst + 240), _mm256_extracti128_si256(r7, 1));
+  }
+  /* Scalar tail for remaining <32 records and any incomplete trailing bytes. */
+  uint8_t tail_carry[16];
+  _mm_storeu_si128((__m128i *)tail_carry, carry128);
+  for (int p = 0; p < 8; p++) {
+    uint8_t carry = tail_carry[p];
+    for (int i = vector_count; i < count; i++) {
+      carry = (uint8_t)(carry + input[p * count + i]);
+      output[i * 8 + p] = carry;
+    }
+  }
+  memcpy(output + count * 8, input + count * 8, (size_t)(length % 8));
+  return 1;
+}
 
 int shuffle_bytedelta_avx2_forward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
   switch (typesize) {

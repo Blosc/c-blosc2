@@ -30,6 +30,8 @@
 
 #if defined(__AVX2__)
 #include <immintrin.h>
+#elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
+#include <emmintrin.h>
 #endif
 
 #if defined(__aarch64__) || defined(_M_ARM64)
@@ -117,6 +119,7 @@ int blosclz_compress_avx2(const int clevel, const void* input, int length,
                           void* output, int maxout, blosc2_context* ctx);
 int blosclz_compress_state_avx2(const int clevel, const void* input, int length,
                                 void* output, int maxout, blosclz_state* state);
+int blosclz_decompress_avx2(const void* input, int length, void* output, int maxout);
 #endif
 
 #if defined(__AVX2__)
@@ -1130,86 +1133,363 @@ bool blosc_get_run_avx2(const uint8_t* ip, const uint8_t* ip_bound) {
   return true;
 }
 #endif /* defined(__AVX2__) */
+#endif /* defined(BLOSCLZ_BUILD_AVX2) */
 
-#else /* !defined(BLOSCLZ_BUILD_AVX2) */
-
-int blosclz_compress(const int clevel, const void* input, int length,
-                     void* output, int maxout, blosc2_context* ctx) {
-#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
-  if (blosc_cpu_has_avx2()) {
-    return blosclz_compress_avx2(clevel, input, length, output, maxout, ctx);
-  }
-#endif
-  BLOSC_UNUSED_PARAM(ctx);
-  uint32_t htab[1U << HASH_LOG];
-  return compress_impl(clevel, input, length, output, maxout, htab, NULL, 0);
-}
-
-int blosclz_compress_state(const int clevel, const void* input, int length,
-                           void* output, int maxout, blosclz_state* state) {
-#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
-  if (blosc_cpu_has_avx2()) {
-    return blosclz_compress_state_avx2(clevel, input, length, output, maxout, state);
-  }
-#endif
-  if (state->tagged) {
-    return compress_impl(clevel, input, length, output, maxout, state->htab, state, 1);
-  }
-  return compress_impl(clevel, input, length, output, maxout, state->htab, state, 0);
-}
-
-// See https://habr.com/en/company/yandex/blog/457612/
 #if defined(__AVX2__)
+/* x86-64 AVX2 match copier: uses 128B/64B/32B ordered vector copies with exact
+ * overlapping 32B/16B tails (so end-of-stream matches need no slack and do not
+ * fall back to scalar copy_match), inline AVX2 RLE fills up to 256B, 32B
+ * doubling for 16..31-byte distances, and 16B doubling for 8..15-byte distances. */
+BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_avx2(
+    uint8_t *op, const uint8_t *ref, int32_t len, uint8_t *op_limit) {
+  ptrdiff_t dist = op - ref;
+  uint8_t *end = op + len;
 
-#if defined(_MSC_VER)
-#define ALIGNED_(x) __declspec(align(x))
-#else
-#if defined(__GNUC__)
-#define ALIGNED_(x) __attribute__ ((aligned(x)))
-#endif
-#endif
-#define ALIGNED_TYPE_(t, x) t ALIGNED_(x)
-
-static unsigned char* copy_match_16(unsigned char *op, const unsigned char *match, int32_t len)
-{
-  size_t offset = op - match;
-  while (len >= 16) {
-
-    static const ALIGNED_TYPE_(uint8_t, 16) masks[] =
-      {
-                0,  1,  2,  1,  4,  1,  4,  2,  8,  7,  6,  5,  4,  3,  2,  1, // offset = 0, not used as mask, but for shift
-                0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // offset = 1
-                0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,  0,  1,
-                0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,  1,  2,  0,
-                0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,  0,  1,  2,  3,
-                0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,  1,  2,  3,  4,  0,
-                0,  1,  2,  3,  4,  5,  0,  1,  2,  3,  4,  5,  0,  1,  2,  3,
-                0,  1,  2,  3,  4,  5,  6,  0,  1,  2,  3,  4,  5,  6,  0,  1,
-                0,  1,  2,  3,  4,  5,  6,  7,  0,  1,  2,  3,  4,  5,  6,  7,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  0,  1,  2,  3,  4,  5,  6,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  0,  1,  2,  3,  4,  5,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10,  0,  1,  2,  3,  4,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,  0,  1,  2,  3,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12,  0,  1,  2,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13,  0,  1,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,  0,
-                0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14,  15, // offset = 16
-      };
-
-    _mm_storeu_si128((__m128i *)(op),
-                     _mm_shuffle_epi8(_mm_loadu_si128((const __m128i *)(match)),
-                                      _mm_load_si128((const __m128i *)(masks) + offset)));
-
-    match += masks[offset];
-
-    op += 16;
-    len -= 16;
+  if (dist >= 32) {
+    /* Short match overcopies when output slack permits (subsequent tokens overwrite excess). */
+    if (len <= 16 && op_limit - op >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      return end;
+    }
+    if (len <= 32 && op_limit - op >= 32) {
+      _mm256_storeu_si256((__m256i *)op, _mm256_loadu_si256((const __m256i *)ref));
+      return end;
+    }
+    if (len <= 64 && op_limit - op >= 64) {
+      _mm256_storeu_si256((__m256i *)op, _mm256_loadu_si256((const __m256i *)ref));
+      _mm256_storeu_si256((__m256i *)(op + 32), _mm256_loadu_si256((const __m256i *)(ref + 32)));
+      return end;
+    }
+    if (len >= 32) {
+      uint8_t *cur = op;
+      const uint8_t *src = ref;
+      if (dist >= 128) {
+        /* Non-overlapping 128B blocks: batch 4x32B loads before stores in 256B/128B steps. */
+        while (cur + 256 <= end) {
+          __m256i v0 = _mm256_loadu_si256((const __m256i *)src);
+          __m256i v1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+          __m256i v2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+          __m256i v3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+          _mm256_storeu_si256((__m256i *)cur, v0);
+          _mm256_storeu_si256((__m256i *)(cur + 32), v1);
+          _mm256_storeu_si256((__m256i *)(cur + 64), v2);
+          _mm256_storeu_si256((__m256i *)(cur + 96), v3);
+          __m256i v4 = _mm256_loadu_si256((const __m256i *)(src + 128));
+          __m256i v5 = _mm256_loadu_si256((const __m256i *)(src + 160));
+          __m256i v6 = _mm256_loadu_si256((const __m256i *)(src + 192));
+          __m256i v7 = _mm256_loadu_si256((const __m256i *)(src + 224));
+          _mm256_storeu_si256((__m256i *)(cur + 128), v4);
+          _mm256_storeu_si256((__m256i *)(cur + 160), v5);
+          _mm256_storeu_si256((__m256i *)(cur + 192), v6);
+          _mm256_storeu_si256((__m256i *)(cur + 224), v7);
+          cur += 256;
+          src += 256;
+        }
+        if (cur + 128 <= end) {
+          __m256i v0 = _mm256_loadu_si256((const __m256i *)src);
+          __m256i v1 = _mm256_loadu_si256((const __m256i *)(src + 32));
+          __m256i v2 = _mm256_loadu_si256((const __m256i *)(src + 64));
+          __m256i v3 = _mm256_loadu_si256((const __m256i *)(src + 96));
+          _mm256_storeu_si256((__m256i *)cur, v0);
+          _mm256_storeu_si256((__m256i *)(cur + 32), v1);
+          _mm256_storeu_si256((__m256i *)(cur + 64), v2);
+          _mm256_storeu_si256((__m256i *)(cur + 96), v3);
+          cur += 128;
+          src += 128;
+        }
+      }
+      else {
+        /* Keep each 32B load/store ordered so distances in [32, 128) propagate safely. */
+        while (cur + 128 <= end) {
+          _mm256_storeu_si256((__m256i *)cur, _mm256_loadu_si256((const __m256i *)src));
+          _mm256_storeu_si256((__m256i *)(cur + 32), _mm256_loadu_si256((const __m256i *)(src + 32)));
+          _mm256_storeu_si256((__m256i *)(cur + 64), _mm256_loadu_si256((const __m256i *)(src + 64)));
+          _mm256_storeu_si256((__m256i *)(cur + 96), _mm256_loadu_si256((const __m256i *)(src + 96)));
+          cur += 128;
+          src += 128;
+        }
+      }
+      /* Finish remaining <128B using 64B/32B steps and an exact overlapping 32B tail. */
+      if (cur + 64 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, _mm256_loadu_si256((const __m256i *)src));
+        _mm256_storeu_si256((__m256i *)(cur + 32), _mm256_loadu_si256((const __m256i *)(src + 32)));
+        cur += 64;
+        src += 64;
+      }
+      if (cur + 32 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, _mm256_loadu_si256((const __m256i *)src));
+        cur += 32;
+      }
+      if (cur < end) {
+        _mm256_storeu_si256((__m256i *)(end - 32), _mm256_loadu_si256((const __m256i *)(ref + len - 32)));
+      }
+      return end;
+    }
+    /* Exact 16..31-byte copy near end of buffer using two overlapping 16B stores. */
+    if (len >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(ref + len - 16)));
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
   }
-  // Deal with remainders
-  for (; len > 0; len--) {
-    *op++ = *match++;
+
+  if (dist >= 16) {
+    /* 16..31-byte overlap distance: single 16B overcopy for short matches. */
+    if (len <= 16 && op_limit - op >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      return end;
+    }
+    if (len >= 32) {
+      /* Seed first dist bytes so wide_dist = 2 * dist >= 32, enabling 32B AVX2 copies. */
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      _mm_storeu_si128((__m128i *)(op + dist - 16), _mm_loadu_si128((const __m128i *)(ref + dist - 16)));
+      uint8_t *cur = op + dist;
+      const uint8_t *src = ref;
+      ptrdiff_t wide_dist = dist * 2;
+      while (cur + 64 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, _mm256_loadu_si256((const __m256i *)src));
+        _mm256_storeu_si256((__m256i *)(cur + 32), _mm256_loadu_si256((const __m256i *)(src + 32)));
+        cur += 64;
+        src += 64;
+      }
+      if (cur + 32 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, _mm256_loadu_si256((const __m256i *)src));
+        cur += 32;
+        src += 32;
+      }
+      /* Overlapping 32B tail if the wide loop ran; otherwise finish safely with 16B ops. */
+      if (cur < end) {
+        if (cur > op + dist) {
+          _mm256_storeu_si256((__m256i *)(end - 32), _mm256_loadu_si256((const __m256i *)(end - 32 - wide_dist)));
+        }
+        else {
+          if (cur + 16 <= end) {
+            _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+            cur += 16;
+          }
+          if (cur < end) {
+            _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(end - 16 - dist)));
+          }
+        }
+      }
+      return end;
+    }
+    /* Exact 16..31-byte copy with two overlapping 16B stores. */
+    if (len >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      if (len > 16) {
+        _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(ref + len - 16)));
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
   }
-  return op;
+
+  if (dist == 1) {
+    /* Inline AVX2 RLE fills up to 256B to avoid memset call overhead; longer runs use memset. */
+    if (len <= 32 && op_limit - op >= 32) {
+      _mm256_storeu_si256((__m256i *)op, _mm256_set1_epi8((char)*ref));
+      return end;
+    }
+    if (len <= 64 && op_limit - op >= 64) {
+      __m256i v = _mm256_set1_epi8((char)*ref);
+      _mm256_storeu_si256((__m256i *)op, v);
+      _mm256_storeu_si256((__m256i *)(op + 32), v);
+      return end;
+    }
+    if (len >= 32 && len <= 256) {
+      __m256i v = _mm256_set1_epi8((char)*ref);
+      uint8_t *cur = op;
+      while (cur + 64 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, v);
+        _mm256_storeu_si256((__m256i *)(cur + 32), v);
+        cur += 64;
+      }
+      if (cur + 32 <= end) {
+        _mm256_storeu_si256((__m256i *)cur, v);
+        cur += 32;
+      }
+      if (cur < end) {
+        _mm256_storeu_si256((__m256i *)(end - 32), v);
+      }
+      return end;
+    }
+    memset(op, *ref, (size_t)len);
+    return end;
+  }
+
+  if (dist >= 8) {
+    /* 8..15-byte overlap distance: fast short copies, or double distance to >=16B for loops. */
+    if (len <= dist && op_limit - op >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      return end;
+    }
+    if (len <= 16 && op_limit - op >= 16) {
+      memcpy(op, ref, 8);
+      memcpy(op + 8, ref + 8, 8);
+      return end;
+    }
+    if (len > 16) {
+      /* Seed first dist bytes so wide_dist = 2 * dist >= 16. */
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      uint8_t *cur = op + dist;
+      const uint8_t *src = ref;
+      ptrdiff_t wide_dist = dist * 2;
+      while (cur + 16 <= end) {
+        _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+        cur += 16;
+        src += 16;
+      }
+      /* Finish tail via overlapping 16B copy if wide loop ran, else bytewise fallback. */
+      if (cur < end) {
+        if (cur > op + dist) {
+          _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(end - 16 - wide_dist)));
+        }
+        else {
+          while (cur < end) {
+            *cur++ = *src++;
+          }
+        }
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
+  }
+
+  return copy_match(op, ref, (unsigned)len);
+}
+#elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
+/* x86 SSE2 match copier: mirrors the ARM64 NEON fast paths using 128-bit XMM ops. */
+BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_sse2(
+    uint8_t *op, const uint8_t *ref, int32_t len, uint8_t *op_limit) {
+  ptrdiff_t dist = op - ref;
+  uint8_t *end = op + len;
+
+  if (dist >= 16) {
+    /* Fast 16B overcopy for short matches when output slack allows. */
+    if (len <= 16 && op_limit - op >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      return end;
+    }
+    if (dist >= 32) {
+      /* Fast 32B overcopy, or 64B/32B/16B vector copy with exact overlapping 16B tail. */
+      if (len <= 32 && op_limit - op >= 32) {
+        __m128i v0 = _mm_loadu_si128((const __m128i *)ref);
+        __m128i v1 = _mm_loadu_si128((const __m128i *)(ref + 16));
+        _mm_storeu_si128((__m128i *)op, v0);
+        _mm_storeu_si128((__m128i *)(op + 16), v1);
+        return end;
+      }
+      if (len >= 16) {
+        uint8_t *cur = op;
+        const uint8_t *src = ref;
+        while (cur + 64 <= end) {
+          __m128i v0 = _mm_loadu_si128((const __m128i *)src);
+          __m128i v1 = _mm_loadu_si128((const __m128i *)(src + 16));
+          _mm_storeu_si128((__m128i *)cur, v0);
+          _mm_storeu_si128((__m128i *)(cur + 16), v1);
+          __m128i v2 = _mm_loadu_si128((const __m128i *)(src + 32));
+          __m128i v3 = _mm_loadu_si128((const __m128i *)(src + 48));
+          _mm_storeu_si128((__m128i *)(cur + 32), v2);
+          _mm_storeu_si128((__m128i *)(cur + 48), v3);
+          cur += 64;
+          src += 64;
+        }
+        if (cur + 32 <= end) {
+          __m128i v0 = _mm_loadu_si128((const __m128i *)src);
+          __m128i v1 = _mm_loadu_si128((const __m128i *)(src + 16));
+          _mm_storeu_si128((__m128i *)cur, v0);
+          _mm_storeu_si128((__m128i *)(cur + 16), v1);
+          cur += 32;
+          src += 32;
+        }
+        if (cur + 16 <= end) {
+          _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+          cur += 16;
+        }
+        if (cur < end) {
+          _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(ref + len - 16)));
+        }
+        return end;
+      }
+      return copy_match(op, ref, (unsigned)len);
+    }
+    /* 16 <= dist < 32: ordered 16B stores so overlapping matches propagate safely. */
+    if (len >= 16) {
+      uint8_t *cur = op;
+      const uint8_t *src = ref;
+      while (cur + 32 <= end) {
+        _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+        _mm_storeu_si128((__m128i *)(cur + 16), _mm_loadu_si128((const __m128i *)(src + 16)));
+        cur += 32;
+        src += 32;
+      }
+      if (cur + 16 <= end) {
+        _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+        cur += 16;
+      }
+      if (cur < end) {
+        _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(ref + len - 16)));
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
+  }
+
+  if (dist == 1) {
+    /* Inline SSE2 RLE fill for short runs <=32B; longer runs delegate to memset. */
+    if (len <= 32 && op_limit - op >= 32) {
+      __m128i v = _mm_set1_epi8((char)*ref);
+      _mm_storeu_si128((__m128i *)op, v);
+      if (len > 16) {
+        _mm_storeu_si128((__m128i *)(op + 16), v);
+      }
+      return end;
+    }
+    memset(op, *ref, (size_t)len);
+    return end;
+  }
+
+  if (dist >= 8) {
+    /* 8..15-byte overlap distance: fast short copies, or double distance to >=16B for loops. */
+    if (len <= dist && op_limit - op >= 16) {
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      return end;
+    }
+    if (len <= 16 && op_limit - op >= 16) {
+      memcpy(op, ref, 8);
+      memcpy(op + 8, ref + 8, 8);
+      return end;
+    }
+    if (len > 16) {
+      /* Seed first dist bytes so wide_dist = 2 * dist >= 16. */
+      _mm_storeu_si128((__m128i *)op, _mm_loadu_si128((const __m128i *)ref));
+      uint8_t *cur = op + dist;
+      const uint8_t *src = ref;
+      ptrdiff_t wide_dist = dist * 2;
+      while (cur + 16 <= end) {
+        _mm_storeu_si128((__m128i *)cur, _mm_loadu_si128((const __m128i *)src));
+        cur += 16;
+        src += 16;
+      }
+      /* Finish tail via overlapping 16B copy if wide loop ran, else bytewise fallback. */
+      if (cur < end) {
+        if (cur > op + dist) {
+          _mm_storeu_si128((__m128i *)(end - 16), _mm_loadu_si128((const __m128i *)(end - 16 - wide_dist)));
+        }
+        else {
+          while (cur < end) {
+            *cur++ = *src++;
+          }
+        }
+      }
+      return end;
+    }
+    return copy_match(op, ref, (unsigned)len);
+  }
+
+  return copy_match(op, ref, (unsigned)len);
 }
 #endif
 
@@ -1345,7 +1625,11 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
 }
 #endif
 
-#if !defined(__aarch64__) && !defined(_M_ARM64)
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__x86_64__) || defined(_M_X64)
+#define BLOSCLZ_WIDE_DECODE
+#endif
+
+#if !defined(__aarch64__) && !defined(_M_ARM64) && !defined(__AVX2__) && !defined(__SSE2__) && !defined(__x86_64__) && !defined(_M_X64)
 // LZ4 wildCopy which can reach excellent copy bandwidth (even if insecure)
 static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
   uint8_t* d = out;
@@ -1356,19 +1640,7 @@ static inline void wild_copy(uint8_t *out, const uint8_t* from, uint8_t* end) {
 }
 #endif
 
-#if defined(__aarch64__) || defined(_M_ARM64) || defined(__x86_64__) || defined(_M_X64)
-#define BLOSCLZ_WIDE_DECODE
-#endif
-
-#if defined(BLOSCLZ_WIDE_DECODE) && !defined(__aarch64__) && !defined(_M_ARM64)
-/* The caller guarantees a distance and output slack of at least 16 bytes.
- * Keep each load/store ordered so overlapping matches propagate correctly. */
-static inline void wild_copy_16(uint8_t *out, const uint8_t *from, uint8_t *end) {
-  do { memcpy(out, from, 16); out += 16; from += 16; } while (out < end);
-}
-#endif
-
-int blosclz_decompress(const void* input, int length, void* output, int maxout) {
+static inline int blosclz_decompress_impl(const void* input, int length, void* output, int maxout) {
   const uint8_t* ip = (const uint8_t*)input;
   const uint8_t* ip_limit = ip + length;
   uint8_t* op = (uint8_t*)output;
@@ -1451,7 +1723,11 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
       ctrl = *ip++;
 
       ref--;
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__AVX2__)
+      op = blosclz_copy_match_avx2(op, ref, len, op_limit);
+#elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
+      op = blosclz_copy_match_sse2(op, ref, len, op_limit);
+#elif defined(__aarch64__) || defined(_M_ARM64)
       op = blosclz_copy_match_neon(op, ref, len, op_limit);
 #else
       if (ref == op - 1) {
@@ -1459,31 +1735,13 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         memset(op, *ref, len);
         op += len;
       }
-#ifdef BLOSCLZ_WIDE_DECODE
-      else if ((op - ref >= 16) && (op_limit - op - len >= 16)) {
-        wild_copy_16(op, ref, op + len);
-        op += len;
-      }
-#endif
       else if ((op - ref >= 8) && (op_limit - op - len >= 8)) {
         // copy with an overlap not larger than 8
         wild_copy(op, ref, op + len);
         op += len;
       }
       else {
-        // general copy with any overlap
-#if 0 && defined(__AVX2__)
-        if (op - ref <= 16) {
-          // This is not faster on a combination of compilers (clang, gcc, icc) or machines, but
-          // it is not too slower either.
-          op = copy_match_16(op, ref, len);
-        }
-        else {
-#endif
-          op = copy_match(op, ref, (unsigned) len);
-#if 0 && defined(__AVX2__)
-        }
-#endif
+        op = copy_match(op, ref, (unsigned) len);
       }
 #endif
     }
@@ -1512,11 +1770,6 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
         memcpy(op, ip, ctrl);
       }
       op += ctrl; ip += ctrl;
-      // On GCC-6, fastcopy this is still faster than plain memcpy
-      // However, using recent CLANG/LLVM 9.0, there is almost no difference
-      // in performance.
-      // And starting on CLANG/LLVM 10 and GCC 9, memcpy is generally faster.
-      // op = fastcopy(op, ip, (unsigned) ctrl); ip += ctrl;
 
       if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) break;
       ctrl = *ip++;
@@ -1524,6 +1777,49 @@ int blosclz_decompress(const void* input, int length, void* output, int maxout) 
   }
 
   return (int)(op - (uint8_t*)output);
+}
+
+#if defined(BLOSCLZ_BUILD_AVX2)
+
+/* Exported AVX2 decompressor compiled in blosclz-avx2.c for runtime dispatch. */
+int blosclz_decompress_avx2(const void* input, int length, void* output, int maxout) {
+  return blosclz_decompress_impl(input, length, output, maxout);
+}
+
+#else /* !defined(BLOSCLZ_BUILD_AVX2) */
+
+int blosclz_compress(const int clevel, const void* input, int length,
+                     void* output, int maxout, blosc2_context* ctx) {
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
+  if (blosc_cpu_has_avx2()) {
+    return blosclz_compress_avx2(clevel, input, length, output, maxout, ctx);
+  }
+#endif
+  BLOSC_UNUSED_PARAM(ctx);
+  uint32_t htab[1U << HASH_LOG];
+  return compress_impl(clevel, input, length, output, maxout, htab, NULL, 0);
+}
+
+int blosclz_compress_state(const int clevel, const void* input, int length,
+                           void* output, int maxout, blosclz_state* state) {
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
+  if (blosc_cpu_has_avx2()) {
+    return blosclz_compress_state_avx2(clevel, input, length, output, maxout, state);
+  }
+#endif
+  if (state->tagged) {
+    return compress_impl(clevel, input, length, output, maxout, state->htab, state, 1);
+  }
+  return compress_impl(clevel, input, length, output, maxout, state->htab, state, 0);
+}
+
+int blosclz_decompress(const void* input, int length, void* output, int maxout) {
+#if defined(BLOSCLZ_AVX2_ENABLED) && !defined(__AVX2__)
+  if (blosc_cpu_has_avx2()) {
+    return blosclz_decompress_avx2(input, length, output, maxout);
+  }
+#endif
+  return blosclz_decompress_impl(input, length, output, maxout);
 }
 
 #endif /* !defined(BLOSCLZ_BUILD_AVX2) */
