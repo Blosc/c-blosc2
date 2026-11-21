@@ -27,7 +27,11 @@ static void check_kernel(int typesize, int length, int pattern) {
   for (int i = 0; i < length; i++) {
     random = random * 1664525U + 1013904223U;
     input[i] = pattern == 0 ? (uint8_t)(random >> 24) :
-               pattern == 1 ? (uint8_t)((i / typesize) % 251) : 0;
+               pattern == 1 ? (uint8_t)((i / typesize) % 251) :
+               pattern == 2 ? 0 :
+               ((i % typesize) < (typesize / 2)
+                    ? (uint8_t)((i / typesize) * 17 + (i % typesize) * 53)
+                    : (uint8_t)(0x3f + (i % typesize)));
   }
   memset(encoded_base, 0xcd, (size_t)length + 32);
   memset(decoded_base, 0xcd, (size_t)length + 32);
@@ -206,7 +210,7 @@ int main(void) {
   CHECK(blosc2_register_filter(&aliases[1]) == 0);
   printf("Runtime fused kernels available: %d\n", shuffle_bytedelta_available());
   for (int typesize = 2; typesize <= 8; typesize *= 2) {
-    for (int pattern = 0; pattern < 3; pattern++) {
+    for (int pattern = 0; pattern < 4; pattern++) {
       for (int length = 0; length < 130 * typesize; length++) check_kernel(typesize, length, pattern);
       check_kernel(typesize, 80000, pattern);
       check_kernel(typesize, 400000, pattern);

@@ -326,6 +326,52 @@ int shuffle_bytedelta_neon_backward(const uint8_t *input, uint8_t *output, int32
       uint16x8_t a1 = vreinterpretq_u16_u8(vzip2q_u8(p0, p1));
       uint16x8_t a2 = vreinterpretq_u16_u8(vzip1q_u8(p2, p3));
       uint16x8_t a3 = vreinterpretq_u16_u8(vzip2q_u8(p2, p3));
+
+      bytes16 hi = vorrq_u8(vorrq_u8(p4, p5), vorrq_u8(p6, p7));
+      if (vmaxvq_u32(vreinterpretq_u32_u8(hi)) == 0) {
+        /* Fast path when upper 4 byte planes (p4..p7) are all zero in this tile:
+         * prefix-sum only planes 0..3 and interleave with constant carry_hi. */
+        bytes16 e0 = vreinterpretq_u8_u16(vtrn1q_u16(a0, a2));
+        bytes16 o0 = vreinterpretq_u8_u16(vtrn2q_u16(a0, a2));
+        bytes16 e1 = vreinterpretq_u8_u16(vtrn1q_u16(a1, a3));
+        bytes16 o1 = vreinterpretq_u8_u16(vtrn2q_u16(a1, a3));
+
+        o0 = vaddq_u8(o0, e0);
+        o1 = vaddq_u8(o1, e1);
+        o0 = vaddq_u8(o0, vextq_u8(zero, o0, 12));
+        o1 = vaddq_u8(o1, vextq_u8(zero, o1, 12));
+        o0 = vaddq_u8(o0, vextq_u8(zero, o0, 8));
+        o1 = vaddq_u8(o1, vextq_u8(zero, o1, 8));
+        e0 = vaddq_u8(e0, vextq_u8(zero, o0, 12));
+        e1 = vaddq_u8(e1, vextq_u8(zero, o1, 12));
+
+        bytes16 c_lo = vreinterpretq_u8_u32(vdupq_laneq_u32(vreinterpretq_u32_u8(carry_vec), 0));
+        uint32x4_t carry_hi = vdupq_laneq_u32(vreinterpretq_u32_u8(carry_vec), 1);
+        e0 = vaddq_u8(e0, c_lo);
+        o0 = vaddq_u8(o0, c_lo);
+        bytes16 c0 = dup_lane3_u32(o0);
+        e1 = vaddq_u8(e1, c0);
+        o1 = vaddq_u8(o1, c0);
+        uint32x4_t carry_lo = vreinterpretq_u32_u8(dup_lane3_u32(o1));
+        carry_vec = vreinterpretq_u8_u32(vzip1q_u32(carry_lo, carry_hi));
+
+        uint32x4_t b0 = vzip1q_u32(vreinterpretq_u32_u8(e0), vreinterpretq_u32_u8(o0));
+        uint32x4_t b1 = vzip2q_u32(vreinterpretq_u32_u8(e0), vreinterpretq_u32_u8(o0));
+        uint32x4_t b2 = vzip1q_u32(vreinterpretq_u32_u8(e1), vreinterpretq_u32_u8(o1));
+        uint32x4_t b3 = vzip2q_u32(vreinterpretq_u32_u8(e1), vreinterpretq_u32_u8(o1));
+
+        uint8_t *dst = output + i * 8;
+        simd_store(dst + 0, vreinterpretq_u8_u32(vzip1q_u32(b0, carry_hi)));
+        simd_store(dst + 16, vreinterpretq_u8_u32(vzip2q_u32(b0, carry_hi)));
+        simd_store(dst + 32, vreinterpretq_u8_u32(vzip1q_u32(b1, carry_hi)));
+        simd_store(dst + 48, vreinterpretq_u8_u32(vzip2q_u32(b1, carry_hi)));
+        simd_store(dst + 64, vreinterpretq_u8_u32(vzip1q_u32(b2, carry_hi)));
+        simd_store(dst + 80, vreinterpretq_u8_u32(vzip2q_u32(b2, carry_hi)));
+        simd_store(dst + 96, vreinterpretq_u8_u32(vzip1q_u32(b3, carry_hi)));
+        simd_store(dst + 112, vreinterpretq_u8_u32(vzip2q_u32(b3, carry_hi)));
+        continue;
+      }
+
       uint16x8_t a4 = vreinterpretq_u16_u8(vzip1q_u8(p4, p5));
       uint16x8_t a5 = vreinterpretq_u16_u8(vzip2q_u8(p4, p5));
       uint16x8_t a6 = vreinterpretq_u16_u8(vzip1q_u8(p6, p7));

@@ -230,11 +230,57 @@ static int backward8(const uint8_t *input, uint8_t *output, int32_t length) {
     __m128i p6 = _mm_loadu_si128((const __m128i *)(input + 6 * count + i));
     __m128i p7 = _mm_loadu_si128((const __m128i *)(input + 7 * count + i));
 
-    /* Three-stage transpose interleaving 8 byte planes into 8-byte records in r0..r7. */
+    /* Stage 1 transpose of low 4 byte planes; skip upper 4 planes when all zero. */
     __m128i a0 = _mm_unpacklo_epi8(p0, p1);
     __m128i a1 = _mm_unpackhi_epi8(p0, p1);
     __m128i a2 = _mm_unpacklo_epi8(p2, p3);
     __m128i a3 = _mm_unpackhi_epi8(p2, p3);
+
+    __m128i hi = _mm_or_si128(_mm_or_si128(p4, p5), _mm_or_si128(p6, p7));
+    if (_mm_movemask_epi8(_mm_cmpeq_epi8(hi, _mm_setzero_si128())) == 0xFFFF) {
+      __m128i b0 = _mm_unpacklo_epi16(a0, a2);
+      __m128i b1 = _mm_unpackhi_epi16(a0, a2);
+      __m128i b2 = _mm_unpacklo_epi16(a1, a3);
+      __m128i b3 = _mm_unpackhi_epi16(a1, a3);
+
+      b0 = _mm_add_epi8(b0, _mm_slli_si128(b0, 4));
+      b1 = _mm_add_epi8(b1, _mm_slli_si128(b1, 4));
+      b2 = _mm_add_epi8(b2, _mm_slli_si128(b2, 4));
+      b3 = _mm_add_epi8(b3, _mm_slli_si128(b3, 4));
+
+      b0 = _mm_add_epi8(b0, _mm_slli_si128(b0, 8));
+      b1 = _mm_add_epi8(b1, _mm_slli_si128(b1, 8));
+      b2 = _mm_add_epi8(b2, _mm_slli_si128(b2, 8));
+      b3 = _mm_add_epi8(b3, _mm_slli_si128(b3, 8));
+
+      b1 = _mm_add_epi8(b1, dup_hi32_128(b0));
+      b3 = _mm_add_epi8(b3, dup_hi32_128(b2));
+      __m128i d1 = dup_hi32_128(b1);
+      __m128i b3_local = _mm_add_epi8(b3, d1);
+      __m128i tile_sum_lo = dup_hi32_128(b3_local);
+
+      __m128i carry_lo = _mm_shuffle_epi32(carry_vec, 0x00);
+      __m128i carry_hi = _mm_shuffle_epi32(carry_vec, 0x55);
+      __m128i d1c = _mm_add_epi8(d1, carry_lo);
+      b0 = _mm_add_epi8(b0, carry_lo);
+      b1 = _mm_add_epi8(b1, carry_lo);
+      b2 = _mm_add_epi8(b2, d1c);
+      b3 = _mm_add_epi8(b3_local, carry_lo);
+      carry_lo = _mm_add_epi8(carry_lo, tile_sum_lo);
+      carry_vec = _mm_unpacklo_epi32(carry_lo, carry_hi);
+
+      uint8_t *dst = output + i * 8;
+      _mm_storeu_si128((__m128i *)(dst + 0), _mm_unpacklo_epi32(b0, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 16), _mm_unpackhi_epi32(b0, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 32), _mm_unpacklo_epi32(b1, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 48), _mm_unpackhi_epi32(b1, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 64), _mm_unpacklo_epi32(b2, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 80), _mm_unpackhi_epi32(b2, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 96), _mm_unpacklo_epi32(b3, carry_hi));
+      _mm_storeu_si128((__m128i *)(dst + 112), _mm_unpackhi_epi32(b3, carry_hi));
+      continue;
+    }
+
     __m128i a4 = _mm_unpacklo_epi8(p4, p5);
     __m128i a5 = _mm_unpackhi_epi8(p4, p5);
     __m128i a6 = _mm_unpacklo_epi8(p6, p7);

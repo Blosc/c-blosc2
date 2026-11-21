@@ -346,11 +346,81 @@ static int backward8_avx2(const uint8_t *input, uint8_t *output, int32_t length)
     __m256i p6 = _mm256_loadu_si256((const __m256i *)(input + 6 * count + i));
     __m256i p7 = _mm256_loadu_si256((const __m256i *)(input + 7 * count + i));
 
-    /* Stage 1 (8-bit), Stage 2 (16-bit), Stage 3 (32-bit) in-lane transpose into 8-byte records. */
+    /* Stage 1 (8-bit) transpose of low 4 planes; skip upper 4 planes when all zero. */
     __m256i a0 = _mm256_unpacklo_epi8(p0, p1);
     __m256i a1 = _mm256_unpackhi_epi8(p0, p1);
     __m256i a2 = _mm256_unpacklo_epi8(p2, p3);
     __m256i a3 = _mm256_unpackhi_epi8(p2, p3);
+
+    __m256i hi = _mm256_or_si256(_mm256_or_si256(p4, p5), _mm256_or_si256(p6, p7));
+    if (_mm256_testz_si256(hi, hi)) {
+      __m256i b0 = _mm256_unpacklo_epi16(a0, a2);
+      __m256i b1 = _mm256_unpackhi_epi16(a0, a2);
+      __m256i b2 = _mm256_unpacklo_epi16(a1, a3);
+      __m256i b3 = _mm256_unpackhi_epi16(a1, a3);
+
+      b0 = _mm256_add_epi8(b0, _mm256_slli_si256(b0, 4));
+      b1 = _mm256_add_epi8(b1, _mm256_slli_si256(b1, 4));
+      b2 = _mm256_add_epi8(b2, _mm256_slli_si256(b2, 4));
+      b3 = _mm256_add_epi8(b3, _mm256_slli_si256(b3, 4));
+
+      b0 = _mm256_add_epi8(b0, _mm256_slli_si256(b0, 8));
+      b1 = _mm256_add_epi8(b1, _mm256_slli_si256(b1, 8));
+      b2 = _mm256_add_epi8(b2, _mm256_slli_si256(b2, 8));
+      b3 = _mm256_add_epi8(b3, _mm256_slli_si256(b3, 8));
+
+      b1 = _mm256_add_epi8(b1, dup_hi32_256(b0));
+      b3 = _mm256_add_epi8(b3, dup_hi32_256(b2));
+      __m256i d1 = dup_hi32_256(b1);
+      __m256i b3_local = _mm256_add_epi8(b3, d1);
+
+      __m128i carry_lo128 = _mm_shuffle_epi32(carry128, 0x00);
+      __m128i carry_hi128 = _mm_shuffle_epi32(carry128, 0x55);
+      __m128i sum_lo = _mm_shuffle_epi32(_mm256_castsi256_si128(b3_local), 0xff);
+      __m128i sum_hi = _mm_shuffle_epi32(_mm256_extracti128_si256(b3_local, 1), 0xff);
+      __m128i carry_mid = _mm_add_epi8(carry_lo128, sum_lo);
+      __m256i tile_carry_lo = _mm256_inserti128_si256(
+          _mm256_castsi128_si256(carry_lo128), carry_mid, 1);
+      carry_lo128 = _mm_add_epi8(carry_mid, sum_hi);
+      carry128 = _mm_unpacklo_epi32(carry_lo128, carry_hi128);
+
+      __m256i d1c = _mm256_add_epi8(d1, tile_carry_lo);
+      b0 = _mm256_add_epi8(b0, tile_carry_lo);
+      b1 = _mm256_add_epi8(b1, tile_carry_lo);
+      b2 = _mm256_add_epi8(b2, d1c);
+      b3 = _mm256_add_epi8(b3_local, tile_carry_lo);
+
+      __m256i carry_hi256 = _mm256_inserti128_si256(
+          _mm256_castsi128_si256(carry_hi128), carry_hi128, 1);
+      __m256i r0 = _mm256_unpacklo_epi32(b0, carry_hi256);
+      __m256i r1 = _mm256_unpackhi_epi32(b0, carry_hi256);
+      __m256i r2 = _mm256_unpacklo_epi32(b1, carry_hi256);
+      __m256i r3 = _mm256_unpackhi_epi32(b1, carry_hi256);
+      __m256i r4 = _mm256_unpacklo_epi32(b2, carry_hi256);
+      __m256i r5 = _mm256_unpackhi_epi32(b2, carry_hi256);
+      __m256i r6 = _mm256_unpacklo_epi32(b3, carry_hi256);
+      __m256i r7 = _mm256_unpackhi_epi32(b3, carry_hi256);
+
+      uint8_t *dst = output + i * 8;
+      _mm_storeu_si128((__m128i *)(dst + 0), _mm256_castsi256_si128(r0));
+      _mm_storeu_si128((__m128i *)(dst + 16), _mm256_castsi256_si128(r1));
+      _mm_storeu_si128((__m128i *)(dst + 32), _mm256_castsi256_si128(r2));
+      _mm_storeu_si128((__m128i *)(dst + 48), _mm256_castsi256_si128(r3));
+      _mm_storeu_si128((__m128i *)(dst + 64), _mm256_castsi256_si128(r4));
+      _mm_storeu_si128((__m128i *)(dst + 80), _mm256_castsi256_si128(r5));
+      _mm_storeu_si128((__m128i *)(dst + 96), _mm256_castsi256_si128(r6));
+      _mm_storeu_si128((__m128i *)(dst + 112), _mm256_castsi256_si128(r7));
+      _mm_storeu_si128((__m128i *)(dst + 128), _mm256_extracti128_si256(r0, 1));
+      _mm_storeu_si128((__m128i *)(dst + 144), _mm256_extracti128_si256(r1, 1));
+      _mm_storeu_si128((__m128i *)(dst + 160), _mm256_extracti128_si256(r2, 1));
+      _mm_storeu_si128((__m128i *)(dst + 176), _mm256_extracti128_si256(r3, 1));
+      _mm_storeu_si128((__m128i *)(dst + 192), _mm256_extracti128_si256(r4, 1));
+      _mm_storeu_si128((__m128i *)(dst + 208), _mm256_extracti128_si256(r5, 1));
+      _mm_storeu_si128((__m128i *)(dst + 224), _mm256_extracti128_si256(r6, 1));
+      _mm_storeu_si128((__m128i *)(dst + 240), _mm256_extracti128_si256(r7, 1));
+      continue;
+    }
+
     __m256i a4 = _mm256_unpacklo_epi8(p4, p5);
     __m256i a5 = _mm256_unpackhi_epi8(p4, p5);
     __m256i a6 = _mm256_unpacklo_epi8(p6, p7);

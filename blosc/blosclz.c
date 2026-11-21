@@ -1357,6 +1357,47 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_avx2(
     return copy_match(op, ref, (unsigned)len);
   }
 
+  if ((dist == 2 || dist == 4) && len >= 16) {
+    __m256i v256;
+    if (dist == 2) {
+      int16_t pat2;
+      memcpy(&pat2, ref, sizeof(pat2));
+      v256 = _mm256_set1_epi16(pat2);
+    }
+    else {
+      int32_t pat4;
+      memcpy(&pat4, ref, sizeof(pat4));
+      v256 = _mm256_set1_epi32(pat4);
+    }
+    __m128i v128 = _mm256_castsi256_si128(v256);
+    uint8_t *cur = op;
+    while (cur + 64 <= end) {
+      _mm256_storeu_si256((__m256i *)cur, v256);
+      _mm256_storeu_si256((__m256i *)(cur + 32), v256);
+      cur += 64;
+    }
+    if (cur + 32 <= end) {
+      _mm256_storeu_si256((__m256i *)cur, v256);
+      cur += 32;
+    }
+    if (cur + 16 <= end) {
+      _mm_storeu_si128((__m128i *)cur, v128);
+      cur += 16;
+    }
+    if (cur < end) {
+      if (op_limit - cur >= 16) {
+        _mm_storeu_si128((__m128i *)cur, v128);
+      }
+      else {
+        const uint8_t *tail_src = ref;
+        while (cur < end) {
+          *cur++ = *tail_src++;
+        }
+      }
+    }
+    return end;
+  }
+
   return copy_match(op, ref, (unsigned)len);
 }
 #elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
@@ -1489,6 +1530,42 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_sse2(
     return copy_match(op, ref, (unsigned)len);
   }
 
+  if ((dist == 2 || dist == 4) && len >= 16) {
+    __m128i v;
+    if (dist == 2) {
+      int16_t pat2;
+      memcpy(&pat2, ref, sizeof(pat2));
+      v = _mm_set1_epi16(pat2);
+    }
+    else {
+      int32_t pat4;
+      memcpy(&pat4, ref, sizeof(pat4));
+      v = _mm_set1_epi32(pat4);
+    }
+    uint8_t *cur = op;
+    while (cur + 32 <= end) {
+      _mm_storeu_si128((__m128i *)cur, v);
+      _mm_storeu_si128((__m128i *)(cur + 16), v);
+      cur += 32;
+    }
+    if (cur + 16 <= end) {
+      _mm_storeu_si128((__m128i *)cur, v);
+      cur += 16;
+    }
+    if (cur < end) {
+      if (op_limit - cur >= 16) {
+        _mm_storeu_si128((__m128i *)cur, v);
+      }
+      else {
+        const uint8_t *tail_src = ref;
+        while (cur < end) {
+          *cur++ = *tail_src++;
+        }
+      }
+    }
+    return end;
+  }
+
   return copy_match(op, ref, (unsigned)len);
 }
 #endif
@@ -1619,6 +1696,42 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
       return end;
     }
     return copy_match(op, ref, (unsigned)len);
+  }
+
+  if ((dist == 2 || dist == 4) && len >= 16) {
+    uint8x16_t v;
+    if (dist == 2) {
+      uint16_t pat2;
+      memcpy(&pat2, ref, sizeof(pat2));
+      v = vreinterpretq_u8_u16(vdupq_n_u16(pat2));
+    }
+    else {
+      uint32_t pat4;
+      memcpy(&pat4, ref, sizeof(pat4));
+      v = vreinterpretq_u8_u32(vdupq_n_u32(pat4));
+    }
+    uint8_t *cur = op;
+    while (cur + 32 <= end) {
+      vst1q_u8(cur, v);
+      vst1q_u8(cur + 16, v);
+      cur += 32;
+    }
+    if (cur + 16 <= end) {
+      vst1q_u8(cur, v);
+      cur += 16;
+    }
+    if (cur < end) {
+      if (op_limit - cur >= 16) {
+        vst1q_u8(cur, v);
+      }
+      else {
+        const uint8_t *tail_src = ref;
+        while (cur < end) {
+          *cur++ = *tail_src++;
+        }
+      }
+    }
+    return end;
   }
 
   return copy_match(op, ref, (unsigned)len);
