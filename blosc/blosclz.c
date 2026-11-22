@@ -636,7 +636,7 @@ static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t 
     memcpy(&b, ref, sizeof(b));
     uint64_t diff = a ^ b;
     if (diff) {
-#if defined(BLOSCLZ_HAVE_CTZ64) && !defined(__AARCH64EB__)
+#if defined(BLOSCLZ_HAVE_CTZ64) && !BLOSCLZ_BIG_ENDIAN
       return ip + (blosclz_ctz64(diff) >> 3) + 1;
 #else
       while (*ref++ == *ip++) {}
@@ -660,14 +660,19 @@ static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t 
     ip += 64;
     ref += 64;
   }
-  while (bound - ip >= 16) {
-    /* Test 16 bytes for any difference via XOR and 4-lane u32 reduction */
-    if (blosclz_neon_any_nonzero(veorq_u8(vld1q_u8(ip), vld1q_u8(ref)))) {
-      while (*ref++ == *ip++) {}
-      return ip;
+  /* The 64-byte group may already contain a mismatch. Locate it a word
+   * at a time, using the same post-increment convention as the scalar tail. */
+  while (bound - ip >= 8) {
+    uint64_t diff = blosclz_readu64(ip) ^ blosclz_readu64(ref);
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64) && !BLOSCLZ_BIG_ENDIAN
+      return ip + (blosclz_ctz64(diff) >> 3) + 1;
+#else
+      break;
+#endif
     }
-    ip += 16;
-    ref += 16;
+    ip += 8;
+    ref += 8;
   }
   while (ip < bound && *ref++ == *ip++) {}
   return ip;
@@ -1050,25 +1055,24 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
 
       /* find potential match */
       uint32_t hval = blosclz_hash6(ip, hashlog);
-      ref = ibase + HTAB_GET(htab[hval], base);
+      const uint8_t *preferred = NULL;
 
       /* Immediately after a match (no pending literals), try the position
-       * following the previous occurrence of ip[-1..4].  Its alignment can
-       * break a chain of short matches on periodic filtered data even when
+       * following the previous occurrence of the prefix at ip - 1. Its alignment
+       * can break a chain of short matches on periodic filtered data even when
        * the ordinary candidate also matches. */
-      if (after_match && ip_bound - ip >= 8) {
+      if (after_match) {
         uint32_t prevhash = blosclz_hash6(ip - 1, hashlog);
         const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
         htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
-        if (prevhash == hval) {
-          ref = ibase + HTAB_GET(htab[hval], base);
-        }
         if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
             memcmp(candidate, ip, 8) == 0) {
-          ref = candidate;
+          preferred = candidate;
         }
       }
       after_match = false;
+
+      ref = preferred ? preferred : ibase + HTAB_GET(htab[hval], base);
 
       /* calculate distance to the match */
       distance = (unsigned int)(anchor - ref);
@@ -1077,10 +1081,8 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
       htab[hval] = (uint32_t)(anchor - ibase) + base;
 
       if (distance != 0 && distance < MAX_FARDISTANCE) {
-        /* Verify all 6 bytes (minlen == 4) in one 64-bit XOR before match scan */
-        uint64_t a64 = blosclz_readu64(anchor);
-        uint64_t b64 = blosclz_readu64(ref);
-        uint64_t diff = a64 ^ b64;
+        /* The preferred candidate already matched all eight bytes. */
+        uint64_t diff = preferred ? 0 : blosclz_readu64(anchor) ^ blosclz_readu64(ref);
         if ((diff & BLOSCLZ_PREFIX6_MASK) == 0) {
           /* distance is biased */
           distance--;
@@ -1662,26 +1664,44 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_sse2(
 #if defined(__aarch64__) || defined(_M_ARM64)
 /* ARM64 NEON match copier: uses 64B/32B/16B vector copies with exact
  * overlapping 16B tails (so end-of-stream matches need no slack and do not
- * fall back to scalar copy_match), inline NEON short RLE fills, and 16B
+ * fall back to scalar copy_match), table lookups for short matches, and 16B
  * doubling for 8..15-byte overlap distances. */
 BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
     uint8_t *op, const uint8_t *ref, int32_t len, uint8_t *op_limit) {
   ptrdiff_t dist = op - ref;
   uint8_t *end = op + len;
 
-  if (dist >= 16) {
-    if (len <= 16 && op_limit - op >= 16) {
-      vst1q_u8(op, vld1q_u8(ref));
-      return end;
+  /* Row d repeats the first d bytes. Row zero is the identity for distances
+   * of at least 16, where each vector load already contains the next 16 bytes. */
+  static const uint8_t repeat[16][16] = {
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+    {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
+    {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
+    {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
+    {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0},
+  };
+
+  if (len <= 32 && op_limit - op >= 32) {
+    uint8x16_t index = vld1q_u8(repeat[dist < 16 ? dist : 0]);
+    vst1q_u8(op, vqtbl1q_u8(vld1q_u8(ref), index));
+    if (len > 16) {
+      vst1q_u8(op + 16, vqtbl1q_u8(vld1q_u8(ref + 16), index));
     }
+    return end;
+  }
+  if (dist >= 16) {
     if (dist >= 32) {
-      if (len <= 32 && op_limit - op >= 32) {
-        uint8x16_t v0 = vld1q_u8(ref);
-        uint8x16_t v1 = vld1q_u8(ref + 16);
-        vst1q_u8(op, v0);
-        vst1q_u8(op + 16, v1);
-        return end;
-      }
       if (len >= 16) {
         uint8_t *cur = op;
         const uint8_t *src = ref;
@@ -1739,14 +1759,6 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
   }
 
   if (dist == 1) {
-    if (len <= 32 && op_limit - op >= 32) {
-      uint8x16_t v = vdupq_n_u8(*ref);
-      vst1q_u8(op, v);
-      if (len > 16) {
-        vst1q_u8(op + 16, v);
-      }
-      return end;
-    }
     memset(op, *ref, (size_t)len);
     return end;
   }
@@ -1950,25 +1962,23 @@ static inline int blosclz_decompress_impl(const void* input, int length, void* o
     else {
       // literal
       ctrl++;
-      if (BLOSCLZ_UNLIKELY(ctrl > op_limit - op)) {
-        return 0;
-      }
-      if (BLOSCLZ_UNLIKELY(ctrl > ip_limit - ip)) {
-        return 0;
-      }
-
 #ifdef BLOSCLZ_WIDE_DECODE
-      /* Fixed-size copies can inline.  Overcopy only within both buffers;
-       * subsequent tokens overwrite the extra output bytes. */
+      /* On ARM64 one 32-byte copy avoids branching on the literal length. */
+#if !defined(__aarch64__) && !defined(_M_ARM64)
       if (ctrl <= 16 && op_limit - op >= 16 && ip_limit - ip >= 16) {
         memcpy(op, ip, 16);
       }
-      else if (op_limit - op >= 32 && ip_limit - ip >= 32) {
+      else
+#endif
+      if (op_limit - op >= 32 && ip_limit - ip >= 32) {
         memcpy(op, ip, 32);
       }
       else
 #endif
       {
+        if (BLOSCLZ_UNLIKELY(ctrl > op_limit - op || ctrl > ip_limit - ip)) {
+          return 0;
+        }
         memcpy(op, ip, ctrl);
       }
       op += ctrl; ip += ctrl;
