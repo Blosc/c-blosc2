@@ -991,10 +991,17 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
                                        HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG};
   uint8_t hashlog = hashlog_[clevel];
 
-  /* Gentle LZ4-style miss skip acceleration: speeds up incompressible regions
-   * inside mixed-entropy blocks (such as BITSHUFFLE LSB planes) by 2-4x. */
-  static const uint8_t skip_shift_[10] = {0, 5, 5, 5, 6, 6, 6, 6, 6, 6};
+  /* Miss skip acceleration:
+   * - clevel 1..3 (fast): capped exponential ramp (misses += step up to max_step)
+   *   so random spans inside mixed-entropy blocks (e.g. BITSHUFFLE LSB planes)
+   *   are crossed quickly.
+   * - clevel 4..9 (balanced/high-ratio): gentle linear ramp (misses++, max_step=0)
+   *   preserving full compression ratio while backward match extension recovers
+   *   any overshot prefix. */
+  static const uint8_t skip_shift_[10] = {0, 4, 5, 5, 6, 6, 6, 6, 6, 6};
+  static const uint16_t max_step_[10] = {0, 256, 256, 128, 0, 0, 0, 0, 0, 0};
   const unsigned skip_shift = skip_shift_[clevel];
+  const unsigned max_step = max_step_[clevel];
 
   /* Discard probes with small compression ratios (too expensive). */
   static const double cratio_[10] = {0, 1.3, 1.25, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
@@ -1044,50 +1051,30 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
     unsigned distance;
     uint8_t* anchor;
     unsigned len;
-    unsigned misses = 1U << skip_shift;
 
-    /* Tight match-finding loop: defer literal copies until a match is found. */
-    for (;;) {
-      if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) {
-        goto tail;
-      }
-      anchor = ip;
-
-      /* find potential match */
-      uint32_t hval = blosclz_hash6(ip, hashlog);
-      const uint8_t *preferred = NULL;
-
-      /* Immediately after a match (no pending literals), try the position
-       * following the previous occurrence of the prefix at ip - 1. Its alignment
-       * can break a chain of short matches on periodic filtered data even when
-       * the ordinary candidate also matches. */
-      if (after_match) {
-        uint32_t prevhash = blosclz_hash6(ip - 1, hashlog);
-        const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
-        htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
-        if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
-            memcmp(candidate, ip, 8) == 0) {
-          preferred = candidate;
-        }
-      }
+    /* Immediately after a match (no pending literals), try the position
+     * following the previous occurrence of the prefix at ip - 1. Hoisted out
+     * of the miss loop so steady-state literal scans do not test after_match. */
+    if (after_match) {
       after_match = false;
-
+      anchor = ip;
+      uint32_t hval = blosclz_hash6(ip, hashlog);
+      uint32_t prevhash = blosclz_hash6(ip - 1, hashlog);
+      const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
+      htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
+      const uint8_t *preferred = NULL;
+      if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
+          memcmp(candidate, ip, 8) == 0) {
+        preferred = candidate;
+      }
       ref = preferred ? preferred : ibase + HTAB_GET(htab[hval], base);
-
-      /* calculate distance to the match */
       distance = (unsigned int)(anchor - ref);
-
-      /* update hash table */
       htab[hval] = (uint32_t)(anchor - ibase) + base;
-
       if (distance != 0 && distance < MAX_FARDISTANCE) {
         /* The preferred candidate already matched all eight bytes. */
         uint64_t diff = preferred ? 0 : blosclz_readu64(anchor) ^ blosclz_readu64(ref);
         if ((diff & BLOSCLZ_PREFIX6_MASK) == 0) {
-          /* distance is biased */
           distance--;
-
-          /* get runs or matches; zero distance means a run */
           if (BLOSCLZ_UNLIKELY(!distance)) {
             ip = get_run_fast(anchor + 4, ip_bound, ref + 4);
           }
@@ -1103,23 +1090,104 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
             ip = get_match_fast(anchor + 6, ip_bound, ref + 6);
           }
 #endif
-
-          /* length is biased, '1' means a match of 3 bytes */
           ip -= ipshift;
           len = (unsigned)(ip - anchor);
-
           if (len >= minlen && !(len <= 5 && distance >= MAX_DISTANCE)) {
-            break;
+            goto emit_match;
           }
-          ip = anchor + 1;
-          continue;
         }
       }
-
-      ip = anchor + (misses >> skip_shift);
-      misses++;
+      ip = anchor + 1;
     }
 
+    {
+      unsigned misses = 1U << skip_shift;
+      /* Keep at least 4 leading literals so output[0] is always a literal token. */
+      const uint8_t *back_limit = (lit_start > ibase) ? lit_start : (ibase + 4);
+
+      /* Tight match-finding loop: defer literal copies until a match is found. */
+      for (;;) {
+        if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) {
+          goto tail;
+        }
+        anchor = ip;
+
+        /* find potential match */
+        uint32_t hval = blosclz_hash6(ip, hashlog);
+        ref = ibase + HTAB_GET(htab[hval], base);
+
+        /* calculate distance to the match */
+        distance = (unsigned int)(anchor - ref);
+
+        /* update hash table */
+        htab[hval] = (uint32_t)(anchor - ibase) + base;
+
+        if (distance != 0 && distance < MAX_FARDISTANCE) {
+          /* Verify all 6 bytes (minlen == 4) in one 64-bit XOR before match scan */
+          uint64_t diff = blosclz_readu64(anchor) ^ blosclz_readu64(ref);
+          if ((diff & BLOSCLZ_PREFIX6_MASK) == 0) {
+            uint8_t *orig_anchor = anchor;
+            /* Recover bytes skipped when a larger step lands inside a match. */
+            if (BLOSCLZ_UNLIKELY(anchor > back_limit && ref > ibase && anchor[-1] == ref[-1])) {
+              do {
+                anchor--;
+                ref--;
+              } while (anchor > back_limit && ref > ibase && anchor[-1] == ref[-1]);
+              distance--;
+              if (BLOSCLZ_UNLIKELY(!distance)) {
+                ip = get_run_fast(anchor + 4, ip_bound, ref + 4);
+              } else {
+                ip = get_match_fast(anchor + 6, ip_bound, ref + 6);
+              }
+            } else {
+              /* distance is biased */
+              distance--;
+
+              /* get runs or matches; zero distance means a run */
+              if (BLOSCLZ_UNLIKELY(!distance)) {
+                ip = get_run_fast(anchor + 4, ip_bound, ref + 4);
+              }
+#if !BLOSCLZ_BIG_ENDIAN && defined(BLOSCLZ_HAVE_CTZ64)
+              else if (diff != 0) {
+                ip = anchor + (blosclz_ctz64(diff) >> 3) + 1;
+              }
+              else {
+                ip = get_match_fast(anchor + 8, ip_bound, ref + 8);
+              }
+#else
+              else {
+                ip = get_match_fast(anchor + 6, ip_bound, ref + 6);
+              }
+#endif
+            }
+
+            /* length is biased, '1' means a match of 3 bytes */
+            ip -= ipshift;
+            len = (unsigned)(ip - anchor);
+
+            if (len >= minlen && !(len <= 5 && distance >= MAX_DISTANCE)) {
+              break;
+            }
+            ip = orig_anchor + 1;
+            continue;
+          }
+        }
+
+        unsigned step = misses >> skip_shift;
+        if (max_step != 0) {
+          if (step >= max_step) {
+            step = max_step;
+          } else {
+            misses += step;
+          }
+        } else {
+          misses++;
+        }
+        ip = anchor + step;
+      }
+    }
+
+emit_match:
     /* Emit pending literals in bulk */
     size_t lit_len = (size_t)(anchor - lit_start);
     if (lit_len > 0) {
