@@ -71,16 +71,34 @@
 
 #define HASH_LOG (14U)
 
-// This is used in LZ4 and seems to work pretty well here too
-#define HASH_FUNCTION(v, s, h) {      \
-  (v) = ((s) * 2654435761U) >> (32U - (h)); \
-}
+#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__) || \
+    defined(__BIG_ENDIAN__) || defined(__AARCH64EB__)
+#define BLOSCLZ_BIG_ENDIAN 1
+#define BLOSCLZ_PREFIX6_MASK 0xFFFFFFFFFFFF0000ULL
+#else
+#define BLOSCLZ_BIG_ENDIAN 0
+#define BLOSCLZ_PREFIX6_MASK 0x0000FFFFFFFFFFFFULL
+#endif
 
 #if defined(_MSC_VER)
 #define BLOSCLZ_ALWAYS_INLINE static __forceinline
 #else
 #define BLOSCLZ_ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
+
+BLOSCLZ_ALWAYS_INLINE uint64_t blosclz_readu64(const uint8_t *p) {
+  uint64_t v;
+  memcpy(&v, p, sizeof(v));
+  return v;
+}
+
+/* Hash 6 bytes to match minlen == 4 (6-byte minimum match). On low-cardinality
+ * shuffled streams (e.g. 2-symbol byte planes), a 6-byte hash avoids collapsing
+ * the table to 16 buckets and eliminates short-match rejection thrashing. */
+BLOSCLZ_ALWAYS_INLINE uint32_t blosclz_hash6(const uint8_t *p, uint8_t hashlog) {
+  uint64_t s = blosclz_readu64(p) & BLOSCLZ_PREFIX6_MASK;
+  return (uint32_t)((s * 11400714819323198485ULL) >> (64U - hashlog));
+}
 
 #if defined(__GNUC__) || defined(__clang__)
 /* 32-bit ctz is only used by x86 movemask paths; guard to avoid unused warnings on ARM64 */
@@ -125,6 +143,23 @@ int blosclz_decompress_avx2(const void* input, int length, void* output, int max
 #if defined(__AVX2__)
 BLOSCLZ_ALWAYS_INLINE uint8_t *get_run_32(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
+  /* Most runs in shuffled floating-point streams are short; check 8 bytes in a
+   * GPR before broadcasting into YMM registers and loading 128 bytes. */
+  if (ip_bound - ip >= 8) {
+    uint64_t val = (uint64_t)x * 0x0101010101010101ULL;
+    uint64_t r = blosclz_readu64(ref);
+    uint64_t diff = val ^ r;
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64)
+      return ip + (blosclz_ctz64(diff) >> 3);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 8;
+    ref += 8;
+  }
   /* Broadcast the run byte across all 32 lanes once outside the loop */
   const __m256i value = _mm256_set1_epi8((char)x);
   /* Scan long runs in 128-byte (4x32B) groups with a single reduction */
@@ -334,6 +369,22 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *get_match_32(uint8_t *ip, const uint8_t *ip_bound
 #if defined(__SSE2__) && !defined(__AVX2__)
 BLOSCLZ_ALWAYS_INLINE uint8_t *get_run_16(uint8_t *ip, const uint8_t *ip_bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
+  /* Fast 8-byte GPR check for short runs before setting up 16-byte vectors */
+  if (ip_bound - ip >= 8) {
+    uint64_t val = (uint64_t)x * 0x0101010101010101ULL;
+    uint64_t r = blosclz_readu64(ref);
+    uint64_t diff = val ^ r;
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64)
+      return ip + (blosclz_ctz64(diff) >> 3);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 8;
+    ref += 8;
+  }
   /* Broadcast the run byte across all 16 lanes once outside the loop */
   const __m128i value = _mm_set1_epi8((char)x);
   /* Scan long runs in 64-byte (4x16B) groups with a single reduction */
@@ -624,6 +675,21 @@ static uint8_t *get_match_neon(uint8_t *ip, const uint8_t *bound, const uint8_t 
 
 static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *ref) {
   uint8_t x = ip[-1];
+  if (bound - ip >= 8) {
+    uint64_t val = (uint64_t)x * 0x0101010101010101ULL;
+    uint64_t r = blosclz_readu64(ref);
+    uint64_t diff = val ^ r;
+    if (diff) {
+#if defined(BLOSCLZ_HAVE_CTZ64) && !BLOSCLZ_BIG_ENDIAN
+      return ip + (blosclz_ctz64(diff) >> 3);
+#else
+      while (*ref++ == x) ip++;
+      return ip;
+#endif
+    }
+    ip += 8;
+    ref += 8;
+  }
   uint8x16_t value = vdupq_n_u8(x);
   while (bound - ip >= 64) {
     /* Accumulate differences from the run byte via XOR+OR with one 32-bit max reduction */
@@ -655,43 +721,51 @@ static uint8_t *get_run_neon(uint8_t *ip, const uint8_t *bound, const uint8_t *r
 }
 #endif
 
-static inline uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const uint8_t* ref, bool run) {
-  if (BLOSCLZ_UNLIKELY(run)) {
+BLOSCLZ_ALWAYS_INLINE uint8_t* get_run_fast(uint8_t* ip, const uint8_t* ip_bound, const uint8_t* ref) {
 #if defined(__AVX2__)
-    ip = get_run_32(ip, ip_bound, ref);
+  return get_run_32(ip, ip_bound, ref);
 #elif defined(__SSE2__)
-    ip = get_run_16(ip, ip_bound, ref);
+  return get_run_16(ip, ip_bound, ref);
 #elif defined(__aarch64__) || defined(_M_ARM64)
-    ip = get_run_neon(ip, ip_bound, ref);
+  return get_run_neon(ip, ip_bound, ref);
 #else
-    ip = get_run(ip, ip_bound, ref);
+  return get_run(ip, ip_bound, ref);
 #endif
-  }
-  else {
-#if defined(__AVX2__)
-    ip = get_match_32(ip, ip_bound, ref);
-#elif defined(__SSE2__)
-    ip = get_match_16(ip, ip_bound, ref);
-#elif defined(__aarch64__) || defined(_M_ARM64)
-    ip = get_match_neon(ip, ip_bound, ref);
-#else
-    ip = get_match(ip, ip_bound, ref);
-#endif
-  }
-
-  return ip;
 }
 
-#define LITERAL(ip, op, op_limit, anchor, copy) {       \
-  if (BLOSCLZ_UNLIKELY((op_limit) - (op) < 2))          \
-    goto out;                                           \
-  *(op)++ = *(anchor)++;                                \
-  (ip) = (anchor);                                      \
-  (copy)++;                                             \
-  if (BLOSCLZ_UNLIKELY((copy) == MAX_COPY)) {           \
-    (copy) = 0;                                         \
-    *(op)++ = MAX_COPY-1;                               \
-  }                                                     \
+BLOSCLZ_ALWAYS_INLINE uint8_t* get_match_fast(uint8_t* ip, const uint8_t* ip_bound, const uint8_t* ref) {
+#if defined(__AVX2__)
+  return get_match_32(ip, ip_bound, ref);
+#elif defined(__SSE2__)
+  return get_match_16(ip, ip_bound, ref);
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  return get_match_neon(ip, ip_bound, ref);
+#else
+  return get_match(ip, ip_bound, ref);
+#endif
+}
+
+BLOSCLZ_ALWAYS_INLINE uint8_t* emit_literals(uint8_t* op, const uint8_t* op_limit,
+                                             const uint8_t* lit_start, size_t lit_len) {
+  while (lit_len >= MAX_COPY) {
+    if (BLOSCLZ_UNLIKELY((size_t)(op_limit - op) < MAX_COPY + 1)) {
+      return NULL;
+    }
+    *op++ = MAX_COPY - 1;
+    memcpy(op, lit_start, MAX_COPY);
+    op += MAX_COPY;
+    lit_start += MAX_COPY;
+    lit_len -= MAX_COPY;
+  }
+  if (lit_len > 0) {
+    if (BLOSCLZ_UNLIKELY((size_t)(op_limit - op) < lit_len + 1)) {
+      return NULL;
+    }
+    *op++ = (uint8_t)(lit_len - 1);
+    memcpy(op, lit_start, lit_len);
+    op += lit_len;
+  }
+  return op;
 }
 
 #define LITERAL2(ip, anchor, copy) {                    \
@@ -757,65 +831,68 @@ static inline uint8_t* get_run_or_match(uint8_t* ip, uint8_t* ip_bound, const ui
  * no state, base is always 0 and the table is memset as usual. */
 #define HTAB_GET(entry, base) (tagged ? ((entry) >= (base) ? (entry) - (base) : 0) : (entry))
 
-// Get a guess for the compressed size of a buffer
+// Get a guess for the compressed size of a buffer window
 BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, uint32_t htab[],
-                                        int8_t hashlog, uint32_t base, const int tagged) {
-  uint8_t* ip = ibase;
-  int32_t oc = 0;
-  const uint16_t hashlen = (1U << (uint8_t)hashlog);
-  uint32_t hval;
-  uint32_t seq;
-  uint8_t copy;
-  // Make a tradeoff between testing too much and too little
-  uint16_t limit = (maxlen > hashlen) ? hashlen : maxlen;
-  uint8_t* ip_bound = ibase + limit - 1;
-  uint8_t* ip_limit = ibase + limit - 12;
-
-
-  /* we start with literal copy */
-  copy = 4;
-  oc += 5;
+                                        uint8_t hashlog, uint32_t base, const int tagged) {
+  if (maxlen < 16) {
+    return 0.0;
+  }
+  uint8_t* ip = ibase + 4;
+  int32_t oc = 5;
+  uint8_t copy = 4;
+  const uint16_t hashlen = (1U << hashlog);
+  uint16_t limit = (maxlen > hashlen) ? hashlen : (uint16_t)maxlen;
+  uint8_t* ip_end = ibase + limit;
+  uint8_t* ip_bound = ip_end - 1;
+  uint8_t* ip_limit = ip_end - 12;
 
   /* main loop */
   while (BLOSCLZ_LIKELY(ip < ip_limit)) {
-    const uint8_t* ref;
-    unsigned distance;
     uint8_t* anchor = ip;    /* comparison starting-point */
 
     /* find potential match */
-    seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, hashlog)
-    ref = ibase + HTAB_GET(htab[hval], base);
+    uint32_t hval = blosclz_hash6(ip, hashlog);
+    const uint8_t* ref = ibase + HTAB_GET(htab[hval], base);
 
     /* calculate distance to the match */
-    distance = (unsigned int)(anchor - ref);
+    unsigned distance = (unsigned int)(anchor - ref);
 
     /* update hash table */
-    htab[hval] = (uint32_t) (anchor - ibase) + base;
+    htab[hval] = (uint32_t)(anchor - ibase) + base;
 
-    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
+    if (distance == 0 || distance >= MAX_FARDISTANCE) {
       LITERAL2(ip, anchor, copy)
       continue;
     }
 
-    /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip)) {
-      ref += 4;
-    }
-    else {
-      /* no luck, copy as a literal */
+    /* Check the full 6-byte prefix (matching minlen == 4) in one 64-bit op */
+    uint64_t a64 = blosclz_readu64(anchor);
+    uint64_t b64 = blosclz_readu64(ref);
+    uint64_t diff = a64 ^ b64;
+    if ((diff & BLOSCLZ_PREFIX6_MASK) != 0) {
       LITERAL2(ip, anchor, copy)
       continue;
     }
-
-    /* last matched byte */
-    ip = anchor + 4;
 
     /* distance is biased */
     distance--;
 
     /* get runs or matches; zero distance means a run */
-    ip = get_run_or_match(ip, ip_bound, ref, !distance);
+    if (BLOSCLZ_UNLIKELY(!distance)) {
+      ip = get_run_fast(anchor + 4, ip_bound, ref + 4);
+    }
+#if !BLOSCLZ_BIG_ENDIAN && defined(BLOSCLZ_HAVE_CTZ64)
+    else if (diff != 0) {
+      ip = anchor + (blosclz_ctz64(diff) >> 3) + 1;
+    }
+    else {
+      ip = get_match_fast(anchor + 8, ip_bound, ref + 8);
+    }
+#else
+    else {
+      ip = get_match_fast(anchor + 6, ip_bound, ref + 6);
+    }
+#endif
 
     ip -= ipshift;
     int len = (int)(ip - anchor);
@@ -845,15 +922,17 @@ BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, 
       oc += 4;
     }
 
-    /* update the hash at match boundary */
-    seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, hashlog)
-    htab[hval] = (uint32_t)(ip++ - ibase) + base;
-    ip++;
+    /* update the hash at match boundary (guard 8-byte read against window end) */
+    if (ip + 8 <= ip_end) {
+      hval = blosclz_hash6(ip, hashlog);
+      htab[hval] = (uint32_t)(ip - ibase) + base;
+    }
+    ip += 2;
     /* assuming literal copy */
     oc++;
-    /* Stop probing early once a 256-byte prefix already confirms strong compressibility */
-    if (ip - ibase >= 256 && (ip - ibase) >= (ptrdiff_t)oc * 3) {
+    /* Stop probing early once a 256-byte prefix already confirms compressibility
+     * well above the highest level threshold (1.5x at clevel 1). */
+    if (ip - ibase >= 256 && (ip - ibase) * 5 >= (ptrdiff_t)oc * 8) {
       break;
     }
   }
@@ -884,153 +963,169 @@ BLOSCLZ_ALWAYS_INLINE uint32_t htab_reset(uint32_t htab[], uint8_t hashlog, blos
 
 BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int length, void* output,
                                         int maxout, uint32_t htab[], blosclz_state* state, const int tagged) {
-  uint8_t* ibase = (uint8_t*)input;
-
-  /* Keep match coverage and boundary positioning consistent across levels.
-   * A shift of 4 truncates matches further and can disrupt periodic byte deltas,
-   * reducing both compression ratio and speed on floating-point ramps. */
-  unsigned ipshift = 3;
-  /* Retain the higher-level minimum: accepting more short matches can prevent
-   * finding longer matches and increase decompression work. */
-  unsigned minlen = clevel == 1 ? 3 : 4;
-
-  /* Keep at least an 8 KB (2048-entry) hash table at low levels so periodic
-   * shuffled byte streams (periods > 256 B) do not collapse in entropy probing,
-   * then grow to 64 KB at level 7. */
-  uint8_t hashlog_[10] = {0, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3,
-                          HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG};
-  uint8_t hashlog = hashlog_[clevel];
-
-  // Experiments say that checking 1/4 of the buffer is enough to figure out approx cratio
-  // UPDATE: new experiments with ERA5 datasets (float32) say that checking the whole buffer
-  // is better (specially when combined with bitshuffle).
-  // The loss in speed for checking the whole buffer is pretty negligible too.
-  int maxlen = length;
-  if (clevel < 2) {
-    maxlen /= 8;
-  }
-  else if (clevel < 4) {
-    maxlen /= 4;
-  }
-  else if (clevel < 7) {
-    maxlen /= 2;
-  }
-  // Start probing somewhere inside the buffer
-  int shift = length - maxlen;
-  // Actual entropy probing!
-  uint32_t base = htab_reset(htab, hashlog, state, maxlen, tagged);
-  double cratio = get_cratio(ibase + shift, maxlen, minlen, ipshift, htab, hashlog, base, tagged);
-  if (state != NULL) {
-    /* Tagged lookups skip clearing the >= 8 KB table between compressible streams. */
-    state->tagged = hashlog >= 11 && cratio >= 3.0;
-  }
-  // discard probes with small compression ratios (too expensive)
-  double cratio_[10] = {0, 1.5, 1.3, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
-  if (cratio < cratio_[clevel]) {
-      goto out;
-  }
-
-  uint8_t* ip = ibase;
-  uint8_t* ip_bound = ibase + length - 1;
-  uint8_t* ip_limit = ibase + length - 12;
-  uint8_t* op = (uint8_t*)output;
-  const uint8_t* op_limit = op + maxout;
-  uint32_t seq;
-  uint8_t copy;
-  uint32_t hval;
-
   /* input and output buffer cannot be less than 16 and 66 bytes or we can get into trouble */
   if (length < 16 || maxout < 66) {
     return 0;
   }
 
-  // Initialize the hash table
-  base = htab_reset(htab, hashlog, state, length, tagged);
+  uint8_t* ibase = (uint8_t*)input;
 
-  /* we start with literal copy */
-  copy = 4;
-  *op++ = MAX_COPY - 1;
-  *op++ = *ip++;
-  *op++ = *ip++;
-  *op++ = *ip++;
-  *op++ = *ip++;
+  /* Keep match coverage and boundary positioning consistent across levels.
+   * A shift of 4 truncates matches further and can disrupt periodic byte deltas,
+   * reducing both compression ratio and speed on floating-point ramps. */
+  const unsigned ipshift = 3;
+  /* Use a uniform 6-byte minimum match (len >= 4) paired with 6-byte hashing.
+   * Matching hash width to minlen eliminates short-match rejection thrashing
+   * on low-cardinality shuffled streams and keeps clevel cratio monotonic. */
+  const unsigned minlen = 4;
+
+  /* Keep at least an 8 KB (2048-entry) hash table at low levels so periodic
+   * shuffled byte streams (periods > 256 B) do not collapse, growing to 64 KB
+   * at level 7. */
+  static const uint8_t hashlog_[10] = {0, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3, HASH_LOG - 3,
+                                       HASH_LOG - 2, HASH_LOG - 1, HASH_LOG, HASH_LOG, HASH_LOG};
+  uint8_t hashlog = hashlog_[clevel];
+
+  /* Gentle LZ4-style miss skip acceleration: speeds up incompressible regions
+   * inside mixed-entropy blocks (such as BITSHUFFLE LSB planes) by 2-4x. */
+  static const uint8_t skip_shift_[10] = {0, 5, 5, 5, 6, 6, 6, 6, 6, 6};
+  const unsigned skip_shift = skip_shift_[clevel];
+
+  /* Discard probes with small compression ratios (too expensive). */
+  static const double cratio_[10] = {0, 1.3, 1.25, 1.2, 1.2, 1.2, 1.2, 1.15, 1.1, 1.0};
+  const double min_cratio = cratio_[clevel];
+
+  /* Bounded head + tail entropy probing (up to 2 KB at head, plus 1 KB at tail
+   * only if the head falls short).  Capping the probe avoids compressing half
+   * of every stream twice at high levels, while checking the tail preserves
+   * BITSHUFFLE blocks whose compressible MSB planes sit at the end.
+   * Cap the probe table at 2048 entries (8 KB) so it fits in L1 cache and
+   * keeps untagged resets cheap. */
+  int head_len = length < 2048 ? length : 2048;
+  uint8_t probe_hashlog = hashlog > 11 ? 11 : hashlog;
+  uint32_t base = htab_reset(htab, probe_hashlog, state, head_len, tagged);
+  double cratio = get_cratio(ibase, head_len, (int)minlen, (int)ipshift, htab, probe_hashlog, base, tagged);
+  if (cratio < min_cratio && length > 4096) {
+    int tail_len = 1024;
+    base = htab_reset(htab, probe_hashlog, state, tail_len, tagged);
+    double tail_cratio = get_cratio(ibase + (length - tail_len), tail_len, (int)minlen, (int)ipshift,
+                                    htab, probe_hashlog, base, tagged);
+    if (tail_cratio > cratio) {
+      cratio = tail_cratio;
+    }
+  }
+  if (state != NULL) {
+    /* Tagged lookups skip clearing the >= 8 KB table between compressible streams. */
+    state->tagged = hashlog >= 11 && cratio >= min_cratio;
+  }
+  if (cratio < min_cratio) {
+    goto out;
+  }
+
+  uint8_t* ip = ibase + 4;
+  uint8_t* lit_start = ibase;
+  uint8_t* ip_bound = ibase + length - 1;
+  uint8_t* ip_limit = ibase + length - 12;
+  uint8_t* op = (uint8_t*)output;
+  const uint8_t* op_limit = op + maxout;
+  bool after_match = false;
+
+  /* Initialize the hash table for the full pass */
+  base = htab_reset(htab, hashlog, state, length, tagged);
 
   /* main loop */
   while (BLOSCLZ_LIKELY(ip < ip_limit)) {
     const uint8_t* ref;
     unsigned distance;
-    uint8_t* anchor = ip;    /* comparison starting-point */
+    uint8_t* anchor;
+    unsigned len;
+    unsigned misses = 1U << skip_shift;
 
-    /* find potential match */
-    seq = BLOSCLZ_READU32(ip);
-    HASH_FUNCTION(hval, seq, hashlog)
-    ref = ibase + HTAB_GET(htab[hval], base);
-    /* With no pending literals, try the position following the previous
-     * occurrence of ip[-1..2].  Its alignment can break a chain of short
-     * matches on periodic data even when the ordinary candidate also matches.
-     * Read the old entry before updating it, then reload the ordinary candidate:
-     * the two hashes can share a slot. */
-    if (copy == 0 && ip > ibase + 4 && ip_bound - ip >= 8) {
-      uint32_t prevhash;
-      HASH_FUNCTION(prevhash, BLOSCLZ_READU32(ip - 1), hashlog)
-      const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
-      htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
+    /* Tight match-finding loop: defer literal copies until a match is found. */
+    for (;;) {
+      if (BLOSCLZ_UNLIKELY(ip >= ip_limit)) {
+        goto tail;
+      }
+      anchor = ip;
+
+      /* find potential match */
+      uint32_t hval = blosclz_hash6(ip, hashlog);
       ref = ibase + HTAB_GET(htab[hval], base);
-      if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
-          memcmp(candidate, ip, 8) == 0) {
-        ref = candidate;
+
+      /* Immediately after a match (no pending literals), try the position
+       * following the previous occurrence of ip[-1..4].  Its alignment can
+       * break a chain of short matches on periodic filtered data even when
+       * the ordinary candidate also matches. */
+      if (after_match && ip_bound - ip >= 8) {
+        uint32_t prevhash = blosclz_hash6(ip - 1, hashlog);
+        const uint8_t *candidate = ibase + HTAB_GET(htab[prevhash], base) + 1;
+        htab[prevhash] = (uint32_t)(ip - 1 - ibase) + base;
+        if (prevhash == hval) {
+          ref = ibase + HTAB_GET(htab[hval], base);
+        }
+        if (candidate < ip && ip - candidate < MAX_FARDISTANCE &&
+            memcmp(candidate, ip, 8) == 0) {
+          ref = candidate;
+        }
+      }
+      after_match = false;
+
+      /* calculate distance to the match */
+      distance = (unsigned int)(anchor - ref);
+
+      /* update hash table */
+      htab[hval] = (uint32_t)(anchor - ibase) + base;
+
+      if (distance != 0 && distance < MAX_FARDISTANCE) {
+        /* Verify all 6 bytes (minlen == 4) in one 64-bit XOR before match scan */
+        uint64_t a64 = blosclz_readu64(anchor);
+        uint64_t b64 = blosclz_readu64(ref);
+        uint64_t diff = a64 ^ b64;
+        if ((diff & BLOSCLZ_PREFIX6_MASK) == 0) {
+          /* distance is biased */
+          distance--;
+
+          /* get runs or matches; zero distance means a run */
+          if (BLOSCLZ_UNLIKELY(!distance)) {
+            ip = get_run_fast(anchor + 4, ip_bound, ref + 4);
+          }
+#if !BLOSCLZ_BIG_ENDIAN && defined(BLOSCLZ_HAVE_CTZ64)
+          else if (diff != 0) {
+            ip = anchor + (blosclz_ctz64(diff) >> 3) + 1;
+          }
+          else {
+            ip = get_match_fast(anchor + 8, ip_bound, ref + 8);
+          }
+#else
+          else {
+            ip = get_match_fast(anchor + 6, ip_bound, ref + 6);
+          }
+#endif
+
+          /* length is biased, '1' means a match of 3 bytes */
+          ip -= ipshift;
+          len = (unsigned)(ip - anchor);
+
+          if (len >= minlen && !(len <= 5 && distance >= MAX_DISTANCE)) {
+            break;
+          }
+          ip = anchor + 1;
+          continue;
+        }
+      }
+
+      ip = anchor + (misses >> skip_shift);
+      misses++;
+    }
+
+    /* Emit pending literals in bulk */
+    size_t lit_len = (size_t)(anchor - lit_start);
+    if (lit_len > 0) {
+      op = emit_literals(op, op_limit, lit_start, lit_len);
+      if (BLOSCLZ_UNLIKELY(op == NULL)) {
+        goto out;
       }
     }
-
-    /* calculate distance to the match */
-    distance = (unsigned int)(anchor - ref);
-
-    /* update hash table */
-    htab[hval] = (uint32_t) (anchor - ibase) + base;
-
-    if (distance == 0 || (distance >= MAX_FARDISTANCE)) {
-      LITERAL(ip, op, op_limit, anchor, copy)
-      continue;
-    }
-
-    /* is this a match? check the first 4 bytes */
-    if (BLOSCLZ_UNLIKELY(BLOSCLZ_READU32(ref) == BLOSCLZ_READU32(ip))) {
-      ref += 4;
-    } else {
-      /* no luck, copy as a literal */
-      LITERAL(ip, op, op_limit, anchor, copy)
-      continue;
-    }
-
-    /* last matched byte */
-    ip = anchor + 4;
-
-    /* distance is biased */
-    distance--;
-
-    /* get runs or matches; zero distance means a run */
-    ip = get_run_or_match(ip, ip_bound, ref, !distance);
-
-    /* length is biased, '1' means a match of 3 bytes */
-    ip -= ipshift;
-
-    unsigned len = (int)(ip - anchor);
-
-    // Encoding short lengths is expensive during decompression
-    if (len < minlen || (len <= 5 && distance >= MAX_DISTANCE)) {
-      LITERAL(ip, op, op_limit, anchor, copy)
-      continue;
-    }
-
-    /* if we have copied something, adjust the copy count */
-    if (copy)
-      /* copy is biased, '0' means 1 byte copy */
-      *(op - copy - 1) = (uint8_t)(copy - 1);
-    else
-      /* back, to overwrite the copy count */
-      op--;
-    /* reset literal counter */
-    copy = 0;
 
     /* encode the match */
     if (distance < MAX_DISTANCE) {
@@ -1052,37 +1147,28 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
     /* Advance past the biased match length.  Update the boundary hashes on
      * the next iteration, preserving the old ip-1 entry for the extra candidate. */
     ip += 2;
-
-    if (BLOSCLZ_UNLIKELY(op_limit - op < 1))
-      goto out;
-
-    /* assuming literal copy */
-    *op++ = MAX_COPY - 1;
+    lit_start = ip;
+    after_match = true;
   }
 
-  /* left-over as literal copy */
-  while (BLOSCLZ_UNLIKELY(ip <= ip_bound)) {
-    if (BLOSCLZ_UNLIKELY(op_limit - op < 2)) goto out;
-    *op++ = *ip++;
-    copy++;
-    if (BLOSCLZ_UNLIKELY(copy == MAX_COPY)) {
-      copy = 0;
-      *op++ = MAX_COPY - 1;
+tail:
+  /* Emit left-over bytes as literals */
+  {
+    size_t lit_len = (size_t)(ip_bound - lit_start + 1);
+    if (lit_len > 0) {
+      op = emit_literals(op, op_limit, lit_start, lit_len);
+      if (BLOSCLZ_UNLIKELY(op == NULL)) {
+        goto out;
+      }
     }
   }
-
-  /* if we have copied something, adjust the copy length */
-  if (copy)
-    *(op - copy - 1) = (uint8_t)(copy - 1);
-  else
-    op--;
 
   /* marker for blosclz */
   *(uint8_t*)output |= (1U << 5U);
 
   return (int)(op - (uint8_t*)output);
 
-  out:
+out:
   return 0;
 }
 

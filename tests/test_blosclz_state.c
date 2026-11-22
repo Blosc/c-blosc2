@@ -90,7 +90,7 @@ static int test_state_reuse(void) {
   }
   state->base = UINT32_MAX - 1;
   state->tagged = 1;
-  if (compare_state(state, 9, src, sizeof(src), sizeof(src)) || state->base != 32000) {
+  if (compare_state(state, 9, src, sizeof(src), sizeof(src)) || state->base != 2048 + sizeof(src)) {
     printf("Hash offset did not wrap safely before probing\n");
     goto cleanup;
   }
@@ -121,6 +121,69 @@ static int test_state_reuse(void) {
       compare_state(state, 9, src, sizeof(src), sizeof(src)) || state->tagged) {
     printf("Noisy data did not return to ordinary resets\n");
     goto cleanup;
+  }
+  /* Tail-compressible data (such as little-endian BITSHUFFLE blocks whose
+   * random LSB planes precede compressible MSB planes) must still compress at
+   * high levels instead of bailing out on a head-only entropy probe. */
+  {
+    const int n = 65536;
+    uint8_t *tail_src = malloc((size_t)n);
+    uint8_t *tail_dst = malloc((size_t)n);
+    uint8_t *tail_dec = malloc((size_t)n);
+    if (!tail_src || !tail_dst || !tail_dec) {
+      free(tail_src);
+      free(tail_dst);
+      free(tail_dec);
+      goto cleanup;
+    }
+    uint32_t r = 1234567;
+    for (int i = 0; i < n / 2; i++) {
+      r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+      tail_src[i] = (uint8_t)r;
+    }
+    for (int i = n / 2; i < n; i++) {
+      tail_src[i] = (uint8_t)((i / 8) & 3);
+    }
+    int cb = blosclz_compress_state(9, tail_src, n, tail_dst, n, state);
+    if (cb <= 0 || cb > (n * 3) / 4 ||
+        blosclz_decompress(tail_dst, cb, tail_dec, n) != n ||
+        memcmp(tail_src, tail_dec, (size_t)n) != 0) {
+      printf("Tail-compressible block failed at clevel=9 (cb=%d)\n", cb);
+      free(tail_src);
+      free(tail_dst);
+      free(tail_dec);
+      goto cleanup;
+    }
+    free(tail_src);
+    free(tail_dst);
+    free(tail_dec);
+  }
+  /* Low-cardinality binary stream: higher clevel should not lose ratio to clevel=1. */
+  {
+    const int n = 32000;
+    uint8_t *bin_src = malloc((size_t)n);
+    uint8_t *bin_dst1 = malloc((size_t)n);
+    uint8_t *bin_dst9 = malloc((size_t)n);
+    uint8_t *bin_dec = malloc((size_t)n);
+    if (!bin_src || !bin_dst1 || !bin_dst9 || !bin_dec) {
+      free(bin_src); free(bin_dst1); free(bin_dst9); free(bin_dec);
+      goto cleanup;
+    }
+    uint32_t r = 7654321;
+    for (int i = 0; i < n; i++) {
+      r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+      bin_src[i] = (r % 100 < 64) ? 0x00 : 0xff;
+    }
+    int cb1 = blosclz_compress_state(1, bin_src, n, bin_dst1, n, state);
+    int cb9 = blosclz_compress_state(9, bin_src, n, bin_dst9, n, state);
+    if (cb1 <= 0 || cb9 <= 0 || cb9 > cb1 ||
+        blosclz_decompress(bin_dst9, cb9, bin_dec, n) != n ||
+        memcmp(bin_src, bin_dec, (size_t)n) != 0) {
+      printf("Binary stream regression: cb1=%d cb9=%d\n", cb1, cb9);
+      free(bin_src); free(bin_dst1); free(bin_dst9); free(bin_dec);
+      goto cleanup;
+    }
+    free(bin_src); free(bin_dst1); free(bin_dst9); free(bin_dec);
   }
   result = EXIT_SUCCESS;
 cleanup:
