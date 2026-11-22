@@ -30,6 +30,8 @@
 
 #if defined(__AVX2__)
 #include <immintrin.h>
+#elif defined(__SSSE3__)
+#include <tmmintrin.h>
 #elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
 #include <emmintrin.h>
 #endif
@@ -1294,6 +1296,46 @@ bool blosc_get_run_avx2(const uint8_t* ip, const uint8_t* ip_bound) {
 #endif /* defined(__AVX2__) */
 #endif /* defined(BLOSCLZ_BUILD_AVX2) */
 
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__AVX2__) || defined(__SSSE3__)
+BLOSCLZ_ALWAYS_INLINE void blosclz_copy_short_match(uint8_t *op, const uint8_t *ref, int32_t len) {
+  ptrdiff_t dist = op - ref;
+  /* Row d repeats the first d bytes. Row zero is the identity for distances
+   * of at least 16, where each vector load already contains the next 16 bytes. */
+  static const uint8_t repeat[16][16] = {
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
+    {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
+    {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
+    {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
+    {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1},
+    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0},
+  };
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+  uint8x16_t index = vld1q_u8(repeat[dist < 16 ? dist : 0]);
+  vst1q_u8(op, vqtbl1q_u8(vld1q_u8(ref), index));
+  if (len > 16) {
+    vst1q_u8(op + 16, vqtbl1q_u8(vld1q_u8(ref + 16), index));
+  }
+#else
+  __m128i index = _mm_loadu_si128((const __m128i *)repeat[dist < 16 ? dist : 0]);
+  _mm_storeu_si128((__m128i *)op, _mm_shuffle_epi8(_mm_loadu_si128((const __m128i *)ref), index));
+  if (len > 16) {
+    _mm_storeu_si128((__m128i *)(op + 16), _mm_shuffle_epi8(_mm_loadu_si128((const __m128i *)(ref + 16)), index));
+  }
+#endif
+}
+#endif
+
 #if defined(__AVX2__)
 /* x86-64 AVX2 match copier: uses 128B/64B/32B ordered vector copies with exact
  * overlapping 32B/16B tails (so end-of-stream matches need no slack and do not
@@ -1739,35 +1781,6 @@ BLOSCLZ_ALWAYS_INLINE uint8_t *blosclz_copy_match_neon(
   ptrdiff_t dist = op - ref;
   uint8_t *end = op + len;
 
-  /* Row d repeats the first d bytes. Row zero is the identity for distances
-   * of at least 16, where each vector load already contains the next 16 bytes. */
-  static const uint8_t repeat[16][16] = {
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},
-    {0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0},
-    {0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3},
-    {0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0},
-    {0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3},
-    {0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6, 0, 1},
-    {0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 3, 4, 5, 6},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 1, 2, 3, 4},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 1, 2},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 0, 1},
-    {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0},
-  };
-
-  if (len <= 32 && op_limit - op >= 32) {
-    uint8x16_t index = vld1q_u8(repeat[dist < 16 ? dist : 0]);
-    vst1q_u8(op, vqtbl1q_u8(vld1q_u8(ref), index));
-    if (len > 16) {
-      vst1q_u8(op + 16, vqtbl1q_u8(vld1q_u8(ref + 16), index));
-    }
-    return end;
-  }
   if (dist >= 16) {
     if (dist >= 32) {
       if (len >= 16) {
@@ -2005,6 +2018,13 @@ static inline int blosclz_decompress_impl(const void* input, int length, void* o
       ctrl = *ip++;
 
       ref--;
+#if defined(__aarch64__) || defined(_M_ARM64) || defined(__AVX2__) || defined(__SSSE3__)
+      if (len <= 32 && op_limit - op >= 32) {
+        blosclz_copy_short_match(op, ref, len);
+        op += len;
+        continue;
+      }
+#endif
 #if defined(__AVX2__)
       op = blosclz_copy_match_avx2(op, ref, len, op_limit);
 #elif defined(__SSE2__) || defined(__x86_64__) || defined(_M_X64)
@@ -2031,13 +2051,7 @@ static inline int blosclz_decompress_impl(const void* input, int length, void* o
       // literal
       ctrl++;
 #ifdef BLOSCLZ_WIDE_DECODE
-      /* On ARM64 one 32-byte copy avoids branching on the literal length. */
-#if !defined(__aarch64__) && !defined(_M_ARM64)
-      if (ctrl <= 16 && op_limit - op >= 16 && ip_limit - ip >= 16) {
-        memcpy(op, ip, 16);
-      }
-      else
-#endif
+      /* All literal lengths fit in one fixed-size copy when both buffers have room. */
       if (op_limit - op >= 32 && ip_limit - ip >= 32) {
         memcpy(op, ip, 32);
       }
