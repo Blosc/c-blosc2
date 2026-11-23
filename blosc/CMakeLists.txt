@@ -193,6 +193,11 @@ list(APPEND SOURCES
     blosc/blosc2-stdio.c
     blosc/b2nd.c
     blosc/b2nd_utils.c
+    blosc/embed-store/embed-store.c
+    blosc/utils/hash.c
+    blosc/utils/hash_map.c
+    blosc/utils/string_manipulation.c
+    blosc/utils/msgpack.c
     blosc/dict-store/dict-store.c
     blosc/utils/ziputils.c
     blosc/utils/miniz.c
