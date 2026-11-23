@@ -141,7 +141,7 @@ C-Blosc2 can either fetch pinned upstream codec releases via CMake ``FetchConten
 ``AUTO``
   Try system packages first and fall back to bundled dependencies.  This is convenient for local development, but less reproducible for distro packaging.
 
-The older ``PREFER_EXTERNAL_LZ4``, ``PREFER_EXTERNAL_ZLIB`` and ``PREFER_EXTERNAL_ZSTD`` options are still accepted as per-dependency compatibility options; when enabled they try the system package first for that dependency.
+The older ``PREFER_EXTERNAL_LZ4``, ``PREFER_EXTERNAL_ZLIB``, ``PREFER_EXTERNAL_ZSTD`` and ``PREFER_EXTERNAL_ZFP`` options are still accepted as per-dependency compatibility options; when enabled they try the system package first for that dependency.
 
 ZFP support is controlled separately because ZFP packages are not available in all distributions:
 
