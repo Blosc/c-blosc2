@@ -180,7 +180,7 @@ bool ziputils_reader_iter_is_dir( zip_archive_iter *iter ) {
     return iter->stat.m_is_directory;
 }
 
-int ziputils_reader_iter_get_filename( zip_archive_iter *iter, const uint8_t** pfilename_buffer, size_t* pfilename_length ) {
+int ziputils_reader_iter_get_filename( zip_archive_iter *iter, uint8_t** pfilename_buffer, size_t* pfilename_length ) {
     if (iter == NULL || pfilename_length == NULL || pfilename_buffer == NULL) return BLOSC2_ERROR_INVALID_PARAM;
 
     char mock = '1';

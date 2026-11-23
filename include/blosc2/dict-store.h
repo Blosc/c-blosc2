@@ -49,20 +49,20 @@ typedef enum {
  *
  * Value returned by blosc2_dict_store_get_storage_type().
  */
-enum {
+typedef enum {
     B2_DS_MEMORY_SPARSE = 0, /**< In memory, one schunk pointer per key (the caller keeps ownership). */
+    B2_DS_B2Z = 1,               /**< A .b2z archive (ZIP container). */
+    B2_DS_B2D = 2,               /**< A .b2d directory holding one file per key. */
     B2_DS_MEMORY_CONTIGUOUS, /**< In memory, all entries packed into a single buffer (see blosc2_dict_store_from_buffer()). */
-    B2_DS_B2Z,               /**< A .b2z archive (ZIP container). */
-    B2_DS_B2D,               /**< A .b2d directory holding one file per key. */
-};
+}b2_ds_storage_type;
 
 typedef enum {
-    B2_DS_VALUE_LOCAL,
-    B2_DS_VALUE_REMOTE
-}b2_ds_value_tag;
+    B2_DS_ITEM_LOCAL,
+    B2_DS_ITEM_REMOTE
+}b2_ds_item_tag;
 
 typedef struct {
-    b2_ds_value_tag tag;
+    b2_ds_item_tag tag;
     union {
         blosc2_schunk* schunk; // Local
         struct {
@@ -337,7 +337,7 @@ bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key )
  *
  * @sa blosc2_dict_store_set, blosc2_dict_store_remove, blosc2_dict_store_contains_key
  */
-int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, blosc2_schunk** pcontainer);
+int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item);
 
 /**
  * @brief Inserts or replaces the schunk associated with a key.
@@ -448,7 +448,7 @@ const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter );
  * @pre The last call to blosc2_dict_store_iter_next() returned true.
  * @sa blosc2_dict_store_get
  */
-int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, blosc2_schunk** pcontainer );
+int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item );
 
 /** @} */  /* Iterator API */
 

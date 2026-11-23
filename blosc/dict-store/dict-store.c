@@ -26,14 +26,9 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <b2nd.h>
 
 typedef blosc2_dict_store dict_store;
-typedef b2_ds_pair pair;
 typedef b2_ds_value value; // Recall that this is an union in C
 
 /* == Static functions (and some constants) == */
-
-// Used to mark tombstones
-static const uint8_t tombstone_sentinel;
-#define TOMBSTONE (&tombstone_sentinel)
 
 static const uint8_t* b2z_extension = (const uint8_t*)"b2z";
 //static const size_t b2z_extension_len = 3;
@@ -46,225 +41,52 @@ static const size_t b2nd_extension_len = 3;
 
 /* # Dict functions */
 
-// (note): Creates a zero initialized struct
-static int s_dict_store_alloc(dict_store **ds) {
-    dict_store *pds = calloc(1, sizeof(dict_store));
-    if (pds == NULL) {
+static int s_dict_store_alloc(dict_store** dstore, cb_free_value free_value) {
+    dict_store *ds = calloc(1, sizeof(dict_store));
+    if (ds == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
 
-    pds->pairs = calloc(BLOSC2_DICT_STORE_INITIAL_CAPACITY, sizeof(pair));
-    if (pds->pairs == NULL) {
-        free(pds);
-        return BLOSC2_ERROR_MEMORY_ALLOC;
+    int rc = hash_map_init(&ds->map, sizeof(b2_ds_value), free_value);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not init hash map");
+        free(ds);
+        return rc;
     }
+    *dstore = ds;
 
-    pds->capacity = BLOSC2_DICT_STORE_INITIAL_CAPACITY;
-    *ds = pds;
-    return BLOSC2_ERROR_SUCCESS;
+    return rc;
 }
 
-static int s_dict_store_alloc_urlpath(dict_store **ds, const uint8_t* urlpath, int storage_type, b2_ds_open_mode open_mode) {
-    *ds = NULL;
+static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpath, b2_ds_storage_type storage_type, b2_ds_open_mode open_mode, cb_free_value cb) {
+    *dstore = NULL;
     dict_store *pds = NULL;
-    int error_code = s_dict_store_alloc(&pds);
-    if (error_code != 0) {
+    int error_code = s_dict_store_alloc(&pds, cb);
+    if (error_code < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory for blosc2_dict_store structure");
         return error_code;
     }
     error_code = blosc2_string_duplicate(urlpath, (uint8_t**)&pds->urlpath);
-    if (error_code != 0) {
+    if (error_code < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to duplicate string");
-        free(pds->pairs);
-        free(pds);
+        blosc2_dict_store_free(pds);
         return error_code;
     }
     pds->urlpath_length = strlen((const char*)pds->urlpath);
     pds->open_mode = open_mode;
     pds->storage_type = storage_type;
-    *ds = pds;
+    *dstore = pds;
     return error_code;
 }
 
-// (note): This "simple free", does not free individual pairs. It assumes that ds->pairs does not contain any pointer
-static void s_dict_store_simple_free(dict_store *ds) {
-    free(ds->pairs);
-    free((void*)ds->urlpath);
-    free(ds);
+static void s_b2_ds_item_set_local(b2_ds_item* item, blosc2_schunk* schunk) {
+    item->tag = B2_DS_ITEM_LOCAL;
+    item->schunk = schunk;
 }
 
-static bool s_dict_pair_is_live(const pair* p) {
-    return p->key != NULL && p->key != TOMBSTONE;
-}
-
-static bool s_dict_pair_is_tombstone(const pair* p) {
-    return p->key == TOMBSTONE;
-}
-
-static bool s_dict_pair_is_empty(const pair* p) {
-    return p->key == NULL;
-}
-
-static bool s_dict_set_pair_hash(
-    pair* pairs,
-    size_t capacity,
-    const uint8_t* key,
-    b2_ds_value *ds_value,
-    size_t* p_length, // If NULL, then a resize is being performed
-    size_t* p_tombstones,
-    uint64_t hash
-) {
-    size_t index = (size_t)(hash % capacity);
-    pair *first_tomb = NULL;
-    pair *p = &pairs[index];
-
-    while (!s_dict_pair_is_empty(p)) {
-        if (s_dict_pair_is_tombstone(p)) {
-            if (first_tomb == NULL) first_tomb = p;
-        } else if (p->hash == hash && strcmp((const char*)p->key, (const char*)key) == 0) {
-            p->value = *ds_value;
-            return false;
-        }
-
-        index += 1;
-        if (index >= capacity) index = 0;
-        p = &pairs[index];
-    }
-
-    if (first_tomb != NULL) {
-        p = first_tomb;
-        if (p_tombstones != NULL) *p_tombstones -= 1;
-    }
-    if (p_length != NULL) *p_length += 1;
-
-    p->key = key;
-    p->hash = hash;
-    p->value = *ds_value;
-    return true;
-}
-
-// Returns true if the key was setted. That way, the user code can check whether it needs to free the key
-// or not
-static bool s_dict_set_pair(
-    pair* pairs,
-    size_t capacity,
-    const uint8_t* key,
-    b2_ds_value *ds_value,
-    size_t* p_length, // If NULL, then a resize is being performed
-    size_t* p_tombstones
-) {
-    uint64_t hash = hash_fnv_1a((const char*)key);
-    return s_dict_set_pair_hash(pairs, capacity, key, ds_value, p_length, p_tombstones, hash);
-}
-
-static pair* s_dict_find_pair(dict_store *ds, const uint8_t* key) {
-    uint64_t hash = hash_fnv_1a((const char*)key);
-    size_t index = (size_t)(hash % ds->capacity);
-
-    for (size_t i = 0; i < ds->capacity; i += 1) {
-        pair *p = &ds->pairs[index];
-        if (s_dict_pair_is_empty(p)) return NULL;
-        if (s_dict_pair_is_live(p) && p->hash == hash && strcmp((const char*)p->key, (const char*)key) == 0) {
-            return p;
-        }
-        index += 1;
-        if (index >= ds->capacity) index = 0;
-    }
-    return NULL;
-}
-
-static bool s_dict_needs_resize(dict_store *ds) {
-    return (float)(ds->length + ds->tombstones) >= BLOSC2_DICT_STORE_LOAD_FACTOR * (float)(ds->capacity);
-}
-
-static bool s_dict_resize(dict_store* ds) {
-    size_t new_capacity = ds->capacity;
-
-    if ((float)ds->length >= (float)ds->capacity * BLOSC2_DICT_STORE_LOAD_FACTOR / 2.0f) {
-        new_capacity = ds->capacity * BLOSC2_DICT_STORE_RESIZE_FACTOR;
-        if (new_capacity < ds->capacity) return false; // Overflow
-    }
-
-    pair *new_pairs = (pair*)calloc(new_capacity, sizeof(pair));
-    if (new_pairs == NULL) return false;
-
-    for (size_t i = 0; i < ds->capacity; i += 1) {
-        pair *p = &ds->pairs[i];
-        if (s_dict_pair_is_live(p)) {
-            s_dict_set_pair_hash(new_pairs, new_capacity, p->key, &p->value, NULL, NULL, p->hash);
-        }
-    }
-
-    free(ds->pairs);
-    ds->pairs = new_pairs;
-    ds->capacity = new_capacity;
-    ds->tombstones = 0;
-    return true;
-}
-
-static int s_dict_store_put(dict_store *ds, const uint8_t* key, value *val, bool *needs_free) {
-    if (s_dict_needs_resize(ds)) {
-        if (!s_dict_resize(ds)) {
-            BLOSC_TRACE_ERROR("Could not resize blosc2_dict_store, aborting...");
-            return BLOSC2_ERROR_MEMORY_ALLOC;
-        }
-    }
-
-    *needs_free = !s_dict_set_pair(ds->pairs, ds->capacity, key, val, &ds->length, &ds->tombstones);
-    return BLOSC2_ERROR_SUCCESS;
-}
-
-static void s_dict_free_keys(dict_store *ds) {
-    for (size_t i = 0; i < ds->capacity; i+=1) {
-        pair *p = &ds->pairs[i];
-        if (s_dict_pair_is_live(p)) {
-            free((void*)p->key);
-        }
-    }
-}
-
-static void s_dict_free_keys_and_localpaths(dict_store *ds) {
-    for (size_t i = 0; i < ds->capacity; i+=1) {
-        pair *p = &ds->pairs[i];
-        if (s_dict_pair_is_live(p)) {
-            free((void*)p->key);
-            free((void*)p->value.f_dir.localpath);
-        }
-    }
-}
-
-static void s_dict_free_b2d(dict_store *ds) {
-    s_dict_free_keys_and_localpaths(ds);
-    free((void*)ds->urlpath);
-    free(ds->pairs);
-    free(ds);
-}
-
-static void s_dict_free_b2z(dict_store *ds) {
-    switch (ds->open_mode) {
-    case B2_DS_RDONLY: {
-        s_dict_free_keys(ds);
-        free((void*)ds->urlpath);
-        break;
-    }
-
-    // (note): Write, Append is the same thing
-    case B2_DS_WRONLY:
-    case B2_DS_RDWR: {
-        s_dict_free_keys_and_localpaths(ds);
-        free((void*)ds->urlpath);
-        if (ds->tmpdir) free((void*)ds->tmpdir);
-        break;
-    }
-    }
-    free(ds->pairs);
-    free(ds);
-}
-
-static void s_dict_free_mem(dict_store *ds) {
-    s_dict_free_keys(ds);
-    free(ds->pairs);
-    free(ds);
+static void s_b2_ds_value_free_dir(void* ptr) {
+    b2_ds_value* value = (b2_ds_value*)ptr;
+    free(value->f_dir.localpath);
 }
 
 // # END Dict functions
@@ -326,50 +148,45 @@ static int s_inode_exists(const uint8_t* path) {
     }
 }
 
-static int s_zip_write_all_pairs(dict_store *ds, zip_archive *za) {
-    // Preconditions:
-    //              - ds is valid
-    //              - za is valid and in writer mode
+static int s_zip_write_all_pairs(const dict_store *ds, zip_archive *za) {
+    assert(ds != NULL && za != NULL);
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    for (size_t i = 0; i < ds->capacity; i+=1) {
-        pair *p = &ds->pairs[i];
-        if (s_dict_pair_is_live(p) && p->value.f_mem.schunk != NULL) {
+    int rc = BLOSC2_ERROR_SUCCESS;
+    hash_map_iter iter = {0};
+    hash_map_iter* piter = &iter;
+    hash_map_iter_init(&iter, &ds->map);
+    while (hash_map_iter_next(piter)) {
+        const uint8_t* key = hash_map_iter_get_key(piter);
+        b2_ds_value* value = hash_map_iter_get_value(piter);
+        blosc2_schunk* schunk = value->f_mem.schunk;
 
-            uint8_t* concat = NULL;
-            int64_t frame_len = 0;
-            uint8_t* frame_buffer = NULL;
-            bool needs_free = false;
+        uint8_t* concat = NULL;
+        rc = s_add_extension_to_key(key, schunk, &concat, NULL);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not allocate memory to set extension to key");
+            break;
+        }
 
-            error_code = s_add_extension_to_key(p->key, p->value.f_mem.schunk, &concat, NULL);
-            if (error_code != 0) {
-                BLOSC_TRACE_ERROR("Could not allocate memory to set extension to key");
-                error_code = BLOSC2_ERROR_MEMORY_ALLOC;
-                break;
-            }
-
-            frame_len = blosc2_schunk_to_buffer(p->value.f_mem.schunk, &frame_buffer, &needs_free);
-            if (frame_len < 0) {
-                BLOSC_TRACE_ERROR("Could not convert schunk to cframe");
-                error_code = (int)frame_len;
-                free((void*)concat);
-                break;
-            }
-            bool ok = ziputils_writer_add_entry(za, concat, (void*)frame_buffer, (size_t)frame_len);
-            if (needs_free) {
-                free((void*)frame_buffer);
-            }
-            if (!ok) {
-                BLOSC_TRACE_ERROR("Could not add cframe to zip archive");
-                error_code = BLOSC2_ERROR_WRITE_BUFFER;
-                free(concat);
-                break;
-            }
-            free((void*)concat);
+        uint8_t* frame_buffer = NULL;
+        bool needs_free = false;
+        int64_t frame_len = blosc2_schunk_to_buffer(schunk, &frame_buffer, &needs_free);
+        if (frame_len < 0) {
+            BLOSC_TRACE_ERROR("Could not convert schunk to cframe");
+            rc = (int)frame_len;
+            free(concat);
+            break;
+        }
+        bool ok = ziputils_writer_add_entry(za, concat, frame_buffer, (size_t)frame_len);
+        if (needs_free) free(frame_buffer);
+        free(concat);
+        if (!ok) {
+            BLOSC_TRACE_ERROR("Could not add cframe to zip archive");
+            rc = BLOSC2_ERROR_WRITE_BUFFER;
+            break;
         }
     }
 
-    return error_code;
+    return rc;
 }
 
 // (todo): This is not platform independent
@@ -436,9 +253,13 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
             }
 
             bool needs_free = false;
-            error_code = s_dict_store_put(ds, key, &v, &needs_free);
+            error_code = hash_map_put(&ds->map, key, &v, &needs_free);
             if (needs_free) {
                 free(key);
+            }
+            if (error_code < 0) {
+                BLOSC_TRACE_ERROR("Could not set pair in hash_map");
+                break;
             }
         }
     }
@@ -491,14 +312,14 @@ static int s_open_rdonly_b2z(dict_store **ds, const uint8_t* urlpath) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
 
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDONLY);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDONLY, NULL);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
     }
 
     while (ziputils_reader_iter_next(iter)) {
-        const uint8_t *filename = NULL;
+        uint8_t *filename = NULL;
         uint8_t* filename_without_extension = NULL;
         size_t filename_size = 0;
         value val = {0};
@@ -521,9 +342,13 @@ static int s_open_rdonly_b2z(dict_store **ds, const uint8_t* urlpath) {
         val.f_zip.length = ziputils_reader_iter_get_length(iter);
 
         bool needs_free = false;
-        error_code = s_dict_store_put(pds, filename_without_extension, &val, &needs_free);
+        error_code = hash_map_put(&pds->map, filename_without_extension, &val, &needs_free);
         if (needs_free) {
             free((void*)filename_without_extension);
+        }
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not put element in hash_map");
+            break;
         }
     }
 
@@ -546,7 +371,7 @@ static int s_open_rdonly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
     dict_store *pds = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDONLY);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -588,10 +413,10 @@ static int s_open_rdonly(dict_store **ds, const uint8_t* urlpath, int storage_ty
 static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
 
     dict_store *pds = NULL;
-    const uint8_t* tmpdir = NULL;
+    uint8_t* tmpdir = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
 
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_WRONLY);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_WRONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -599,7 +424,7 @@ static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
 
     error_code = blosc2_create_tmp_dir((char**)&tmpdir);
     if (error_code != 0) {
-        s_dict_store_simple_free(pds);
+        blosc2_dict_store_free(pds);
         return error_code;
     }
     pds->tmpdir = tmpdir;
@@ -617,7 +442,7 @@ static int s_open_wronly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
     dict_store *pds = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_WRONLY);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_WRONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         rmdir((const char*)urlpath);
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
@@ -654,20 +479,16 @@ static int s_open_wronly(dict_store **ds, const uint8_t* urlpath, int storage_ty
 
 static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
 
-    //if (!ziputils_validate_file(urlpath)) {
-    //    return BLOSC2_ERROR_FILE_OPEN;
-    //}
-
     bool free_pds = true;
     dict_store *pds = NULL;
     bool remove_tmpdir = true;
-    const uint8_t* tmpdir = NULL;
+    uint8_t* tmpdir = NULL;
     size_t tmpdir_length = 0;
     zip_archive *za = NULL;
     zip_archive_iter *iter = NULL;
 
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDWR);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDWR, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -676,7 +497,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     error_code = blosc2_create_tmp_dir((char**)&tmpdir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not create temporal directory at %s", (const char*)urlpath);
-        s_dict_store_simple_free(pds);
+        blosc2_dict_store_free(pds);
         return error_code;
     }
     tmpdir_length = strlen((const char*)tmpdir);
@@ -684,7 +505,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     za = ziputils_archive_new();
     if (za == NULL) {
         BLOSC_TRACE_ERROR("Could not allocate new zip_archive");
-        s_dict_store_simple_free(pds);
+        blosc2_dict_store_free(pds);
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     if (!ziputils_reader_init_file(za, urlpath)) {
@@ -704,7 +525,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     while (ziputils_reader_iter_next(iter)) {
         value val = {0};
         uint8_t* key_with_extension = NULL;
-        const uint8_t* key = NULL;
+        uint8_t* key = NULL;
 
         error_code = ziputils_reader_iter_get_filename(iter, &val.f_dir.localpath, &val.f_dir.localpath_length);
         if (error_code != 0) {
@@ -746,9 +567,13 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         }
 
         bool needs_free = false;
-        error_code = s_dict_store_put(pds, key, &val, &needs_free);
+        error_code = hash_map_put(&pds->map, key, &val, &needs_free);
         if (needs_free) {
             free((void*)key);
+        }
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Coudl not set element in hash_map");
+            goto cleanup;
         }
     }
     pds->tmpdir = tmpdir;
@@ -787,7 +612,7 @@ static int s_open_rdwr_b2d(dict_store **ds, const uint8_t* urlpath) {
     }
     int error_code = BLOSC2_ERROR_SUCCESS;
     dict_store *pds = NULL;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDWR);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDWR, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -829,196 +654,180 @@ static int s_open_rdwr(dict_store **ds, const uint8_t* urlpath, int storage_type
 }
 
 // (note): s_get_mem_sparse is implemented directly in the switch statement in blosc2_dict_store_get
-static int s_get_mem_contiguous(dict_store *ds, const pair* p, blosc2_schunk **pcontainer) {
-    // Preconditions
-    //      - ds is valid. If open_mode is write or append, then tmpdir is not NULL and valid and tmpdir_length > 0
-    //      - p is not null and belongs in ds->pairs, that means, that it is not required for this function to check
-    //      if the pair exists
-    //      - pcontainer is not NULL
+static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_ds_item* item) {
+    assert(ds != NULL && value != NULL && item != NULL);
+    assert(ds->storage_type == B2_DS_MEMORY_CONTIGUOUS);
+    assert(ds->open_mode == B2_DS_RDONLY);
 
-    int64_t offset = p->value.f_zip.offset;
-    size_t length = p->value.f_zip.length;
-    const uint8_t* ptr = &ds->urlpath[offset];
-    blosc2_schunk *schunk = blosc2_schunk_from_buffer((uint8_t*)ptr, (int64_t)length, true);
+    int64_t offset = value->f_zip.offset;
+    size_t length = value->f_zip.length;
+    uint8_t* ptr = &ds->urlpath[offset];
+    blosc2_schunk* schunk = blosc2_schunk_from_buffer(ptr, (int64_t)length, true);
     if (schunk == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-
-    *pcontainer = schunk;
+    s_b2_ds_item_set_local(item, schunk);
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_get_b2x(dict_store *ds, const pair* p, const uint8_t* prefix, size_t prefix_length, blosc2_schunk **pcontainer) {
-    // Preconditions
-    //      - ds is valid. If open_mode is write or append, then tmpdir is not NULL and valid and tmpdir_length > 0 Also, dict_store is either B2Z or B2D
-    //          also, dict_store is either RDONLY or RDWR
-    //      - p is not null and belongs in ds->pairs, that means, that it is not required for this function to check
-    //      if the pair exists
-    //      - prefix is not null
-    //      - prefix_length > 0
-    //      - pcontainer is not NULL
+static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_ds_item* item) {
+    assert(ds != NULL && value != NULL && value != NULL && item != NULL);
+    assert(ds->open_mode == B2_DS_RDONLY || ds->open_mode == B2_DS_RDWR);
+    assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
 
     bool free_path = false;
-    const uint8_t* path = prefix;
     int64_t offset = 0;
+    uint8_t* path = NULL;
 
     switch (ds->open_mode) {
-        case B2_DS_RDONLY: {
-            if (ds->storage_type == B2_DS_B2Z) {
-                offset = p->value.f_zip.offset;
-                break;
-            }
-            // ds->storage_type == B2_DS_B2Z
-            const uint8_t* localpath = p->value.f_dir.localpath;
-            size_t localpath_len = p->value.f_dir.localpath_length;
-
-            // TODO: Maybe, do better path joining
-            size_t concat_len = prefix_length + localpath_len + 2;
-            uint8_t* concat = NULL;
-            concat = malloc(concat_len);
-            if (concat == NULL) {
-                BLOSC_TRACE_ERROR("Could not allocate memory");
-                return BLOSC2_ERROR_MEMORY_ALLOC;
-            }
-            snprintf((char*)concat, concat_len, "%s/%s", (const char*)prefix, (const char*)localpath);
-            free_path = true;
-            path = concat;
+    case B2_DS_RDONLY:
+        if (ds->storage_type == B2_DS_B2Z) {
+            offset = value->f_zip.offset;
+            path = ds->urlpath;
             break;
         }
-        case B2_DS_RDWR: {
-            const uint8_t* localpath = p->value.f_dir.localpath;
-            size_t localpath_len = p->value.f_dir.localpath_length;
-
-            // TODO: Maybe, do better path joining
-            size_t concat_len = prefix_length + localpath_len + 2;
-            uint8_t* concat = NULL;
-            concat = malloc(concat_len);
-            if (concat == NULL) {
-                BLOSC_TRACE_ERROR("Could not allocate memory");
-                return BLOSC2_ERROR_MEMORY_ALLOC;
-            }
-            snprintf((char*)concat, concat_len, "%s/%s", (const char*)prefix, (const char*)localpath);
-            free_path = true;
-            path = concat;
-            break;
+        /* Intentional fallthrough */
+    case B2_DS_RDWR:{
+        uint8_t* prefix;
+        size_t prefix_length;
+        if (ds->storage_type == B2_DS_B2Z) {
+            prefix = ds->tmpdir;
+            prefix_length = ds->tmpdir_length;
+        } else {
+            prefix = ds->urlpath;
+            prefix_length = ds->urlpath_length;
         }
-        default: return BLOSC2_ERROR_INVALID_PARAM;
+
+        uint8_t* localpath = value->f_dir.localpath;
+        size_t localpath_length = value->f_dir.localpath_length;
+        size_t concat_size = prefix_length + localpath_length + 2;
+        uint8_t* concat = malloc(concat_size);
+        if (concat == NULL) {
+            BLOSC_TRACE_ERROR("Could not allocate memory for path joining");
+            return BLOSC2_ERROR_MEMORY_ALLOC;
+        }
+        snprintf((char*)concat, concat_size, "%s/%s", (const char*)prefix, (const char*)localpath);
+        free_path = true;
+        path = concat;
+        break;
     }
-
-    *pcontainer = blosc2_schunk_open_offset((const char*)path, offset);
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    if (*pcontainer == NULL) {
-        BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %ld", (const char*)path, offset);
-        error_code = BLOSC2_ERROR_FILE_OPEN;
-    }
-    if (free_path) free((void*)path);
-
-    return error_code;
-}
-
-static int s_get_from_pair(dict_store *ds, pair *p, blosc2_schunk **pcontainer) {
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    switch (ds->storage_type) {
-        case B2_DS_MEMORY_SPARSE: {
-            *pcontainer = p->value.f_mem.schunk;
-            break;
-        }
-        case B2_DS_MEMORY_CONTIGUOUS: {
-            error_code = s_get_mem_contiguous(ds, p, pcontainer);
-            break;
-        }
-        case B2_DS_B2Z: {
-            const uint8_t* prefix = NULL;
-            size_t prefix_length = 0;
-            if (ds->open_mode != B2_DS_RDONLY) {
-                prefix = ds->tmpdir;
-                prefix_length = ds->tmpdir_length;
-            } else {
-                prefix = ds->urlpath;
-                prefix_length = ds->urlpath_length;
-            }
-            error_code = s_get_b2x(ds, p, prefix, prefix_length, pcontainer);
-            break;
-        }
-        case B2_DS_B2D: {
-            error_code = s_get_b2x(ds, p, ds->urlpath, ds->urlpath_length, pcontainer);
-            break;
-        }
-    }
-    return error_code;
-}
-
-static int s_set_b2x(dict_store *ds, const uint8_t* key, blosc2_schunk *container, bool *free_key) {
-    // Preconditions
-    //          - ds is valid and storage type is b2z
-    //          - key is already processed
-    //          - container is not NULL
-    //          - free_key is not null
-    // (note): There is not warranty that ds[key] exists. Get functions receive this privilege, set functions do not
-
-    *free_key = true;
-
-    if (ds->open_mode == B2_DS_RDONLY) {
-        BLOSC_TRACE_ERROR("Cannot call set in RDONLY mode");
+    default:
+        BLOSC_TRACE_ERROR("Invalid open mode found");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
+    blosc2_schunk* schunk = blosc2_schunk_open_offset((const char*)path, offset);
     int error_code = BLOSC2_ERROR_SUCCESS;
-    pair *p = s_dict_find_pair(ds, key);
-
-    const uint8_t* prefix_path = NULL;
-    const uint8_t* localpath = NULL;
-    size_t localpath_length = 0;
-    uint8_t full_path[PATH_MAX];
-
-    bool owns_localpath = p == NULL; // Used later to free memory
-
-    if (ds->storage_type == B2_DS_B2Z) {
-        prefix_path = ds->tmpdir;
+    if (schunk == NULL) {
+        BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %ld", (const char*)path, offset);
+        error_code = BLOSC2_ERROR_FILE_OPEN;
     } else {
-        prefix_path = ds->urlpath;
+        s_b2_ds_item_set_local(item, schunk);
     }
-
-    // 1. Obtain localpath (new pair: build it; existing pair: it belongs to the dict)
-    if (p == NULL) {
-        error_code = s_add_extension_to_key(key, container, (uint8_t**)&localpath, &localpath_length);
-        if (error_code != 0) {
-            BLOSC_TRACE_ERROR("Could not add extension to %s", (const char*)key);
-            goto cleanup;
-        }
-    } else {
-        localpath = p->value.f_dir.localpath;
-        localpath_length = p->value.f_dir.localpath_length;
-    }
-
-    // 2. Build full path = tmpdir + "/" + localpath
-    if (ds->tmpdir_length + localpath_length + 1 >= PATH_MAX) goto cleanup;
-    snprintf((char*)full_path, PATH_MAX, "%s/%s", (const char*)prefix_path, (const char*)localpath);
-    blosc2_create_dir_recursive((const char*)full_path);
-
-    // 3. Write the file (the file goes first, the registration last)
-    if (blosc2_atomic_schunk_write((const char*)full_path, container) != 0) {
-        BLOSC_TRACE_ERROR("Could not write atomically the schunk to %s", (const char*)full_path);
-        error_code = BLOSC2_ERROR_FILE_WRITE;
-        goto cleanup;
-    }
-
-    // 4. Register the new pair; the dict now owns localpath
-    if (p == NULL) {
-        value v = {0};
-        v.f_dir.localpath = localpath;
-        v.f_dir.localpath_length = localpath_length;
-        error_code = s_dict_store_put(ds, key, &v, free_key);
-        owns_localpath = false;
-    }
-
-cleanup:
-    if (owns_localpath)
-        free((void*)localpath);
+    if (free_path) free((void*)path);
     return error_code;
 }
 
+static int s_get_from_value(dict_store* ds, b2_ds_value* value, b2_ds_item* item) {
+    assert(ds != NULL && value != NULL && item != NULL);
+    assert(ds->open_mode != B2_DS_WRONLY);
+
+    int rc = BLOSC2_ERROR_SUCCESS;
+    switch (ds->storage_type) {
+    case B2_DS_MEMORY_SPARSE:
+        s_b2_ds_item_set_local(item, value->f_mem.schunk);
+        break;
+    case B2_DS_MEMORY_CONTIGUOUS:
+        rc = s_get_mem_contiguous(ds, value, item);
+        break;
+    case B2_DS_B2Z:
+    case B2_DS_B2D:
+        rc = s_get_b2x(ds, value, item);
+        break;
+    default:
+        BLOSC_TRACE_ERROR("Invalid storage_type found");
+        rc = BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    return rc;
+}
+
+static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* free_key) {
+    assert(ds != NULL || key != NULL || schunk != NULL || free_key != NULL);
+    assert(ds->open_mode != B2_DS_RDONLY);
+    assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
+    // Also, key is malloc-ed
+
+    *free_key = true;
+
+    int rc = BLOSC2_ERROR_SUCCESS;
+    uint8_t* prefix = NULL;
+    size_t prefix_length = 0;
+    if (ds->storage_type == B2_DS_B2Z) {
+        prefix = ds->tmpdir;
+        prefix_length = ds->tmpdir_length;
+    } else {
+        prefix = ds->urlpath;
+        prefix_length = ds->urlpath_length;
+    }
+
+    uint8_t* localpath = NULL;
+    size_t localpath_length = 0;
+
+    b2_ds_value* value = hash_map_get(&ds->map, key);
+    bool owns_localpath = value == NULL;
+    if (value != NULL) {
+        localpath = value->f_dir.localpath;
+        localpath_length = value->f_dir.localpath_length;
+    } else {
+        rc = s_add_extension_to_key(key, schunk, &localpath, &localpath_length);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not add extension to %s", (const char*)key);
+            goto cleanup;
+        }
+    }
+
+    // Build full path
+    size_t full_path_size = prefix_length + localpath_length + 2;
+    uint8_t* full_path = malloc(full_path_size);
+    if (full_path == NULL) {
+        BLOSC_TRACE_ERROR("Could not allocate memory for path concatenation");
+        rc = BLOSC2_ERROR_MEMORY_ALLOC;
+        goto cleanup;
+    }
+    snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)prefix, (const char*)localpath);
+    rc = blosc2_create_dir_recursive((const char*)full_path);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not create recursively the directory");
+        free(full_path);
+        goto cleanup;
+    }
+    if (blosc2_atomic_schunk_write((const char*)full_path, schunk) < 0) {
+        BLOSC_TRACE_ERROR("Could not write atomically the schunk to %s", (const char*)full_path);
+        free(full_path);
+        rc = BLOSC2_ERROR_FILE_WRITE;
+        goto cleanup;
+    }
+    free(full_path);
+    if (value == NULL) {
+        b2_ds_value v = {0};
+        v.f_dir.localpath = localpath;
+        v.f_dir.localpath_length = localpath_length;
+        rc = hash_map_put(&ds->map, key, &v, free_key);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not set hash");
+            goto cleanup;
+        }
+        owns_localpath = false;
+    }
+cleanup:
+    if (owns_localpath) free(localpath);
+    return rc;
+}
+
 static int s_to_b2z_from_mem(dict_store *ds, const uint8_t* destination_urlpath) {
+    assert(ds != NULL && destination_urlpath != NULL);
+
     zip_archive *za = ziputils_archive_new();
     if (za == NULL) {
         BLOSC_TRACE_ERROR("Could allocate memory for zip archive");
@@ -1041,6 +850,8 @@ static int s_to_b2z_from_mem(dict_store *ds, const uint8_t* destination_urlpath)
 }
 
 static int s_to_b2z_from_b2d(dict_store *ds, const uint8_t* destination_urlpath) {
+    assert(ds != NULL && destination_urlpath != NULL);
+
     if (!ziputils_archive_directory(ds->urlpath, destination_urlpath)) {
         BLOSC_TRACE_ERROR("Could not archive directory %s from b2z", (const char*)destination_urlpath);
         return BLOSC2_ERROR_FAILURE;
@@ -1049,62 +860,68 @@ static int s_to_b2z_from_b2d(dict_store *ds, const uint8_t* destination_urlpath)
 }
 
 static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpath) {
-    // Preconditions:
-    //          - ds is valid
-    //          - destination_urlpath is not null and it does not exist in the filesystem
+    assert(ds != NULL && destination_urlpath != NULL);
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    blosc2_dict_store_iter iter = {0};
-    iter.ds = ds;
+    int rc = BLOSC2_ERROR_SUCCESS;
+    hash_map_iter iter = {0};
+    hash_map_iter* piter= &iter;
+    hash_map_iter_init(piter, &ds->map);
+    size_t destination_urlpath_length = strlen((const char*)destination_urlpath);
+    size_t full_path_size = destination_urlpath_length + 1;
+    uint8_t* full_path = NULL;
 
-    uint8_t full_path[PATH_MAX];
-    const size_t full_path_length = PATH_MAX;
-    while (blosc2_dict_store_iter_next(&iter)) {
-        const uint8_t* key = iter.p->key;
-        blosc2_schunk *schunk = iter.p->value.f_mem.schunk;
-        // Add extension to key
-        const uint8_t* key_with_extension = NULL;
+    while (hash_map_iter_next(piter)) {
+        const uint8_t* key = hash_map_iter_get_key(piter);
+        b2_ds_value* value = hash_map_iter_get_value(piter);
+        blosc2_schunk* schunk = value->f_mem.schunk;
+
+        uint8_t* key_with_extension = NULL;
         size_t key_with_extension_length = 0;
-        error_code = s_add_extension_to_key(key, schunk, (uint8_t**)&key_with_extension, &key_with_extension_length);
-        if (error_code != 0) {
-            if (key_with_extension == NULL) free((void*)key_with_extension);
-            break;
-        }
-        if (key_with_extension_length >= PATH_MAX) {
-            BLOSC_TRACE_ERROR("Key with extension (%s) is larger or equal than %d", (const char*)key_with_extension, PATH_MAX);
-            free((void*)key_with_extension);
-            error_code = BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
-            break;
-        }
-        snprintf((char*)full_path, full_path_length, "%s/%s", (const char*)destination_urlpath, (const char*)key_with_extension);
-        error_code = blosc2_create_dir_recursive((const char*)full_path);
-        if (error_code != 0) {
-            BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)full_path);
-            free((void*)key_with_extension);
+        rc = s_add_extension_to_key(key, schunk, &key_with_extension, &key_with_extension_length);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not add extension to key");
             break;
         }
 
+        size_t new_full_path_size = key_with_extension_length + destination_urlpath_length + 2;
+        if (new_full_path_size > full_path_size) {
+            if (full_path != NULL) free(full_path);
+            full_path_size = new_full_path_size;
+            full_path = malloc(full_path_size);
+            if (full_path == NULL) {
+                BLOSC_TRACE_ERROR("Could not allocate memory for path concatenation");
+                free(key_with_extension);
+                rc = BLOSC2_ERROR_MEMORY_ALLOC;
+                break;
+            }
+        }
+        snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)destination_urlpath, (const char*)key_with_extension);
+        free(key_with_extension);
+        rc = blosc2_create_dir_recursive((const char*)full_path);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)full_path);
+            free(full_path);
+        }
         if (blosc2_schunk_to_file(schunk, (const char*)full_path) < 0) {
             BLOSC_TRACE_ERROR("Could not write schunk to %s", (const char*)full_path);
-            free((void*)key_with_extension);
-            error_code = BLOSC2_ERROR_FILE_WRITE;
+            free(full_path);
+            rc = BLOSC2_ERROR_FILE_WRITE;
             break;
         }
-        free((void*)key_with_extension);
     }
-
-    if (error_code != 0) {
+    if (rc < 0) {
         BLOSC_TRACE_ERROR("There was an error creating a b2d from memory");
-        // Remove destination directory
         if (s_inode_exists(destination_urlpath) != 0) {
             blosc2_remove_dir_recursive((const char*)destination_urlpath);
         }
     }
-
-    return error_code;
+    if (full_path != NULL) free(full_path);
+    return rc;
 }
 
 static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath) {
+    assert(ds != NULL && destination_urlpath != NULL);
+
     int error_code = BLOSC2_ERROR_SUCCESS;
 
     switch (ds->open_mode) {
@@ -1115,14 +932,17 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
         }
         case B2_DS_WRONLY:
         case B2_DS_RDWR: {
-            blosc2_dict_store_iter iter = {0};
-            iter.ds = ds;
+            hash_map_iter iter = {0};
+            hash_map_iter* piter = &iter;
+            hash_map_iter_init(piter, &ds->map);
+
             const uint8_t* tmpdir = ds->tmpdir;
             uint8_t full_path_origin[PATH_MAX];
             uint8_t full_path_destination[PATH_MAX];
 
-            while (blosc2_dict_store_iter_next(&iter)) {
-                const uint8_t* localpath = iter.p->value.f_dir.localpath;
+            while (hash_map_iter_next(piter)) {
+                b2_ds_value* value = hash_map_iter_get_value(piter);
+                const uint8_t* localpath = value->f_dir.localpath;
                 if (snprintf((char*)full_path_origin, PATH_MAX, "%s/%s", (const char*)tmpdir, (const char*)localpath) < 0) {
                     BLOSC_TRACE_ERROR("The resultant string's length was greater than %d", PATH_MAX);
                     return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
@@ -1161,20 +981,32 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
     return error_code;
 }
 
-static int s_remove_b2x(pair *p, const uint8_t* prefix, size_t prefix_length) {
-    // Preconditions: ds is either in write or rdwr mode and, storage type is either B2Z or B2D.
+static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
+    assert(ds != NULL && key != NULL);
+    assert(ds->open_mode != B2_DS_RDONLY);
+    assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
 
-    const uint8_t* localpath = p->value.f_dir.localpath;
-    size_t localpath_length = p->value.f_dir.localpath_length;
-    const char* full_path = NULL;
+    b2_ds_value* value = hash_map_get(&ds->map, key);
+    uint8_t* prefix;
+    size_t prefix_length;
+    if (ds->storage_type == B2_DS_B2Z) {
+        prefix = ds->tmpdir;
+        prefix_length = ds->tmpdir_length;
+    } else {
+        prefix = ds->urlpath;
+        prefix_length = ds->urlpath_length;
+    }
+
+    uint8_t* localpath = value->f_dir.localpath;
+    size_t localpath_length = value->f_dir.localpath_length;
+
+    char* full_path = NULL;
     size_t full_path_size = prefix_length + localpath_length + 2; // +1 for the / and +1 for NUL
-
     full_path = malloc(full_path_size);
     if (full_path == NULL) {
         BLOSC_TRACE_ERROR("Could not allocate memory to create path");
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-
     snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)prefix, (const char*)localpath);
 
     struct stat st = {0};
@@ -1228,15 +1060,16 @@ static int s_close_b2z( dict_store *ds ) {
 /* == END Static functions (and some constants) == */
 
 int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath ) {
-
-    int storage_type = B2_DS_MEMORY_SPARSE;
-    b2_ds_open_mode open_mode = B2_DS_RDWR;
-
     if (pds == NULL) {
         BLOSC_TRACE_ERROR("blosc2_dict_store pointer cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
     *pds = NULL;
+
+    b2_ds_storage_type storage_type = B2_DS_MEMORY_SPARSE;
+    b2_ds_open_mode open_mode = B2_DS_RDWR;
+    cb_free_value cb = NULL;
+
     if (urlpath != NULL) {
         if (!blosc2_string_has_extension(urlpath, b2z_extension) && !blosc2_string_has_extension(urlpath, b2d_extension)) {
             BLOSC_TRACE_ERROR("urlpath must contain an extension, either b2z or b2d");
@@ -1248,52 +1081,51 @@ int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath ) {
         }
 
         storage_type = s_get_storage_type_from_extension(urlpath);
-        if (storage_type == -1) {
+        if ((int)storage_type == -1) {
             BLOSC_TRACE_ERROR("Could not infer storage type from urlpath, a valid extension must be provided");
             return BLOSC2_ERROR_INVALID_PARAM;
         }
-    }
-
-    dict_store *ds;
-    int error_code = s_dict_store_alloc(&ds);
-    if (error_code != 0) {
-        BLOSC_TRACE_ERROR("Could not allocate memory for a blosc2_dict_store");
-        return error_code;
-    }
-
-    if (urlpath != NULL) {
-        error_code = blosc2_string_duplicate(urlpath, (uint8_t**)&ds->urlpath);
-        if (error_code != 0) {
-            BLOSC_TRACE_ERROR("Could not allocate memory to duplicate string");
-            free(ds->pairs);
-            free(ds);
-            return error_code;
+        if (storage_type == B2_DS_B2Z || storage_type == B2_DS_B2D) {
+            cb = s_b2_ds_value_free_dir;
         }
-        ds->urlpath_length = strlen((const char*)urlpath);
+    }
 
+    dict_store* ds = NULL;
+    int rc = BLOSC2_ERROR_SUCCESS;
+    if (urlpath != NULL) {
+        rc = s_dict_store_alloc_urlpath(&ds, urlpath, storage_type, open_mode, cb);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not allocate memory for DictStore");
+            return rc;
+        }
         if (storage_type == B2_DS_B2Z) {
-            const uint8_t* tmpdir = NULL;
-            if (blosc2_create_tmp_dir((char**)&tmpdir) != 0) {
+            uint8_t* tmpdir = NULL;
+            if ((rc = blosc2_create_tmp_dir((char**)&tmpdir)) != 0) {
                 BLOSC_TRACE_ERROR("Could not create temporal directory");
-                s_dict_store_simple_free(ds);
-                return BLOSC2_ERROR_FAILURE;
+                blosc2_dict_store_free(ds);
+                return rc;
             }
             ds->tmpdir = tmpdir;
             ds->tmpdir_length = strlen((const char*)tmpdir);
         } else {
-            error_code = blosc2_mkdir((const char*)urlpath);
-            if (error_code != 0) {
+            rc = blosc2_mkdir((const char*)urlpath);
+            if (rc < 0) {
                 BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)urlpath);
-                s_dict_store_simple_free(ds);
-                return error_code;
+                blosc2_dict_store_free(ds);
+                return rc;
             }
         }
+    } else {
+        rc = s_dict_store_alloc(&ds, cb);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not allocate memory for DictStore");
+            return rc;
+        }
+        ds->storage_type = storage_type;
+        ds->open_mode = open_mode;
     }
-    ds->storage_type = storage_type;
-    ds->open_mode = open_mode;
-
     *pds = ds;
-    return BLOSC2_ERROR_SUCCESS;
+    return rc;
 }
 
 int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_ds_open_mode open_mode) {
@@ -1366,32 +1198,20 @@ int blosc2_dict_store_close( blosc2_dict_store *ds ) {
     }
 }
 
-void blosc2_dict_store_free( blosc2_dict_store *ds ) {
-    if (ds == NULL) return;
-
-    switch (ds->storage_type) {
-        case B2_DS_MEMORY_SPARSE:
-        case B2_DS_MEMORY_CONTIGUOUS: {
-            s_dict_free_mem(ds);
-            break;
-        }
-        case B2_DS_B2Z: {
-            s_dict_free_b2z(ds);
-            break;
-        }
-        case B2_DS_B2D: {
-            s_dict_free_b2d(ds);
-            break;
-        }
-    }
+void blosc2_dict_store_free( blosc2_dict_store* dstore ) {
+    assert(dstore != NULL);
+    hash_map_free_struct(&dstore->map);
+    if (dstore->urlpath != NULL) free(dstore->urlpath);
+    if (dstore->tmpdir != NULL) free(dstore->tmpdir);
+    free(dstore);
 }
 
 size_t blosc2_dict_store_get_length( blosc2_dict_store *ds ) {
-    return ds->length;
+    return ds->map.length;
 }
 
 size_t blosc2_dict_store_get_capacity( blosc2_dict_store *ds ) {
-    return ds->capacity;
+    return ds->map.capacity;
 }
 
 b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds ) {
@@ -1408,14 +1228,14 @@ bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key )
     /* Keep the same key handling as get()/set()/remove(): canonical keys are
        searched as-is, non-canonical ones are normalized first. */
     if (blosc2_key_is_canonical(key)) {
-        return s_dict_find_pair(ds, key) != NULL;
+        return hash_map_contains_key(&ds->map, key);
     }
 
     uint8_t* normalized_key = NULL;
     if (blosc2_key_normalize_copy(key, &normalized_key) != BLOSC2_ERROR_SUCCESS) {
         return false;
     }
-    bool contains = s_dict_find_pair(ds, normalized_key) != NULL;
+    bool contains = hash_map_contains_key(&ds->map, normalized_key);
     free(normalized_key);
     return contains;
 }
@@ -1561,7 +1381,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
     }
 
     dict_store *ds = NULL;
-    int error_code = s_dict_store_alloc(&ds);
+    int error_code = s_dict_store_alloc(&ds, NULL);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate space for the blosc2_dict_store structure");
         free_dict_store = false;
@@ -1575,7 +1395,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
         size_t filename_length = 0;
         value val = {0};
 
-        error_code = ziputils_reader_iter_get_filename(iter, (const uint8_t**)&filename, &filename_length);
+        error_code = ziputils_reader_iter_get_filename(iter, &filename, &filename_length);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not allocate space for zip filename");
             goto cleanup;
@@ -1602,11 +1422,15 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
         val.f_zip.length = ziputils_reader_iter_get_length(iter);
 
         bool needs_free = false;
-        error_code = s_dict_store_put(ds, filename, &val, &needs_free);
+        error_code = hash_map_put(&ds->map, filename, &val, &needs_free);
         if (needs_free) free(filename);
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not put item in hash_map");
+            goto cleanup;
+        }
     }
 
-    ds->urlpath = (const uint8_t*)buffer;
+    ds->urlpath = buffer;
     free_dict_store = false;
     *pds = ds;
 
@@ -1614,13 +1438,13 @@ cleanup:
     ziputils_reader_iter_free(iter);
     ziputils_reader_end(za);
     ziputils_archive_free(za);
-    if (free_dict_store) s_dict_free_mem(ds);
+    if (free_dict_store) blosc2_dict_store_free(ds);
 
     return error_code;
 }
 
-int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, blosc2_schunk** pcontainer ) {
-    if (ds == NULL || key == NULL || pcontainer == NULL) {
+int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item ) {
+    if (ds == NULL || key == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -1628,32 +1452,29 @@ int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
         BLOSC_TRACE_ERROR("Cannot access items in WRONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
-    *pcontainer = NULL;
 
     int error_code = BLOSC2_ERROR_SUCCESS;
-
-    pair *p = NULL;
-    uint8_t* processed_key = NULL;
+    b2_ds_value* value = NULL;
     if (!blosc2_key_is_canonical(key)) {
+        uint8_t* processed_key = NULL;
         error_code = blosc2_key_normalize_copy(key, &processed_key);
         if (error_code != 0) {
             return error_code;
         }
-        p = s_dict_find_pair(ds, processed_key);
+        value = hash_map_get(&ds->map, processed_key);
+        free(processed_key);
     } else {
-        p = s_dict_find_pair(ds, key);
+        value = hash_map_get(&ds->map, key);
     }
 
-    if (p != NULL) {
-        error_code = s_get_from_pair(ds, p, pcontainer);
-    } else {
-        error_code = BLOSC2_ERROR_NOT_FOUND;
+    if (value == NULL) {
+        return BLOSC2_ERROR_NOT_FOUND;
     }
 
+    error_code = s_get_from_value(ds, value, item);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not retrieve schunk with key: %s", (const char*)key);
     }
-    if (processed_key != NULL) free(processed_key);
     return error_code;
 }
 
@@ -1691,7 +1512,7 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
         case B2_DS_MEMORY_SPARSE: {
             value v = {0};
             v.f_mem.schunk = container;
-            error_code = s_dict_store_put(ds, processed_key, &v, &free_processed);
+            error_code = hash_map_put(&ds->map, processed_key, &v, &free_processed);
             break;
         }
         case B2_DS_B2Z:
@@ -1726,42 +1547,23 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
         return processed_key_status;
     }
 
-    pair *p = s_dict_find_pair(ds, processed_key);
     int error_code = BLOSC2_ERROR_SUCCESS;
-    if (p != NULL) {
-        switch (ds->storage_type) {
-            case B2_DS_B2Z: {
-                error_code = s_remove_b2x(p, ds->tmpdir, ds->tmpdir_length);
-                if (error_code != 0) {
-                    BLOSC_TRACE_ERROR("Could not remove element with key: %s", (const char*)key);
-                    break;
-                }
-                free((void*)p->value.f_dir.localpath);
-                p->value.f_dir.localpath = NULL;
-                p->value.f_dir.localpath_length = 0;
-                break;
-            }
-            case B2_DS_B2D: {
-                error_code = s_remove_b2x(p, ds->urlpath, ds->urlpath_length);
-                if (error_code != 0) {
-                    BLOSC_TRACE_ERROR("Could not remove element with key: %s", (const char*)key);
-                    break;
-                }
-                free((void*)p->value.f_dir.localpath);
-                p->value.f_dir.localpath = NULL;
-                p->value.f_dir.localpath_length = 0;
-                break;
-            }
+    switch (ds->storage_type) {
+    case B2_DS_B2Z:
+    case B2_DS_B2D:
+        error_code = s_remove_b2x(ds, processed_key);
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not remove element with key  %s", (const char*)key);
         }
-        if (error_code == 0) {
-            free((void*) p->key);
-            p->key = TOMBSTONE;
-            p->hash = 0;
-            memset(&p->value, 0, sizeof(p->value));
-            ds->length -= 1;
-            ds->tombstones += 1;
-        }
+        break;
+    case B2_DS_MEMORY_SPARSE:
+        error_code = hash_map_remove(&ds->map, processed_key);
+        break;
+    default:
+        BLOSC_TRACE_ERROR("Invalid storage_type detected");
+        error_code = BLOSC2_ERROR_INVALID_PARAM;
     }
+
     free((void*)processed_key);
     return error_code;
 }
@@ -1774,53 +1576,40 @@ blosc2_dict_store_iter* blosc2_dict_store_iter_new( blosc2_dict_store *ds ) {
     }
 
     blosc2_dict_store_iter* iter = calloc(1, sizeof(blosc2_dict_store_iter));
-    if (!iter) return NULL;
-    iter->ds = ds;
+    hash_map_iter_init(&iter->map_iter, &ds->map);
+    iter->dstore = ds;
     return iter;
 }
 
 void blosc2_dict_store_iter_free( blosc2_dict_store_iter* iter ) {
-    if (iter != NULL) free(iter);
+    assert(iter != NULL);
+    free(iter);
 }
 
 bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter ) {
-    dict_store *ds = iter->ds;
-    size_t index = iter->index;
-
-    bool found = false;
-    for (; index < ds->capacity; index += 1) {
-        pair *p = &ds->pairs[index];
-        if (s_dict_pair_is_live(p)) { // A pair was found
-            iter->p = p;
-            index += 1; // Set to the next index so it does not always return the same pair
-            found = true;
-            break;
-        }
-    }
-
-    iter->index = index;
-    return found;
+    assert(iter != NULL);
+    return hash_map_iter_next(&iter->map_iter);
 }
 
 const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter ) {
-    return iter->p->key;
+    assert(iter != NULL);
+    return hash_map_iter_get_key(&iter->map_iter);
 }
 
-int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, blosc2_schunk** pcontainer ) {
-    if (iter == NULL || pcontainer == NULL) {
+int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item ) {
+    if (iter == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (iter->ds->open_mode == B2_DS_WRONLY) {
+    if (iter->dstore->open_mode == B2_DS_WRONLY) {
         BLOSC_TRACE_ERROR("Cannot retrieve container from iterator in WRONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
-    *pcontainer = NULL;
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_get_from_pair(iter->ds, iter->p, pcontainer);
-    if (error_code != 0) {
-        BLOSC_TRACE_ERROR("Could not retrieve container from iterator");
+    b2_ds_value* value = hash_map_iter_get_value(&iter->map_iter);
+    int rc = s_get_from_value(iter->dstore, value, item);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not retrieve item");
     }
-    return error_code;
+    return rc;
 }

@@ -269,13 +269,13 @@ static char* test_dict_store_get_memory(void) {
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    blosc2_schunk* container = NULL;
+    b2_ds_item item = {0};
     for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
         const uint8_t* key_to_get = (const uint8_t*)paths[i];
         mu_assert("ERROR: Could not get a schunk from the dict_store",
-            blosc2_dict_store_get(ds, key_to_get, &container) == 0);
+            blosc2_dict_store_get(ds, key_to_get, &item) == 0);
         mu_assert("ERROR: The returned container is not the expected schunk",
-            container == b2_schunks[i]);
+            item.schunk == b2_schunks[i]);
     }
 
     mu_assert("ERROR: The dict_store length changed after get operations",
@@ -330,10 +330,10 @@ static char* test_dict_store_to_b2z_memory(void) {
         mu_assert("ERROR: Could not set a schunk in the dict_store",
             blosc2_dict_store_set(ds, (const uint8_t*)paths[i], b2_schunks[i]) == 0);
 
-        blosc2_schunk *container = NULL;
+        b2_ds_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &container) == 0);
-        mu_assert("ERROR: The returned container is NULL", container != NULL);
+            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
+        mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
     }
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
@@ -402,11 +402,11 @@ static char* test_dict_store_open_b2z(void) {
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk *schunk = NULL;
+        b2_ds_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the b2z dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &schunk) == 0);
-        mu_assert("ERROR: The returned container is NULL", schunk != NULL);
-        blosc2_schunk_free(schunk);
+            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
+        mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
+        blosc2_schunk_free(item.schunk);
     }
 
     mu_assert("ERROR: set() must fail when the dict_store was opened in RDONLY mode",
@@ -437,10 +437,10 @@ static char* test_dict_store_open_b2z(void) {
             blosc2_dict_store_get_length(ds) == i+1);
     }
 
-    blosc2_schunk *schunk = NULL;
+    b2_ds_item item = {0};
     mu_assert("ERROR: get() must fail when the dict_store was opened in WRONLY mode",
-        blosc2_dict_store_get(ds, (const uint8_t*)paths[0], &schunk) != 0);
-    mu_assert("ERROR: The returned container must be NULL in WRONLY mode", schunk == NULL);
+        blosc2_dict_store_get(ds, (const uint8_t*)paths[0], &item) != 0);
+    mu_assert("ERROR: The returned container must be NULL in WRONLY mode", item.schunk == NULL);
 
     mu_assert("ERROR: Could not close the WRONLY dict_store",
         blosc2_dict_store_close(ds) == 0);
@@ -462,11 +462,11 @@ static char* test_dict_store_open_b2z(void) {
     blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
     mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
     while (blosc2_dict_store_iter_next(iter)) {
-        blosc2_schunk *iter_schunk = NULL;
+        item = (b2_ds_item){0};
         mu_assert("ERROR: Could not get the container from the iterator",
-            blosc2_dict_store_iter_get_container(iter, &iter_schunk) == 0);
-        mu_assert("ERROR: The iterator returned a NULL container", iter_schunk != NULL);
-        blosc2_schunk_free(iter_schunk);
+            blosc2_dict_store_iter_get_container(iter, &item) == 0);
+        mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
+        blosc2_schunk_free(item.schunk);
     }
     blosc2_dict_store_iter_free(iter);
 
@@ -502,10 +502,10 @@ static char* test_dict_store_new_b2d(void) {
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
+        b2_ds_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the b2d dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &schunk) == 0);
-        blosc2_schunk_free(schunk);
+            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
+        blosc2_schunk_free(item.schunk);
     }
 
     mu_assert("ERROR: Could not close the b2d dict_store",
@@ -532,11 +532,11 @@ static char* test_dict_store_open_b2d(void) {
     blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
     mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
     while (blosc2_dict_store_iter_next(iter)) {
-        blosc2_schunk *schunk = NULL;
+        b2_ds_item item = {0};
         mu_assert("ERROR: Could not get the container from the iterator",
-            blosc2_dict_store_iter_get_container(iter, &schunk) == 0);
-        mu_assert("ERROR: The iterator returned a NULL container", schunk != NULL);
-        blosc2_schunk_free(schunk);
+            blosc2_dict_store_iter_get_container(iter, &item) == 0);
+        mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
+        blosc2_schunk_free(item.schunk);
     }
     blosc2_dict_store_iter_free(iter);
 

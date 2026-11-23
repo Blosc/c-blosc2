@@ -248,8 +248,8 @@ static void s_bench_get_memory(void) {
 
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk *schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(last, current);
@@ -271,10 +271,10 @@ static void s_bench_get_b2z(void) {
 
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        rc = blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        rc = blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        rc = blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        rc = blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(last, current);
@@ -286,10 +286,10 @@ static void s_bench_get_b2z(void) {
     rc = blosc2_dict_store_open(&ds, archive_path, B2_DS_RDONLY);
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        rc = blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        rc = blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(last, current);
@@ -301,10 +301,10 @@ static void s_bench_get_b2z(void) {
     blosc2_dict_store_open(&ds, archive_path, B2_DS_RDWR);
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(last, current);
@@ -325,10 +325,10 @@ static void s_bench_get_b2d(void) {
 
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(last, current);
@@ -341,10 +341,10 @@ static void s_bench_get_b2d(void) {
     blosc2_dict_store_open(&ds, dir_path, B2_DS_RDONLY);
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        rc = blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        rc = blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
 
@@ -355,10 +355,10 @@ static void s_bench_get_b2d(void) {
     blosc2_dict_store_open(&ds, dir_path, B2_DS_RDWR);
     blosc_set_timestamp(&last);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
-        rc = blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
+        rc = blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
 
@@ -423,10 +423,10 @@ static void s_perf_get_b2z_rdonly(void) {
     blosc2_dict_store_open(&ds, archive_path, B2_DS_RDONLY);
     blosc_set_timestamp(&least);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
-        blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
+        blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(least, current);
@@ -442,10 +442,10 @@ static void s_perf_get_b2z_rdwr(void) {
     blosc2_dict_store_open(&ds, archive_path, B2_DS_RDWR);
     blosc_set_timestamp(&least);
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_schunk* schunk = NULL;
-        blosc2_dict_store_get(ds, paths[i], &schunk);
-        blosc2_schunk_get_slice_buffer(schunk, 0, 1, data);
-        blosc2_schunk_free(schunk);
+        b2_ds_item item = {0};
+        blosc2_dict_store_get(ds, paths[i], &item);
+        blosc2_schunk_get_slice_buffer(item.schunk, 0, 1, data);
+        blosc2_schunk_free(item.schunk);
     }
     blosc_set_timestamp(&current);
     totaltime = blosc_elapsed_secs(least, current);

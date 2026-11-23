@@ -70,7 +70,7 @@ bool ziputils_reader_iter_is_dir( zip_archive_iter *iter );
   using the stdlib.h free function, in other words, ziputils does not own the buffer returned
   Returns NULL on failure
 */
-int ziputils_reader_iter_get_filename( zip_archive_iter *iter, const uint8_t** pfilename_buffer, size_t* pfilename_length );
+int ziputils_reader_iter_get_filename( zip_archive_iter *iter, uint8_t** pfilename_buffer, size_t* pfilename_length );
 uint64_t ziputils_reader_iter_get_offset( zip_archive_iter *iter );
 size_t ziputils_reader_iter_get_length( zip_archive_iter *iter );
 size_t ziputils_reader_iter_get_file_index( zip_archive_iter *iter );
