@@ -1,20 +1,24 @@
-# Announcing C-Blosc2 3.7.0
+# Announcing C-Blosc2 3.8.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-We have put considerable love in speeding up compression and decompression,
-specially for SIMD instructions in existing filters.  We also improved the
-handling of special-value and lazy chunks and did some fixes too.
+C-Blosc2 3.8.0 delivers major SIMD optimizations in BloscLZ 2.7.0 and fused
+SHUFFLE+BYTEDELTA across x86-64 and ARM64, lower thread-pool overhead, and
+important security and portability fixes.
 
-- Faster SIMD shuffle and bitshuffle, with fused SHUFFLE+BYTEDELTA enabled
-  by default.
-- New BloscLZ 2.6.0 improves matching on periodic data and adds decoder fast
-  paths on ARM64 and AMD64. Bundled LZ4 reuses worker compression state.
-- The new `blosc2_set_prefilter_full_write()` lets prefilters that write every
-  output byte skip zero-initialization.
-- Chunk decoding validates special-value buffer sizes and resizes worker
-  scratch buffers when element widths grow.
+- BloscLZ 2.7.0 speeds up both compression and decompression on x86-64
+  (SSE2/SSSE3/AVX2) and ARM64 (NEON) with improved match finding, run
+  detection, and vectorized literal/match copying.
+- Fused SHUFFLE+BYTEDELTA gains an AVX2 path, faster x86-64 and NEON backward
+  decoders, a zero-high-planes fast path, and fixes missing NEON symbols on
+  ARM64 Linux (#883).
+- Reduced shared thread-pool overhead by running worker 0 on the calling
+  thread, spawning `nthreads - 1` workers, and reusing thread-local scratch
+  buffers.
+- Fixed a heap buffer overflow in the ZFP compressors when compressed output
+  exceeds `output_len` (#887, #888), added `PREFER_EXTERNAL_ZFP` (#886), and
+  fixed portability issues on older macOS / unoptimized GCC builds (#884, #885).
 
 For more info, see the release notes in:
 

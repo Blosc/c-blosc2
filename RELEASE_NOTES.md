@@ -1,10 +1,37 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.7.0 to 3.7.1
+Changes from 3.7.0 to 3.8.0
 ===========================
 
-#XXX version-specific blurb XXX#
+* **BloscLZ 2.7.0**. Major compression and decompression speedups on x86-64
+  (SSE2/SSSE3/AVX2) and ARM64 (NEON): 6-byte hashing, bounded head/tail probe,
+  low-level hash table floor, early-exit entropy probe, exponential skip ramp,
+  hoisted prevhash, backward match extension, bulk literal copies, NEON match
+  and run detection (also in `get_run()`), 2/4-byte pattern broadcast, and
+  `pshufb`/NEON fast match copying.
+* **Faster fused SHUFFLE+BYTEDELTA**. Add AVX2 implementation, optimize x86-64
+  SSE2/SSSE3/AVX2 backward paths, accelerate ARM64 NEON backward decoding with
+  record-parallel prefix sums, add a zero-high-planes fast path, and fix
+  missing `shuffle_bytedelta_neon_*` symbols on non-Apple ARM64 builds (#883).
+* **Lower threading and hot-path overhead**. Run worker `tid 0` directly on the
+  calling thread, spawn `nthreads - 1` workers in the shared thread pool, skip
+  redundant wakeups, guard the POSIX shared thread pool under `!_WIN32` for
+  MSVC, reuse thread-local scratch buffers in `schunk_compress_store()`, remove
+  hot-path `BLOSC_TRACE_INFO` calls in the disposable prefilter loop, and use
+  `clock_gettime()` on macOS while skipping unused compression timestamps.
+* **ZFP buffer bounds fix and build option**. Check compressed size against
+  `output_len` (and reject `output_len <= 0`) before copying in
+  `zfp_acc_compress`, `zfp_prec_compress`, and `zfp_rate_compress`, fixing a
+  heap buffer overflow especially visible with 8-bit ZFP bitstream word size
+  (#887, #888). Add `PREFER_EXTERNAL_ZFP` CMake option for parity with
+  `PREFER_EXTERNAL_{LZ4,ZLIB,ZSTD}` (#886).
+* **Portability fixes**. Mark `print_error()` in `include/blosc2.h` as
+  `static inline` so unoptimized GCC builds of shared libraries/plugins do not
+  emit spurious undefined `_blosc2_error_string` references (#884). Fall back
+  to `dup()` + `FD_CLOEXEC` in `frame.c` and `prefetch.c` when
+  `F_DUPFD_CLOEXEC` is unavailable at compile time or rejected with `EINVAL` at
+  runtime (#885).
 
 Changes from 3.6.2 to 3.7.0
 ===========================
