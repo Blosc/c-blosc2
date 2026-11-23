@@ -70,6 +70,19 @@ CUTEST_TEST_TEST(large_typesize) {
   b2nd_array_t *src;
   B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, (int64_t) buffersize));
 
+  // Verify round-trip through b2nd_to_cframe / b2nd_from_cframe (see #890)
+  uint8_t *cframe;
+  int64_t cframe_len;
+  bool needs_free;
+  B2ND_TEST_ASSERT(b2nd_to_cframe(src, &cframe, &cframe_len, &needs_free));
+  b2nd_array_t *roundtripped;
+  B2ND_TEST_ASSERT(b2nd_from_cframe(cframe, cframe_len, true, &roundtripped));
+  if (needs_free) {
+    free(cframe);
+  }
+  CUTEST_ASSERT("typesize lost after cframe round-trip",
+                roundtripped->sc->typesize == typesize);
+
   int64_t destshape[] = {slice.stop - slice.start};
   int64_t destbuffersize = destshape[0] * typesize;
   uint8_t *destbuffer = malloc((size_t) destbuffersize);
@@ -84,8 +97,17 @@ CUTEST_TEST_TEST(large_typesize) {
                   destbuffer[i] == (uint8_t) ((offset + i) % 251));
   }
 
+  memset(destbuffer, 0xAA, (size_t) destbuffersize);
+  B2ND_TEST_ASSERT(b2nd_get_slice_cbuffer(roundtripped, &slice.start, &slice.stop, destbuffer,
+                                          destshape, destbuffersize));
+  for (int64_t i = 0; i < destbuffersize; ++i) {
+    CUTEST_ASSERT("Elements after cframe round-trip are not equals!",
+                  destbuffer[i] == (uint8_t) ((offset + i) % 251));
+  }
+
   free(buffer);
   free(destbuffer);
+  B2ND_TEST_ASSERT(b2nd_free(roundtripped));
   B2ND_TEST_ASSERT(b2nd_free(src));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
 

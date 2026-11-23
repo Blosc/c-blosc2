@@ -270,7 +270,7 @@ static blosc2_schunk* schunk_copy_skeleton(blosc2_schunk *schunk, const blosc2_s
   blosc2_cparams cparams = {0};
   if (storage->cparams == NULL) {
     // When cparams are not specified, just use the same of schunk
-    cparams.typesize = schunk->cctx->typesize;
+    cparams.typesize = schunk->typesize;
     cparams.clevel = schunk->cctx->clevel;
     cparams.compcode = schunk->cctx->compcode;
     cparams.compcode_meta = schunk->cctx->compcode_meta;
@@ -291,7 +291,7 @@ static blosc2_schunk* schunk_copy_skeleton(blosc2_schunk *schunk, const blosc2_s
     cparams.blocksize = schunk->cctx->blocksize;
   }
 
-  if (cparams.typesize != schunk->cctx->typesize ||
+  if (cparams.typesize != schunk->typesize ||
       cparams.clevel != schunk->cctx->clevel ||
       cparams.compcode != schunk->cctx->compcode ||
       cparams.use_dict != schunk->cctx->use_dict ||
