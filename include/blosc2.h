@@ -521,8 +521,8 @@ BLOSC_EXPORT const char *blosc2_error_string(int error_code);
  * @param rc The error code to get the string representation for.
  * @return A pointer to a static string representing the error code.
  */
-static char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
-static char *print_error(int rc) {
+static inline char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
+static inline char *print_error(int rc) {
   // TODO: remove this function, use blosc2_error_string only
   return (char *) blosc2_error_string(rc);
 }
