@@ -144,6 +144,24 @@ bool prefetch_applies(const blosc2_frame_s *frame) {
 #include <sys/types.h>
 #include <unistd.h>
 
+static int dup_cloexec(int fd) {
+  int dupfd;
+#if defined(F_DUPFD_CLOEXEC)
+  dupfd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+  if (dupfd >= 0 || errno != EINVAL) {
+    return dupfd;
+  }
+#endif
+  dupfd = dup(fd);
+  if (dupfd >= 0) {
+    int flags = fcntl(dupfd, F_GETFD);
+    if (flags >= 0) {
+      (void)fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC);
+    }
+  }
+  return dupfd;
+}
+
 #if defined(__linux__)
 #include <sys/syscall.h>
 #include <sys/vfs.h>
@@ -695,7 +713,7 @@ static prefetch_batch* batch_start(const cache_query *query, int fd, const uint8
     add_piece(batch, &cur);
   }
 
-  batch->fd = batch->npieces > 0 ? fcntl(fd, F_DUPFD_CLOEXEC, 0) : -1;
+  batch->fd = batch->npieces > 0 ? dup_cloexec(fd) : -1;
   if (batch->fd < 0) {
     free(batch);
     return NULL;

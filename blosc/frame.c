@@ -205,12 +205,30 @@ static int file_identity(int fd, const char* path, uint64_t* dev, uint64_t* ino)
   return 0;
 }
 
+static int dup_cloexec(int fd) {
+  int dupfd;
+#if defined(F_DUPFD_CLOEXEC)
+  dupfd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+  if (dupfd >= 0 || errno != EINVAL) {
+    return dupfd;
+  }
+#endif
+  dupfd = dup(fd);
+  if (dupfd >= 0) {
+    int flags = fcntl(dupfd, F_GETFD);
+    if (flags >= 0) {
+      (void)fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC);
+    }
+  }
+  return dupfd;
+}
+
 /* A read-only stdio handle on a duplicate of @p fp's descriptor, or NULL.  It
    shares the open file description, so it costs no open on the server. */
 static void* stdio_dup_reader(void* fp) {
   blosc2_stdio_file* sfp = (blosc2_stdio_file*)fp;
   int fd = sfp->file != NULL ? fileno(sfp->file) : -1;
-  int dupfd = fd >= 0 ? fcntl(fd, F_DUPFD_CLOEXEC, 0) : -1;
+  int dupfd = fd >= 0 ? dup_cloexec(fd) : -1;
   if (dupfd < 0) {
     return NULL;
   }
