@@ -2324,6 +2324,47 @@ int view_new(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx
 
   /* Fill view with zeros */
   BLOSC_ERROR(b2nd_zeros(ctx1, view));
+
+  /* Deep-copy variable-length metalayers before marking the view as aliasing
+     base data/frame so any allocation failure frees only the view cleanly. */
+  for (int i = 0; i < array->sc->nvlmetalayers; i++) {
+    blosc2_metalayer *src_vl = array->sc->vlmetalayers[i];
+    if (src_vl == NULL) {
+      continue;
+    }
+    if ((*view)->sc->nvlmetalayers >= BLOSC2_MAX_VLMETALAYERS) {
+      b2nd_free(*view);
+      *view = NULL;
+      return BLOSC2_ERROR_FAILURE;
+    }
+    blosc2_metalayer *dst_vl = calloc(1, sizeof(blosc2_metalayer));
+    if (dst_vl == NULL) {
+      b2nd_free(*view);
+      *view = NULL;
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    dst_vl->name = strdup(src_vl->name);
+    if (dst_vl->name == NULL) {
+      free(dst_vl);
+      b2nd_free(*view);
+      *view = NULL;
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    if (src_vl->content_len > 0 && src_vl->content != NULL) {
+      dst_vl->content = malloc((size_t) src_vl->content_len);
+      if (dst_vl->content == NULL) {
+        free(dst_vl->name);
+        free(dst_vl);
+        b2nd_free(*view);
+        *view = NULL;
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+      }
+      memcpy(dst_vl->content, src_vl->content, (size_t) src_vl->content_len);
+      dst_vl->content_len = src_vl->content_len;
+    }
+    (*view)->sc->vlmetalayers[(*view)->sc->nvlmetalayers++] = dst_vl;
+  }
+
   // Free the chunks in base array
   for (int i = 0; i < (*view)->sc->nchunks; i++) {
     free((*view)->sc->data[i]);
@@ -2332,10 +2373,6 @@ int view_new(const b2nd_array_t *array, b2nd_array_t **view, b2nd_context_t *ctx
   (*view)->sc->view = true;
   (*view)->sc->data = array->sc->data; // point view to the same data
   (*view)->sc->frame = array->sc->frame; // if original array is contiguous, point to frame
-  (*view)->sc->nvlmetalayers = array->sc->nvlmetalayers; //
-  for (int i = 0; i< array->sc->nvlmetalayers; i++) {
-    (*view)->sc->vlmetalayers[i] = array->sc->vlmetalayers[i]; // add ptrs to vlmetalayers
-  }
 
   return BLOSC2_ERROR_SUCCESS;
 }
@@ -2383,10 +2420,10 @@ int b2nd_expand_dims(const b2nd_array_t *array, b2nd_array_t **view, const bool 
                                         newchunkshape, newblockshape, array->dtype,
                                         array->dtype_format, NULL, 0);
 
-  view_new(array, view, ctx1);
+  int rc = view_new(array, view, ctx1);
   b2nd_free_ctx(ctx1);
 
-  return BLOSC2_ERROR_SUCCESS;
+  return rc;
 }
 
 
@@ -2447,10 +2484,10 @@ int b2nd_squeeze_index(b2nd_array_t *array, b2nd_array_t **view, const bool *ind
                                         newchunkshape, newblockshape, array->dtype,
                                         array->dtype_format, NULL, 0);
 
-  view_new(array, view, ctx1);
+  int rc = view_new(array, view, ctx1);
   b2nd_free_ctx(ctx1);
 
-  return BLOSC2_ERROR_SUCCESS;
+  return rc;
 }
 
 

@@ -84,9 +84,36 @@ CUTEST_TEST_TEST(expand_dims) {
   b2nd_array_t *src;
   B2ND_TEST_ASSERT(b2nd_from_cbuffer(ctx, &src, buffer, buffersize));
 
+  uint8_t vlmeta_payload[100];
+  memset(vlmeta_payload, 'x', sizeof(vlmeta_payload));
+  CUTEST_ASSERT("Failed to add vlmeta",
+                blosc2_vlmeta_add(src->sc, "test_vlmeta", vlmeta_payload, sizeof(vlmeta_payload), NULL) >= 0);
+
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_expand_dims(src, &dest, shapes.axis, shapes.final_dims));
   CUTEST_ASSERT("dims are equal", (dest)->ndim == shapes.final_dims);
+
+  /* Verify view exposes vlmetalayer and freeing a view before its base does not double-free */
+  {
+    uint8_t *got = NULL;
+    int32_t got_len = 0;
+    B2ND_TEST_ASSERT(blosc2_vlmeta_get(dest->sc, "test_vlmeta", &got, &got_len));
+    CUTEST_ASSERT("vlmeta length mismatch on view", got_len == (int32_t) sizeof(vlmeta_payload));
+    CUTEST_ASSERT("vlmeta content mismatch on view", memcmp(got, vlmeta_payload, sizeof(vlmeta_payload)) == 0);
+    free(got);
+
+    b2nd_array_t *tmp_view = NULL;
+    B2ND_TEST_ASSERT(b2nd_expand_dims(src, &tmp_view, shapes.axis, shapes.final_dims));
+    B2ND_TEST_ASSERT(b2nd_free(tmp_view));
+
+    got = NULL;
+    got_len = 0;
+    B2ND_TEST_ASSERT(blosc2_vlmeta_get(src->sc, "test_vlmeta", &got, &got_len));
+    CUTEST_ASSERT("vlmeta length mismatch on base after freeing view", got_len == (int32_t) sizeof(vlmeta_payload));
+    CUTEST_ASSERT("vlmeta content mismatch on base after freeing view",
+                  memcmp(got, vlmeta_payload, sizeof(vlmeta_payload)) == 0);
+    free(got);
+  }
   int j = 0;
   // check dimensions added correctly
   for (int i = 0; i < dest->ndim; ++i) {

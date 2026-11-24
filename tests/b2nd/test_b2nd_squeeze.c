@@ -109,6 +109,11 @@ CUTEST_TEST_TEST(squeeze) {
   b2nd_array_t *dest;
   B2ND_TEST_ASSERT(b2nd_get_slice(ctx2, &dest, src, shapes.start, shapes.stop));
 
+  uint8_t vlmeta_payload[100];
+  memset(vlmeta_payload, 'y', sizeof(vlmeta_payload));
+  CUTEST_ASSERT("Failed to add vlmeta",
+                blosc2_vlmeta_add(dest->sc, "test_vlmeta", vlmeta_payload, sizeof(vlmeta_payload), NULL) >= 0);
+
   b2nd_array_t *dest_view;
   B2ND_TEST_ASSERT(b2nd_squeeze(dest, &dest_view));
 
@@ -119,9 +124,25 @@ CUTEST_TEST_TEST(squeeze) {
     CUTEST_ASSERT("dims are equal", src->ndim != dest_view->ndim);
   }
 
+  uint8_t *got = NULL;
+  int32_t got_len = 0;
+  B2ND_TEST_ASSERT(blosc2_vlmeta_get(dest_view->sc, "test_vlmeta", &got, &got_len));
+  CUTEST_ASSERT("vlmeta length mismatch on view", got_len == (int32_t) sizeof(vlmeta_payload));
+  CUTEST_ASSERT("vlmeta content mismatch on view", memcmp(got, vlmeta_payload, sizeof(vlmeta_payload)) == 0);
+  free(got);
+
   free(buffer);
   B2ND_TEST_ASSERT(b2nd_free(src));
   B2ND_TEST_ASSERT(b2nd_free(dest_view));
+
+  got = NULL;
+  got_len = 0;
+  B2ND_TEST_ASSERT(blosc2_vlmeta_get(dest->sc, "test_vlmeta", &got, &got_len));
+  CUTEST_ASSERT("vlmeta length mismatch on base after freeing view", got_len == (int32_t) sizeof(vlmeta_payload));
+  CUTEST_ASSERT("vlmeta content mismatch on base after freeing view",
+                memcmp(got, vlmeta_payload, sizeof(vlmeta_payload)) == 0);
+  free(got);
+
   B2ND_TEST_ASSERT(b2nd_free(dest));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx));
   B2ND_TEST_ASSERT(b2nd_free_ctx(ctx2));
