@@ -1191,11 +1191,13 @@ BLOSCLZ_ALWAYS_INLINE int compress_impl(const int clevel, const void* input, int
 
 emit_match:
     /* Emit pending literals in bulk */
-    size_t lit_len = (size_t)(anchor - lit_start);
-    if (lit_len > 0) {
-      op = emit_literals(op, op_limit, lit_start, lit_len);
-      if (BLOSCLZ_UNLIKELY(op == NULL)) {
-        goto out;
+    {
+      size_t lit_len = (size_t)(anchor - lit_start);
+      if (lit_len > 0) {
+        op = emit_literals(op, op_limit, lit_start, lit_len);
+        if (BLOSCLZ_UNLIKELY(op == NULL)) {
+          goto out;
+        }
       }
     }
 
