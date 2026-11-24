@@ -151,7 +151,7 @@ set(BLOSC_ZLIBNG_VERSION "2.3.3" CACHE STRING
     "zlib-ng version to use when fetching internal sources.")
 set(BLOSC_ZLIBNG_SOURCE_DIR "" CACHE PATH
     "Optional local zlib-ng checkout to use instead of downloading sources.")
-set(BLOSC_ZSTD_VERSION "1.5.7" CACHE STRING
+set(BLOSC_ZSTD_VERSION "1.6.0" CACHE STRING
     "zstd version to use when fetching internal sources.")
 set(BLOSC_ZSTD_SOURCE_DIR "" CACHE PATH
     "Optional local zstd checkout to use instead of downloading sources.")
@@ -412,7 +412,7 @@ if(NOT DEACTIVATE_ZSTD)
             message(STATUS "Using zstd ${BLOSC_ZSTD_VERSION} via FetchContent download")
             FetchContent_Declare(
                 zstd
-                URL "https://github.com/facebook/zstd/archive/refs/tags/v${BLOSC_ZSTD_VERSION}.tar.gz"
+                URL "https://github.com/meta/zstd/archive/refs/tags/v${BLOSC_ZSTD_VERSION}.tar.gz"
                 DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                 SOURCE_SUBDIR build/cmake)
         endif()
