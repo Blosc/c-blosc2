@@ -146,10 +146,13 @@ static int s_remove_dir_recursive(const char* dir_path) {
                         break;
                     case EACCES:
                         BLOSC_TRACE_ERROR("Write permission was unexpectedly revoked or is being used by another process at %s", (const char*)fname);
+                        break;
                     case ENAMETOOLONG:
                         BLOSC_TRACE_ERROR("Filename %s was too long", (const char*)fname);
+                        break;
                     default:
                         BLOSC_TRACE_ERROR("Could not remove file %s", fname);
+                        break;
                     }
                     free(fname);
                     free((void*)path);
@@ -245,7 +248,7 @@ int blosc2_create_dir_recursive_check_extension_paths(const char* dir_path) {
             *ptr_last = '\0';
 
             // Check extension
-            if (strrchr(tmp, '.') != NULL) {
+            if (strrchr((const char*)tmp, '.') != NULL) {
                 abort = true;
             } else if (stat((const char*)tmp, &st) != 0) {
                 if (errno == ENOENT) {

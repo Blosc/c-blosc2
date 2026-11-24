@@ -14,6 +14,36 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <stdlib.h>
 #include <string.h>
 
+static const char s_invalid_key_chars[] = ":\0\n\r\t";
+static const size_t s_invalid_key_chars_size = sizeof(s_invalid_key_chars) - 1;
+
+bool blosc2_embed_key_is_valid(const char* key) {
+    size_t key_len = strlen(key);
+    if (key_len == 0) {
+        BLOSC_TRACE_ERROR("Key cannot be empty");
+        return false;
+    }
+    if (key[0] != '/') {
+        BLOSC_TRACE_ERROR("The key must always start with '/'");
+        return false;
+    }
+    if (key_len > 1 && key[key_len - 1] == '/') {
+        BLOSC_TRACE_ERROR("Unless the key is the root key, it cannot end with a '/'");
+        return false;
+    }
+    // TODO: Maybe use a better method (hash tables?... maybe?)
+    for (size_t i = 0; i < key_len; i+=1) {
+        for (size_t j = 0; j < s_invalid_key_chars_size; j+=1) {
+            if (key[i] == s_invalid_key_chars[j]) {
+                BLOSC_TRACE_ERROR("Key cannot contain '%c'", s_invalid_key_chars[j]);
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 bool blosc2_key_is_canonical(const uint8_t* key) {
     if (key == NULL || key[0] == '\0') {
         return false;

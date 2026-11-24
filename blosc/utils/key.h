@@ -14,6 +14,8 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+/* This is the function that the EmbedStore uses to check whether the keys passed to it are valid */
+bool blosc2_embed_key_is_valid(const char* key);
 
 /* Returns true when key is already in canonical form.  Never allocates. */
 bool blosc2_key_is_canonical(const uint8_t* key);

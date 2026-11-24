@@ -13,6 +13,7 @@ Blosc - Blocked Shuffling and Compression Library
 
 #define BLOSC2_EMBED_STORE_DEFAULT_VERSION 2
 #define BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE 256
+#define BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE 64
 
 #include <blosc2.h>
 #include <blosc2/blosc2-export.h>
@@ -68,7 +69,7 @@ typedef struct {
  *
  * The store owns its backing SChunk and starts in B2_ES_RDWR mode.
  */
-BLOSC_EXPORT int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage, int32_t chunksize);
+BLOSC_EXPORT int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage, int32_t chunksize, int32_t blocksize);
 
 /**
  * Free a store and its backing SChunk.

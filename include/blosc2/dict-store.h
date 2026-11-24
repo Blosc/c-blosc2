@@ -20,6 +20,8 @@
 #define BLOSC_DICT_STORE_H
 
 #include <blosc2.h>
+#include <blosc2/blosc2-export.h>
+#include <blosc2/embed-store.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -99,7 +101,7 @@ typedef struct {
  *
  * @sa blosc2_dict_store_open, blosc2_dict_store_close, blosc2_dict_store_free
  */
-int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath );
+BLOSC_EXPORT int blosc2_dict_store_new( blosc2_dict_store** dstorem, const uint8_t* urlpath, blosc2_embed_store* estore, int64_t threshold );
 
 /**
  * @brief Opens an existing dictionary stored on disk.
@@ -124,7 +126,7 @@ int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath );
  *
  * @sa blosc2_dict_store_new, blosc2_dict_store_close, blosc2_dict_store_free
  */
-int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_ds_open_mode open_mode);
+BLOSC_EXPORT int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_ds_open_mode open_mode);
 
 /**
  * @brief Flushes pending changes to disk and destroys the temporary structures.
@@ -146,7 +148,7 @@ int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_d
  *
  * @sa blosc2_dict_store_free
  */
-int blosc2_dict_store_close( blosc2_dict_store *ds );
+BLOSC_EXPORT int blosc2_dict_store_close( blosc2_dict_store *ds );
 
 /**
  * @brief Releases all the memory owned by a dictionary.
@@ -160,7 +162,7 @@ int blosc2_dict_store_close( blosc2_dict_store *ds );
  *
  * @sa blosc2_dict_store_new, blosc2_dict_store_open, blosc2_dict_store_close
  */
-void blosc2_dict_store_free( blosc2_dict_store *ds );
+BLOSC_EXPORT void blosc2_dict_store_free( blosc2_dict_store *ds );
 
 /** @} */  /* Alloc / Free API */
 
@@ -187,7 +189,7 @@ void blosc2_dict_store_free( blosc2_dict_store *ds );
  *
  * @sa blosc2_dict_store_to_b2d, blosc2_dict_store_to_buffer
  */
-int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_urlpath );
+BLOSC_EXPORT int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_urlpath );
 
 /**
  * @brief Writes the dictionary contents to a `.b2d` directory.
@@ -210,7 +212,7 @@ int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_
  *
  * @sa blosc2_dict_store_to_b2z, blosc2_dict_store_to_buffer
  */
-int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* urlpath );
+BLOSC_EXPORT int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* urlpath );
 
 /**
  * @brief Serializes an in-memory dictionary into a new heap buffer.
@@ -229,7 +231,7 @@ int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* urlpath );
  *
  * @sa blosc2_dict_store_from_buffer
  */
-int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* psize );
+BLOSC_EXPORT int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* psize );
 
 /**
  * @brief Creates a read-only, contiguous in-memory dictionary from a buffer.
@@ -255,7 +257,7 @@ int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* 
  *
  * @sa blosc2_dict_store_to_buffer
  */
-int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t size);
+BLOSC_EXPORT int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t size);
 
 /** @} */  /* Serialization / conversion API */
 
@@ -266,7 +268,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
  * @brief Returns the number of keys currently stored.
  * @param[in] ds Dictionary. Must not be NULL.
  */
-size_t blosc2_dict_store_get_length( blosc2_dict_store *ds );
+BLOSC_EXPORT size_t blosc2_dict_store_get_length( blosc2_dict_store *ds );
 
 /**
  * @brief Returns the number of slots in the internal hash table.
@@ -277,13 +279,13 @@ size_t blosc2_dict_store_get_length( blosc2_dict_store *ds );
  *
  * @param[in] ds Dictionary. Must not be NULL.
  */
-size_t blosc2_dict_store_get_capacity( blosc2_dict_store *ds );
+BLOSC_EXPORT size_t blosc2_dict_store_get_capacity( blosc2_dict_store *ds );
 
 /**
  * @brief Returns the access mode the dictionary was created/opened with.
  * @param[in] ds Dictionary. Must not be NULL.
  */
-b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds );
+BLOSC_EXPORT b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds );
 
 /**
  * @brief Returns the storage backend of the dictionary.
@@ -293,7 +295,7 @@ b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds );
  *         B2_DS_MEMORY_CONTIGUOUS, B2_DS_B2Z or B2_DS_B2D. Returns a negative
  *         value for an unknown backend.
  */
-int blosc2_dict_store_get_storage_type( blosc2_dict_store *ds );
+BLOSC_EXPORT int blosc2_dict_store_get_storage_type( blosc2_dict_store *ds );
 
 /** @} */  /* Introspection API */
 
@@ -313,7 +315,7 @@ int blosc2_dict_store_get_storage_type( blosc2_dict_store *ds );
  *
  * @sa blosc2_dict_store_get
  */
-bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key );
+BLOSC_EXPORT bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key );
 
 /**
  * @brief Retrieves the schunk associated with a key.
@@ -337,7 +339,7 @@ bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key )
  *
  * @sa blosc2_dict_store_set, blosc2_dict_store_remove, blosc2_dict_store_contains_key
  */
-int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item);
+BLOSC_EXPORT int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item);
 
 /**
  * @brief Inserts or replaces the schunk associated with a key.
@@ -364,7 +366,10 @@ int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_ds_item*
  *
  * @sa blosc2_dict_store_get, blosc2_dict_store_remove
  */
-int blosc2_dict_store_set(blosc2_dict_store* ds, const uint8_t* key, blosc2_schunk* container);
+BLOSC_EXPORT int blosc2_dict_store_set(blosc2_dict_store* ds, const uint8_t* key, blosc2_schunk* container);
+
+// TODO
+BLOSC_EXPORT int blosc2_dict_store_set_remote(blosc2_dict_store* dstore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path);
 
 /**
  * @brief Removes a key.
@@ -383,7 +388,7 @@ int blosc2_dict_store_set(blosc2_dict_store* ds, const uint8_t* key, blosc2_schu
  *
  * @sa blosc2_dict_store_get, blosc2_dict_store_set
  */
-int blosc2_dict_store_remove(blosc2_dict_store* ds, const uint8_t* key);
+BLOSC_EXPORT int blosc2_dict_store_remove(blosc2_dict_store* ds, const uint8_t* key);
 
 /** @} */  /* Get / Set / Remove API */
 
@@ -400,13 +405,13 @@ int blosc2_dict_store_remove(blosc2_dict_store* ds, const uint8_t* key);
  * @warning Do not insert or remove entries while iterating; the iteration
  *          order is unspecified.
  */
-blosc2_dict_store_iter* blosc2_dict_store_iter_new( blosc2_dict_store *ds );
+BLOSC_EXPORT blosc2_dict_store_iter* blosc2_dict_store_iter_new( blosc2_dict_store *ds );
 
 /**
  * @brief Releases an iterator.
  * @param[in] iter Iterator to free. If NULL, this function does nothing.
  */
-void blosc2_dict_store_iter_free( blosc2_dict_store_iter* iter );
+BLOSC_EXPORT void blosc2_dict_store_iter_free( blosc2_dict_store_iter* iter );
 
 /**
  * @brief Advances the iterator to the next live entry.
@@ -417,7 +422,7 @@ void blosc2_dict_store_iter_free( blosc2_dict_store_iter* iter );
  * @pre It must be called before blosc2_dict_store_iter_get_key() and
  *      blosc2_dict_store_iter_get_container().
  */
-bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter );
+BLOSC_EXPORT bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter );
 
 /**
  * @brief Returns the key of the current entry.
@@ -427,7 +432,7 @@ bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter );
  *
  * @pre The last call to blosc2_dict_store_iter_next() returned true.
  */
-const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter );
+BLOSC_EXPORT const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter );
 
 /**
  * @brief Returns the schunk of the current entry.
@@ -448,7 +453,7 @@ const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter );
  * @pre The last call to blosc2_dict_store_iter_next() returned true.
  * @sa blosc2_dict_store_get
  */
-int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item );
+BLOSC_EXPORT int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item );
 
 /** @} */  /* Iterator API */
 

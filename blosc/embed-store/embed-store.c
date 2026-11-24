@@ -96,6 +96,7 @@ static bool s_embed_key_is_valid(const uint8_t* key) {
         BLOSC_TRACE_ERROR("Unless the key is the root key, it cannot end with a '/'");
         return false;
     }
+    // TODO: Maybe use a better method (hash tables?... maybe?)
     for (size_t i = 0; i < key_len; i+=1) {
         for (size_t j = 0; j < s_invalid_key_chars_size; j+=1) {
             if (key[i] == s_invalid_key_chars[j]) {
@@ -526,13 +527,13 @@ static int s_exists_inode(const char* urlpath) {
 /* == END Static functions == */
 
 
-int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage, int32_t chunksize) {
+int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage, int32_t chunksize, int32_t blocksize) {
     if (estore == NULL) {
         BLOSC_TRACE_ERROR("pes must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (chunksize <= 0) {
-        BLOSC_TRACE_ERROR("Chunksize cannot be less or equal to 0");
+    if (chunksize <= 0 || blocksize <= 0) {
+        BLOSC_TRACE_ERROR("Neither blocksize or chunksize can be less or equal to 0");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
     *estore = NULL;
@@ -562,6 +563,7 @@ int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage,
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     schunk->chunksize = chunksize;
+    schunk->blocksize = blocksize;
 
     int rc = s_embed_init_new_store(schunk, B2_ES_RDWR, estore);
     if (rc < 0) {
@@ -899,6 +901,11 @@ int blosc2_embed_store_get_mmap_mode(blosc2_embed_store* estore, char** mode) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
+void priv_embed_store_iter_init(blosc2_embed_store_iter* iter, embed_store* estore) {
+    iter->es = estore;
+    hash_map_iter_init(&iter->map_iter, &estore->hm);
+}
+
 blosc2_embed_store_iter* blosc2_embed_store_iter_new(blosc2_embed_store* estore) {
     if (estore == NULL) {
         BLOSC_TRACE_ERROR("es cannot be equal to NULL");
@@ -909,8 +916,7 @@ blosc2_embed_store_iter* blosc2_embed_store_iter_new(blosc2_embed_store* estore)
     if (iter == NULL) {
         return NULL;
     }
-    iter->es = estore;
-    hash_map_iter_init(&iter->map_iter, &estore->hm);
+    priv_embed_store_iter_init(iter, estore);
     return iter;
 }
 

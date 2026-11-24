@@ -9,12 +9,12 @@ See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 #include <blosc2/dict-store.h>
+#include "dict-store-private.h"
+#include <embed-store/embed-store-private.h>
 #include <utils/filesystem.h>
-#include <utils/hash.h>
 #include <utils/key.h>
 #include <utils/string_manipulation.h>
 #include <utils/ziputils.h>
-#include "dict-store-private.h"
 
 #include <assert.h>
 #include <errno.h>
@@ -38,6 +38,12 @@ static const uint8_t* schunk_extension = (const uint8_t*)"cframe";
 static const size_t schunk_extension_len = 6;
 static const uint8_t* b2nd_extension = (const uint8_t*)"b2nd";
 static const size_t b2nd_extension_len = 3;
+
+// Enum used to specify if a value was inserted in the EmbedStore successfully
+enum {
+    EMBED_INSERTED = 1,
+    EMBED_NOT_INSERTED = 2,
+};
 
 /* # Dict functions */
 
@@ -1057,14 +1063,31 @@ static int s_close_b2z( dict_store *ds ) {
     return error_code;
 }
 
+static int s_try_set_schunk_in_embed(blosc2_embed_store* estore, int64_t threshold, const uint8_t* key, blosc2_schunk* schunk) {
+    assert(estore != NULL);
+    assert(schunk != NULL);
+    // Threshold may be <= 0. In that case, we are wasting time
+
+    int64_t nbytes = schunk->nbytes;
+    if (nbytes < threshold) {
+        int rc = blosc2_embed_store_set(estore, key, schunk);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("There was an error while inserting SChunk to DictStore's inner EmbedStore with key %s", (const char*)key);
+            return rc;
+        }
+        return EMBED_INSERTED;
+    }
+    return EMBED_NOT_INSERTED;
+}
+
 /* == END Static functions (and some constants) == */
 
-int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath ) {
-    if (pds == NULL) {
+int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, blosc2_embed_store* estore, int64_t threshold ) {
+    if (dstore == NULL) {
         BLOSC_TRACE_ERROR("blosc2_dict_store pointer cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    *pds = NULL;
+    *dstore = NULL;
 
     b2_ds_storage_type storage_type = B2_DS_MEMORY_SPARSE;
     b2_ds_open_mode open_mode = B2_DS_RDWR;
@@ -1124,7 +1147,24 @@ int blosc2_dict_store_new( blosc2_dict_store **pds, const uint8_t* urlpath ) {
         ds->storage_type = storage_type;
         ds->open_mode = open_mode;
     }
-    *pds = ds;
+
+    if (estore != NULL) {
+        ds->estore = estore;
+    } else if (threshold >= 0) {
+        // Create new EmbedStore
+        blosc2_embed_store* new_estore = NULL;
+        int rc = blosc2_embed_store_new(&new_estore, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not create EmbedStore for the DicStore");
+            blosc2_dict_store_close(ds); // TODO: See that this does not fail
+            blosc2_dict_store_free(ds);
+            return rc;
+        }
+        ds->estore = new_estore;
+    } // else ds->estore == NULL (calloc does that for us)
+    ds->threshold = threshold;
+
+    *dstore = ds;
     return rc;
 }
 
@@ -1203,22 +1243,31 @@ void blosc2_dict_store_free( blosc2_dict_store* dstore ) {
     hash_map_free_struct(&dstore->map);
     if (dstore->urlpath != NULL) free(dstore->urlpath);
     if (dstore->tmpdir != NULL) free(dstore->tmpdir);
+    if (dstore->estore != NULL) blosc2_embed_store_free(dstore->estore); // Remember that dstore->estore could be NULL
     free(dstore);
 }
 
 size_t blosc2_dict_store_get_length( blosc2_dict_store *ds ) {
-    return ds->map.length;
+    assert(ds != NULL);
+    size_t length = ds->map.length;
+    if (ds->estore != NULL) {
+        length += blosc2_embed_store_get_length(ds->estore);
+    }
+    return length;
 }
 
 size_t blosc2_dict_store_get_capacity( blosc2_dict_store *ds ) {
+    assert(ds != NULL);
     return ds->map.capacity;
 }
 
 b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds ) {
+    assert(ds != NULL);
     return ds->open_mode;
 }
 
 int blosc2_dict_store_get_storage_type( blosc2_dict_store *ds ) {
+    assert(ds != NULL);
     return ds->storage_type;
 }
 
@@ -1241,7 +1290,6 @@ bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key )
 }
 
 int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_urlpath ) {
-
     if (ds == NULL || destination_urlpath == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -1269,7 +1317,9 @@ int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_
             error_code = s_to_b2z_from_b2d(ds, destination_urlpath);
             break;
         }
-        default: error_code = BLOSC2_ERROR_FAILURE;
+        default:
+            BLOSC_TRACE_ERROR("Unexpected storage type found");
+            error_code = BLOSC2_ERROR_INVALID_PARAM;
     }
 
     if (error_code != 0) {
@@ -1306,6 +1356,9 @@ int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* destination_
             BLOSC_TRACE_ERROR("Cannot make a to_b2z from a b2z");
             break;
         }
+        default:
+            BLOSC_TRACE_ERROR("Unexpected storage_type found");
+            error_code = BLOSC2_ERROR_INVALID_PARAM;
     }
 
     if (error_code != 0) {
@@ -1454,11 +1507,29 @@ int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_ds_item
     }
 
     int error_code = BLOSC2_ERROR_SUCCESS;
+    // EmbedStore
+    if (ds->estore != NULL) {
+        b2_ds_item es_item = {0};
+        error_code = blosc2_embed_store_get(ds->estore, key, (b2_es_item*)&es_item);
+        if (error_code == BLOSC2_ERROR_SUCCESS) {
+            *item = es_item;
+            return BLOSC2_ERROR_SUCCESS;
+        }
+        if (error_code != BLOSC2_ERROR_NOT_FOUND && error_code < 0) {
+            BLOSC_TRACE_ERROR("Element could not be retrieved from EmbedStore");
+            return error_code;
+        }
+        // The element was not found.
+    }
+    // EmbedStore END
+
+    error_code = BLOSC2_ERROR_SUCCESS;
     b2_ds_value* value = NULL;
     if (!blosc2_key_is_canonical(key)) {
         uint8_t* processed_key = NULL;
         error_code = blosc2_key_normalize_copy(key, &processed_key);
-        if (error_code != 0) {
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not normalize key");
             return error_code;
         }
         value = hash_map_get(&ds->map, processed_key);
@@ -1487,12 +1558,27 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
         BLOSC_TRACE_ERROR("Cannot call set when open_mode is RDONLY");
         return BLOSC2_ERROR_FAILURE;
     }
+
+    // EmbedStore
+    int error_code = BLOSC2_ERROR_SUCCESS;
+    if (ds->estore != NULL) {
+        error_code = s_try_set_schunk_in_embed(ds->estore, ds->threshold, key, container);
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("The element was suitable for insertion, but it couldn't be inserted");
+            return error_code;
+        }
+        if (error_code == EMBED_INSERTED) {
+            return BLOSC2_ERROR_SUCCESS;
+        }
+        // EMBED_NOT_INSERTED
+    }
+    // EmbedStore END
+
     if (key[0] == '\0') {
         BLOSC_TRACE_ERROR("key cannot be equal to the empty string");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
     // The stripped key is a malloc(ed) string that belongs to the map
     uint8_t* processed_key = NULL;
     if (!blosc2_key_is_canonical(key)) {
@@ -1508,6 +1594,7 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
     }
     bool free_processed = true;
 
+    // Try insert it in the DictStore
     switch (ds->storage_type) {
         case B2_DS_MEMORY_SPARSE: {
             value v = {0};
@@ -1530,6 +1617,52 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
     return error_code;
 }
 
+int blosc2_dict_store_set_remote(blosc2_dict_store* dstore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path) {
+    if (dstore == NULL || key == NULL || urlbase == NULL || path == NULL) {
+        BLOSC_TRACE_ERROR("Arguments must be different from NULL");
+        return BLOSC2_ERROR_NULL_POINTER;
+    }
+    if (dstore->open_mode == B2_DS_RDONLY) {
+        BLOSC_TRACE_ERROR("Cannot call set when open_mode is RDONLY");
+        return BLOSC2_ERROR_FAILURE;
+    }
+    if (key[0] == '\0') {
+        BLOSC_TRACE_ERROR("key cannot be equal to the empty string");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    if (dstore->estore == NULL) {
+        BLOSC_TRACE_ERROR("Cannot set remote values when the DictStore does not contain any EmbedStore");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    // EmbedStore
+    int error_code = blosc2_embed_store_set_remote(dstore->estore, key, urlbase, path);
+    if (error_code < 0) {
+        BLOSC_TRACE_ERROR("Could not set item with key '%s'", (const char*)key);
+    }
+    // EmbedStore END
+
+    // TODO: Take into account both urlbase and path and the threshold
+    //error_code = BLOSC2_ERROR_SUCCESS;
+    //// The stripped key is a malloc(ed) string that belongs to the map
+    //uint8_t* processed_key = NULL;
+    //if (!blosc2_key_is_canonical(key)) {
+    //    error_code = blosc2_key_normalize_copy(key, &processed_key);
+    //    if (error_code != 0) {
+    //        return error_code;
+    //    }
+    //} else {
+    //    error_code = blosc2_string_duplicate(key, &processed_key);
+    //    if (error_code != 0) {
+    //        return error_code;
+    //    }
+    //}
+    //bool free_processed = true;
+//
+    //if (free_processed) free(processed_key);
+    return error_code;
+}
+
 int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     if (ds == NULL || key == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
@@ -1538,16 +1671,27 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     if (ds->open_mode == B2_DS_RDONLY) {
         BLOSC_TRACE_ERROR("Cannot remove elements in RDONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
-    };
-
-    uint8_t* processed_key;
-    int processed_key_status = blosc2_key_normalize_copy(key, &processed_key);
-    if (processed_key_status != BLOSC2_ERROR_SUCCESS) {
-        BLOSC_TRACE_ERROR("Could not process and validate key");
-        return processed_key_status;
     }
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
+    uint8_t* processed_key;
+    int error_code = blosc2_key_normalize_copy(key, &processed_key);
+    if (error_code != BLOSC2_ERROR_SUCCESS) {
+        BLOSC_TRACE_ERROR("Could not process and validate key");
+        return error_code;
+    }
+
+    // EmbedStore
+    if (ds->estore != NULL && blosc2_embed_store_contains_key(ds->estore, processed_key)) {
+        error_code = blosc2_embed_store_remove(ds->estore, processed_key);
+        free(processed_key);
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Item was found in the DictStore's inner EmbedStore, but could not be removed");
+        }
+        return error_code;
+    }
+    // EmbedStore END
+
+    error_code = BLOSC2_ERROR_SUCCESS;
     switch (ds->storage_type) {
     case B2_DS_B2Z:
     case B2_DS_B2D:
@@ -1576,7 +1720,13 @@ blosc2_dict_store_iter* blosc2_dict_store_iter_new( blosc2_dict_store *ds ) {
     }
 
     blosc2_dict_store_iter* iter = calloc(1, sizeof(blosc2_dict_store_iter));
-    hash_map_iter_init(&iter->map_iter, &ds->map);
+    if (ds->estore != NULL) {
+        priv_embed_store_iter_init(&iter->embed_iter, ds->estore);
+        iter->state = B2_DS_ITER_EMBED;
+    } else {
+        hash_map_iter_init(&iter->map_iter, &ds->map),
+        iter->state = B2_DS_ITER_DICT;
+    }
     iter->dstore = ds;
     return iter;
 }
@@ -1588,6 +1738,15 @@ void blosc2_dict_store_iter_free( blosc2_dict_store_iter* iter ) {
 
 bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter ) {
     assert(iter != NULL);
+    bool next = false;
+    if (iter->state == B2_DS_ITER_EMBED) {
+        next = blosc2_embed_store_iter_next(&iter->embed_iter);
+        if (!next) {
+
+        }
+    } else {
+
+    }
     return hash_map_iter_next(&iter->map_iter);
 }
 

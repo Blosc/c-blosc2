@@ -34,6 +34,7 @@ static const char* packed_file_v1 = "test_embed_store_v1.msgpack";
 static const char* packed_file_v2 = "test_embed_store_v2.b2e";
 static const uint8_t* embed_store_v1 = (const uint8_t*)"test_embed_store_v1.b2e";
 static int s_default_chunksize = 256; // Bytes
+static int s_default_blocksize = 65; // Bytes
 
 static const uint8_t* keys[] = {
     (const uint8_t*)"/first_key",
@@ -108,16 +109,16 @@ static int s_write_msgpack(const char* destination_file, const uint8_t* packed_b
 }
 
 static char* test_embed_store_new() {
-    int rc = blosc2_embed_store_new(NULL, NULL, -1);
+    int rc = blosc2_embed_store_new(NULL, NULL, -1, -1);
     mu_assert("ERROR: This operation should fail with BLOSC2_ERROR_NULL_POINTER error", rc == BLOSC2_ERROR_NULL_POINTER);
-    rc = blosc2_embed_store_new(&es, NULL, -1);
+    rc = blosc2_embed_store_new(&es, NULL, -1, -1);
     mu_assert("ERROR: Creation should have failed", rc == BLOSC2_ERROR_INVALID_PARAM);
-    rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Creation should have succeed", rc == 0);
     mu_assert("ERROR: Wrong open mode detected, it should be B2_ES_RDWR", blosc2_embed_store_get_open_mode(es) == B2_ES_RDWR);
     blosc2_embed_store_free(es);
     es = NULL;
-    rc = blosc2_embed_store_new(&es, &b2_storage, s_default_chunksize);
+    rc = blosc2_embed_store_new(&es, &b2_storage, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: This should not work. EmbedStore's typedisze must be equal to 1", rc != 0);
 
     return NULL;
@@ -154,7 +155,7 @@ static int s_create_persisted_v2_store(const char* urlpath) {
     };
 
     blosc2_embed_store* writer = NULL;
-    int rc = blosc2_embed_store_new(&writer, &storage_v2, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&writer, &storage_v2, s_default_chunksize, s_default_blocksize);
     if (rc != 0 || writer == NULL) {
         return rc != 0 ? rc : BLOSC2_ERROR_FAILURE;
     }
@@ -339,7 +340,7 @@ static int s_set_elements(blosc2_embed_store* es) {
 }
 
 static char* test_embed_store_set() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create embed store", rc == 0);
 
     rc = s_set_elements(es);
@@ -367,7 +368,7 @@ static char* test_embed_store_set() {
 }
 
 static char* test_embed_store_get() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create embed store", rc == 0);
     mu_assert("ERROR: EmbedStore cannot be NULL", es != NULL);
     rc = s_set_elements(es);
@@ -390,7 +391,7 @@ static char* test_embed_store_get() {
 }
 
 static char* test_embed_store_remove() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create embed store", rc == 0);
     rc = s_set_elements(es);
     mu_assert("ERROR: Set operation failed", rc == 0);
@@ -408,7 +409,7 @@ static char* test_embed_store_remove() {
 }
 
 static char* test_serialize_embed_store() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create embed store", rc == 0);
 
     b2_es_value val = {
@@ -460,7 +461,7 @@ static void s_print_embed_store(blosc2_embed_store* estore) {
 // (including the map-header serializer bug that produced a truncated buffer).
 static char* test_serialize_matches_fixture() {
     blosc2_embed_store* fixture = NULL;
-    int rc = blosc2_embed_store_new(&fixture, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&fixture, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create the fixture store", rc == 0);
 
     rc = msgpack_embed_store_deserialize(packed, packed_size, fixture);
@@ -477,7 +478,7 @@ static char* test_serialize_matches_fixture() {
 
     // Parse the produced buffer back and compare its content against the fixture
     blosc2_embed_store* roundtrip = NULL;
-    rc = blosc2_embed_store_new(&roundtrip, NULL, s_default_chunksize);
+    rc = blosc2_embed_store_new(&roundtrip, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create the roundtrip store", rc == 0);
     rc = msgpack_embed_store_deserialize(out_buffer, out_size, roundtrip);
     free(out_buffer);
@@ -516,7 +517,7 @@ static char* test_serialize_matches_fixture() {
 }
 
 static char* test_deserialize_embed_store_from_file() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create embed store", rc == 0);
 
     rc = msgpack_embed_store_deserialize(packed, packed_size, es);
@@ -539,7 +540,7 @@ static char* test_serialize_version() {
 }
 
 static char* test_deserialize_embed_store_v1_from_file() {
-    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Could not create EmbedStore", rc == 0);
 
     uint8_t* packed_v1 = NULL;
@@ -569,7 +570,7 @@ static char* test_deserialize_embed_store_v1_from_file() {
 // blosc2_embed_store_from_schunk() with `copy = false`, in which case the store adopts it.
 static blosc2_schunk* s_build_embed_store_schunk(void) {
     blosc2_embed_store* writer = NULL;
-    int rc = blosc2_embed_store_new(&writer, NULL, s_default_chunksize);
+    int rc = blosc2_embed_store_new(&writer, NULL, s_default_chunksize, s_default_blocksize);
     if (rc != 0 || writer == NULL) {
         return NULL;
     }

@@ -52,5 +52,6 @@ struct blosc2_embed_store_iter {
 /* The following functions must be used ONLY by bosc2, not by the end user */
 
 void priv_embed_store_free_value(b2_es_value* value);
+void priv_embed_store_iter_init(blosc2_embed_store_iter* iter, blosc2_embed_store* estore);
 
 #endif //BLOSC_EMBED_STORE_PRIVATE_H

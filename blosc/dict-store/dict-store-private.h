@@ -12,6 +12,7 @@ See LICENSE.txt for details about copyright and rights to use.
 #define BLOSC_DICT_STORE_PRIVATE_H
 
 #include <blosc2/dict-store.h>
+#include <embed-store/embed-store-private.h>
 #include <utils/hash_map.h>
 
 #define BLOSC2_DICT_STORE_INITIAL_CAPACITY 16
@@ -44,8 +45,11 @@ struct blosc2_dict_store {
     uint8_t* tmpdir;
     size_t tmpdir_length;
 
+    blosc2_embed_store* estore;
+    int64_t threshold;
+
     b2_ds_open_mode open_mode;
-    int storage_type;
+    b2_ds_storage_type storage_type;
 };
 
 typedef struct {
@@ -57,9 +61,18 @@ typedef struct {
     b2_ds_storage_type storage_type;
 }b2_ds_default;
 
+typedef enum {
+    B2_DS_ITER_EMBED,
+    B2_DS_ITER_DICT,
+}b2_ds_iter_state;
+
 struct blosc2_dict_store_iter {
-    hash_map_iter map_iter;
+    union {
+        hash_map_iter map_iter;
+        blosc2_embed_store_iter embed_iter;
+    };
     blosc2_dict_store* dstore;
+    b2_ds_iter_state state;
 };
 
 #endif // BLOSC_DICT_STORE_PRIVATE_H

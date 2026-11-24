@@ -7,6 +7,7 @@
 #include "context.h"
 #include "test_common.h"
 #include <blosc2/dict-store.h>
+#include "dict-store/dict-store-private.h"
 #include <blosc2.h>
 
 #include <errno.h>
@@ -154,7 +155,7 @@ static int s_generate_b2z(const uint8_t* destination_urlpath) {
 
     remove_dir_recursive(dir_path);
 
-    error_code = blosc2_dict_store_new(&store, dir_path);
+    error_code = blosc2_dict_store_new(&store, dir_path, NULL, -1);
     if (error_code != 0) {
         return error_code;
     }
@@ -180,7 +181,7 @@ static int s_generate_b2d(const uint8_t* urlpath) {
 
     remove_dir_recursive(urlpath);
 
-    error_code = blosc2_dict_store_new(&store, urlpath);
+    error_code = blosc2_dict_store_new(&store, urlpath, NULL, -1);
     if (error_code != 0) {
         return error_code;
     }
@@ -203,10 +204,10 @@ static int s_generate_b2d(const uint8_t* urlpath) {
 
 static char* test_dict_store_new_memory(void) {
     mu_assert("ERROR: Returned success when error was expected",
-        blosc2_dict_store_new(NULL, NULL) != 0);
+        blosc2_dict_store_new(NULL, NULL, NULL, -1) != 0);
 
     mu_assert("ERROR: Returned failure when success was expected",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
     mu_assert("ERROR: A new in-memory dict_store must be empty",
@@ -221,7 +222,7 @@ static char* test_dict_store_set_memory(void) {
         blosc2_dict_store_set(ds, (const uint8_t*)paths[0], NULL) == BLOSC2_ERROR_NULL_POINTER);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
@@ -257,7 +258,7 @@ static char* test_dict_store_get_memory(void) {
         blosc2_dict_store_get(ds, (const uint8_t*)paths[0], NULL) != 0);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
@@ -290,7 +291,7 @@ static char* test_dict_store_remove_memory(void) {
         blosc2_dict_store_remove(ds, (const uint8_t*)paths[0]) != 0);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
@@ -322,7 +323,7 @@ static char* test_dict_store_to_b2z_memory(void) {
     remove((const char*)archive_path);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
@@ -354,7 +355,7 @@ static char* test_dict_store_new_b2z(void) {
     remove((const char*)archive_path);
 
     mu_assert("ERROR: Could not create a b2z dict_store",
-        blosc2_dict_store_new(&ds, archive_path) == 0);
+        blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
     mu_assert("ERROR: Could not close the b2z dict_store",
@@ -368,7 +369,7 @@ static char* test_dict_store_set_b2z(void) {
     remove((const char*)archive_path);
 
     mu_assert("ERROR: Could not create a b2z dict_store",
-        blosc2_dict_store_new(&ds, archive_path) == 0);
+        blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
@@ -488,10 +489,10 @@ static char* test_dict_store_new_b2d(void) {
     remove_dir_recursive(dir_path);
 
     mu_assert("ERROR: new() must fail when the path has no b2d extension",
-        blosc2_dict_store_new(&ds, wrong_dir_path) != 0);
+        blosc2_dict_store_new(&ds, wrong_dir_path, NULL, -1) != 0);
 
     mu_assert("ERROR: Could not create a b2d dict_store",
-        blosc2_dict_store_new(&ds, dir_path) == 0);
+        blosc2_dict_store_new(&ds, dir_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -568,7 +569,7 @@ static char* test_dict_store_to_b2z(void) {
     remove((const char*)archive_path);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -590,7 +591,7 @@ static char* test_dict_store_to_b2z(void) {
 
     /* b2z storage -> b2z */
     mu_assert("ERROR: Could not create a b2z dict_store",
-        blosc2_dict_store_new(&ds, archive_path) == 0);
+        blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -615,7 +616,7 @@ static char* test_dict_store_to_b2z(void) {
     remove_dir_recursive(dir_path);
 
     mu_assert("ERROR: Could not create a b2d dict_store",
-        blosc2_dict_store_new(&ds, dir_path) == 0);
+        blosc2_dict_store_new(&ds, dir_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -644,7 +645,7 @@ static char* test_dict_store_to_b2d(void) {
     remove_dir_recursive(dir_path);
 
     mu_assert("ERROR: Could not create an in-memory dict_store",
-        blosc2_dict_store_new(&ds, NULL) == 0);
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -672,7 +673,7 @@ static char* test_dict_store_to_b2d(void) {
     remove((const char*)archive_path);
 
     mu_assert("ERROR: Could not create a b2z dict_store",
-        blosc2_dict_store_new(&ds, archive_path) == 0);
+        blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
@@ -696,6 +697,47 @@ static char* test_dict_store_to_b2d(void) {
 
     END_TEST;
     return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_embed(void) {
+
+    int64_t threshold = 64;
+    int rc = blosc2_dict_store_new(&ds, NULL, NULL, threshold);
+    mu_assert("ERROR: The DictStore should have been created", rc == 0);
+    mu_assert("ERROR: The DictStore's inner EmbedStore should have been created", ds->estore != NULL);
+    mu_assert("ERROR: THe DictStore's threshold should be equal to the specified threshold", ds->threshold == threshold);
+    mu_assert("ERROR: A newly created DictStore should have 0 length", blosc2_dict_store_get_length(ds) == 0);
+
+    const char* urlbase = "urlbase.com";
+    const char* path = "@some/path";
+
+    rc = blosc2_dict_store_set_remote(ds, (const uint8_t*)"/key", (const uint8_t*)urlbase, (const uint8_t*)path);
+    mu_assert("ERROR: The item should have been inserted", rc == 0);
+    mu_assert("ERROR: The DictStore's length should be 1", blosc2_dict_store_get_length(ds) == 1);
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+= 1) {
+        rc = blosc2_dict_store_set(ds, (const uint8_t*)paths[i], b2_schunks[i]);
+        mu_assert("ERROR: Could not insert SChunk into DictStore", rc == 0);
+        mu_assert("ERROR: DictStore is returning a wrong length number", blosc2_dict_store_get_length(ds) == i + 2);
+    }
+
+    blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(ds);
+    size_t iters = 0;
+    while (blosc2_dict_store_iter_next(iter)) {
+        const uint8_t* key = blosc2_dict_store_iter_get_key(iter);
+        mu_assert("ERROR: Could not get key from iterator", key != NULL);
+        b2_ds_item item = {0};
+        rc = blosc2_dict_store_iter_get_container(iter, &item);
+        mu_assert("ERROR: Could not get container from iterator", rc == 0);
+        if (item.tag == B2_DS_ITEM_LOCAL) {
+            blosc2_schunk_free(item.schunk);
+        }
+        iters += 1;
+    }
+    blosc2_dict_store_iter_free(iter);
+
+    mu_assert("ERROR: The blosc2_dict_store_iter did not iterate blosc2_dict_store_get_length times", blosc2_dict_store_get_length(ds) == iters);
+
+    return NULL;
 }
 
 static char* all_tests(void) {
@@ -736,6 +778,9 @@ static char* all_tests(void) {
     s_teardown();
 
     mu_run_test(test_dict_store_to_b2d);
+    s_teardown();
+
+    mu_run_test(test_dict_store_embed);
     s_teardown();
 
     return EXIT_SUCCESS;
