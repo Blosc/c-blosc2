@@ -4,7 +4,10 @@ Release notes for C-Blosc2
 Changes from 3.8.0 to 3.8.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* **Zstd 1.6.0** (security). Update the bundled/fetched Zstandard to 1.6.0, which
+  fixes CVE-2026-124851 (streaming decompression of malformed data could expose
+  uninitialized memory) along with several other memory-safety fixes. Upgrading
+  is highly recommended. Zstd now disables legacy format support by default.
 
 Changes from 3.7.0 to 3.8.0
 ===========================
