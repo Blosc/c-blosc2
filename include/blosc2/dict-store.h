@@ -58,22 +58,6 @@ typedef enum {
     B2_DS_MEMORY_CONTIGUOUS, /**< In memory, all entries packed into a single buffer (see blosc2_dict_store_from_buffer()). */
 }b2_ds_storage_type;
 
-typedef enum {
-    B2_DS_ITEM_LOCAL,
-    B2_DS_ITEM_REMOTE
-}b2_ds_item_tag;
-
-typedef struct {
-    b2_ds_item_tag tag;
-    union {
-        blosc2_schunk* schunk; // Local
-        struct {
-            uint8_t* urlbase;
-            uint8_t* path;
-        }remote;
-    };
-}b2_ds_item;
-
 /** @name Alloc / Free API */
 /** @{ */
 
@@ -339,7 +323,7 @@ BLOSC_EXPORT bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const u
  *
  * @sa blosc2_dict_store_set, blosc2_dict_store_remove, blosc2_dict_store_contains_key
  */
-BLOSC_EXPORT int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item);
+BLOSC_EXPORT int blosc2_dict_store_get(blosc2_dict_store* ds, const uint8_t* key, b2_es_item* item);
 
 /**
  * @brief Inserts or replaces the schunk associated with a key.
@@ -453,7 +437,9 @@ BLOSC_EXPORT const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_it
  * @pre The last call to blosc2_dict_store_iter_next() returned true.
  * @sa blosc2_dict_store_get
  */
-BLOSC_EXPORT int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item );
+BLOSC_EXPORT int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_es_item* item );
+
+bool blosc2_dict_store_iter_container_is_from_embed_store( blosc2_dict_store_iter* iter );
 
 /** @} */  /* Iterator API */
 

@@ -85,8 +85,8 @@ static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpat
     return error_code;
 }
 
-static void s_b2_ds_item_set_local(b2_ds_item* item, blosc2_schunk* schunk) {
-    item->tag = B2_DS_ITEM_LOCAL;
+static void s_b2_es_item_set_local(b2_es_item* item, blosc2_schunk* schunk) {
+    item->tag = B2_ES_VALUE_LOCAL;
     item->schunk = schunk;
 }
 
@@ -660,7 +660,7 @@ static int s_open_rdwr(dict_store **ds, const uint8_t* urlpath, int storage_type
 }
 
 // (note): s_get_mem_sparse is implemented directly in the switch statement in blosc2_dict_store_get
-static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_ds_item* item) {
+static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_es_item* item) {
     assert(ds != NULL && value != NULL && item != NULL);
     assert(ds->storage_type == B2_DS_MEMORY_CONTIGUOUS);
     assert(ds->open_mode == B2_DS_RDONLY);
@@ -672,11 +672,11 @@ static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_ds_
     if (schunk == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-    s_b2_ds_item_set_local(item, schunk);
+    s_b2_es_item_set_local(item, schunk);
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_ds_item* item) {
+static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_es_item* item) {
     assert(ds != NULL && value != NULL && value != NULL && item != NULL);
     assert(ds->open_mode == B2_DS_RDONLY || ds->open_mode == B2_DS_RDWR);
     assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
@@ -728,20 +728,20 @@ static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_ds_item* item) {
         BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %ld", (const char*)path, offset);
         error_code = BLOSC2_ERROR_FILE_OPEN;
     } else {
-        s_b2_ds_item_set_local(item, schunk);
+        s_b2_es_item_set_local(item, schunk);
     }
     if (free_path) free((void*)path);
     return error_code;
 }
 
-static int s_get_from_value(dict_store* ds, b2_ds_value* value, b2_ds_item* item) {
+static int s_get_from_value(dict_store* ds, b2_ds_value* value, b2_es_item* item) {
     assert(ds != NULL && value != NULL && item != NULL);
     assert(ds->open_mode != B2_DS_WRONLY);
 
     int rc = BLOSC2_ERROR_SUCCESS;
     switch (ds->storage_type) {
     case B2_DS_MEMORY_SPARSE:
-        s_b2_ds_item_set_local(item, value->f_mem.schunk);
+        s_b2_es_item_set_local(item, value->f_mem.schunk);
         break;
     case B2_DS_MEMORY_CONTIGUOUS:
         rc = s_get_mem_contiguous(ds, value, item);
@@ -1496,7 +1496,7 @@ cleanup:
     return error_code;
 }
 
-int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_ds_item* item ) {
+int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_es_item* item ) {
     if (ds == NULL || key == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -1509,10 +1509,8 @@ int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_ds_item
     int error_code = BLOSC2_ERROR_SUCCESS;
     // EmbedStore
     if (ds->estore != NULL) {
-        b2_ds_item es_item = {0};
-        error_code = blosc2_embed_store_get(ds->estore, key, (b2_es_item*)&es_item);
+        error_code = blosc2_embed_store_get(ds->estore, key, item);
         if (error_code == BLOSC2_ERROR_SUCCESS) {
-            *item = es_item;
             return BLOSC2_ERROR_SUCCESS;
         }
         if (error_code != BLOSC2_ERROR_NOT_FOUND && error_code < 0) {
@@ -1673,17 +1671,10 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    uint8_t* processed_key;
-    int error_code = blosc2_key_normalize_copy(key, &processed_key);
-    if (error_code != BLOSC2_ERROR_SUCCESS) {
-        BLOSC_TRACE_ERROR("Could not process and validate key");
-        return error_code;
-    }
-
+    int error_code = BLOSC2_ERROR_SUCCESS;
     // EmbedStore
-    if (ds->estore != NULL && blosc2_embed_store_contains_key(ds->estore, processed_key)) {
-        error_code = blosc2_embed_store_remove(ds->estore, processed_key);
-        free(processed_key);
+    if (ds->estore != NULL && blosc2_embed_store_contains_key(ds->estore, key)) {
+        error_code = blosc2_embed_store_remove(ds->estore, key);
         if (error_code < 0) {
             BLOSC_TRACE_ERROR("Item was found in the DictStore's inner EmbedStore, but could not be removed");
         }
@@ -1691,21 +1682,28 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     }
     // EmbedStore END
 
-    error_code = BLOSC2_ERROR_SUCCESS;
+    uint8_t* processed_key;
+    error_code = blosc2_key_normalize_copy(key, &processed_key);
+    if (error_code != BLOSC2_ERROR_SUCCESS) {
+        BLOSC_TRACE_ERROR("Could not process and validate key");
+        return error_code;
+    }
+
     switch (ds->storage_type) {
-    case B2_DS_B2Z:
-    case B2_DS_B2D:
-        error_code = s_remove_b2x(ds, processed_key);
-        if (error_code < 0) {
-            BLOSC_TRACE_ERROR("Could not remove element with key  %s", (const char*)key);
-        }
-        break;
-    case B2_DS_MEMORY_SPARSE:
-        error_code = hash_map_remove(&ds->map, processed_key);
-        break;
-    default:
-        BLOSC_TRACE_ERROR("Invalid storage_type detected");
-        error_code = BLOSC2_ERROR_INVALID_PARAM;
+        case B2_DS_B2Z:
+        case B2_DS_B2D:
+            error_code = s_remove_b2x(ds, processed_key);
+            if (error_code < 0) {
+                BLOSC_TRACE_ERROR("Could not remove element with key  %s", (const char*)key);
+            }
+            break;
+        case B2_DS_MEMORY_SPARSE:
+            // This returns true if deleted, false if not. It cannot fail in MEMORY_SPARSE
+            hash_map_remove(&ds->map, processed_key);
+            break;
+        default:
+            BLOSC_TRACE_ERROR("Invalid storage_type detected");
+            error_code = BLOSC2_ERROR_INVALID_PARAM;
     }
 
     free((void*)processed_key);
@@ -1742,20 +1740,26 @@ bool blosc2_dict_store_iter_next( blosc2_dict_store_iter *iter ) {
     if (iter->state == B2_DS_ITER_EMBED) {
         next = blosc2_embed_store_iter_next(&iter->embed_iter);
         if (!next) {
-
+            iter->state = B2_DS_ITER_DICT;
+            memset(&iter->map_iter, 0, sizeof(iter->map_iter));
+            hash_map_iter_init(&iter->map_iter, &iter->dstore->map);
+            next = hash_map_iter_next(&iter->map_iter);
         }
     } else {
-
+        next = hash_map_iter_next(&iter->map_iter);
     }
-    return hash_map_iter_next(&iter->map_iter);
+    return next;
 }
 
 const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter ) {
     assert(iter != NULL);
+    if (iter->state == B2_DS_ITER_EMBED) {
+        return blosc2_embed_store_iter_get_key(&iter->embed_iter);
+    }
     return hash_map_iter_get_key(&iter->map_iter);
 }
 
-int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_item* item ) {
+int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_es_item* item ) {
     if (iter == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -1765,10 +1769,20 @@ int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_ds_it
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    b2_ds_value* value = hash_map_iter_get_value(&iter->map_iter);
-    int rc = s_get_from_value(iter->dstore, value, item);
+    int rc = BLOSC2_ERROR_SUCCESS;
+    if (iter->state == B2_DS_ITER_EMBED) {
+        rc = blosc2_embed_store_iter_get_container(&iter->embed_iter, item);
+    } else {
+        b2_ds_value* value = hash_map_iter_get_value(&iter->map_iter);
+        rc = s_get_from_value(iter->dstore, value, item);
+    }
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not retrieve item");
     }
     return rc;
+}
+
+bool blosc2_dict_store_iter_container_is_from_embed_store( blosc2_dict_store_iter* iter ) {
+    assert(iter != NULL);
+    return iter->state == B2_DS_ITER_EMBED;
 }

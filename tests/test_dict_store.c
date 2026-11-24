@@ -20,6 +20,13 @@ int tests_run = 0;
 //#define END_TEST printf("(%d) TEST SUCCESS\n", tests_run)
 #define END_TEST
 
+#define RUN_TEST(func) \
+    do { \
+        mu_run_test(func); \
+        s_teardown(); \
+        printf("FINISHED TEST: '" #func "'\n"); \
+    } while(0);
+
 static blosc2_dict_store *ds = NULL;
 
 static blosc2_cparams cparams;
@@ -270,7 +277,7 @@ static char* test_dict_store_get_memory(void) {
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    b2_ds_item item = {0};
+    b2_es_item item = {0};
     for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
         const uint8_t* key_to_get = (const uint8_t*)paths[i];
         mu_assert("ERROR: Could not get a schunk from the dict_store",
@@ -331,7 +338,7 @@ static char* test_dict_store_to_b2z_memory(void) {
         mu_assert("ERROR: Could not set a schunk in the dict_store",
             blosc2_dict_store_set(ds, (const uint8_t*)paths[i], b2_schunks[i]) == 0);
 
-        b2_ds_item item = {0};
+        b2_es_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the dict_store",
             blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
         mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
@@ -403,7 +410,7 @@ static char* test_dict_store_open_b2z(void) {
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        b2_ds_item item = {0};
+        b2_es_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the b2z dict_store",
             blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
         mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
@@ -438,7 +445,7 @@ static char* test_dict_store_open_b2z(void) {
             blosc2_dict_store_get_length(ds) == i+1);
     }
 
-    b2_ds_item item = {0};
+    b2_es_item item = {0};
     mu_assert("ERROR: get() must fail when the dict_store was opened in WRONLY mode",
         blosc2_dict_store_get(ds, (const uint8_t*)paths[0], &item) != 0);
     mu_assert("ERROR: The returned container must be NULL in WRONLY mode", item.schunk == NULL);
@@ -463,7 +470,7 @@ static char* test_dict_store_open_b2z(void) {
     blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
     mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
     while (blosc2_dict_store_iter_next(iter)) {
-        item = (b2_ds_item){0};
+        item = (b2_es_item){0};
         mu_assert("ERROR: Could not get the container from the iterator",
             blosc2_dict_store_iter_get_container(iter, &item) == 0);
         mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
@@ -503,7 +510,7 @@ static char* test_dict_store_new_b2d(void) {
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        b2_ds_item item = {0};
+        b2_es_item item = {0};
         mu_assert("ERROR: Could not get a schunk from the b2d dict_store",
             blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
         blosc2_schunk_free(item.schunk);
@@ -533,7 +540,7 @@ static char* test_dict_store_open_b2d(void) {
     blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
     mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
     while (blosc2_dict_store_iter_next(iter)) {
-        b2_ds_item item = {0};
+        b2_es_item item = {0};
         mu_assert("ERROR: Could not get the container from the iterator",
             blosc2_dict_store_iter_get_container(iter, &item) == 0);
         mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
@@ -720,68 +727,80 @@ static char* test_dict_store_embed(void) {
         mu_assert("ERROR: DictStore is returning a wrong length number", blosc2_dict_store_get_length(ds) == i + 2);
     }
 
+    {
+        b2_es_item item = {0};
+        rc = blosc2_dict_store_get(ds, (const uint8_t*)"/key", &item);
+        mu_assert("ERROR: Could not get item from EmbedStore", rc == 0);
+        mu_assert("ERROR: Wrong item tag", item.tag == B2_ES_VALUE_REMOTE);
+        mu_assert("ERROR: urlbase is wrong", strcmp(urlbase, (const char*)item.remote.urlbase) == 0);
+        mu_assert("ERROR: path is wrong", strcmp(path, (const char*)item.remote.path) == 0);
+    }
+
     blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(ds);
     size_t iters = 0;
     while (blosc2_dict_store_iter_next(iter)) {
         const uint8_t* key = blosc2_dict_store_iter_get_key(iter);
         mu_assert("ERROR: Could not get key from iterator", key != NULL);
-        b2_ds_item item = {0};
+        b2_es_item item = {0};
         rc = blosc2_dict_store_iter_get_container(iter, &item);
         mu_assert("ERROR: Could not get container from iterator", rc == 0);
-        if (item.tag == B2_DS_ITEM_LOCAL) {
+        if (item.tag == B2_ES_VALUE_LOCAL && blosc2_dict_store_iter_container_is_from_embed_store(iter)) {
             blosc2_schunk_free(item.schunk);
         }
         iters += 1;
     }
     blosc2_dict_store_iter_free(iter);
-
     mu_assert("ERROR: The blosc2_dict_store_iter did not iterate blosc2_dict_store_get_length times", blosc2_dict_store_get_length(ds) == iters);
+
+    rc = blosc2_dict_store_remove(ds, (const uint8_t*)"/key");
+    mu_assert("ERROR: There was an unexpected error while trying to remove key", rc == 0);
+    mu_assert("ERROR: The expected length was not matched", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
+
+    // Again, to show that the remove does nothing when the key was not found
+    rc = blosc2_dict_store_remove(ds, (const uint8_t*)"/key");
+    mu_assert("ERROR: There was an unexpected error while trying to remove key", rc == 0);
+    mu_assert("ERROR: The expected length was not matched", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
+
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        const uint8_t* some_path = (const uint8_t*)paths[i];
+        rc = blosc2_dict_store_remove(ds, some_path);
+        mu_assert("ERROR: Could not remove item from DictStore", rc == 0);
+    }
+
+    mu_assert("ERROR: DictStore should be empty", blosc2_dict_store_get_length(ds) == 0);
 
     return NULL;
 }
 
 static char* all_tests(void) {
     /* Tests when the dict_store data structure only stores data in memory */
-    mu_run_test(test_dict_store_new_memory);
-    s_teardown();
+    RUN_TEST(test_dict_store_new_memory);
 
-    mu_run_test(test_dict_store_set_memory); // It also tests the iterator
-    s_teardown();
+    RUN_TEST(test_dict_store_set_memory); // It also tests the iterator
 
-    mu_run_test(test_dict_store_get_memory);
-    s_teardown();
+    RUN_TEST(test_dict_store_get_memory);
 
-    mu_run_test(test_dict_store_remove_memory);
-    s_teardown();
+    RUN_TEST(test_dict_store_remove_memory);
 
-    mu_run_test(test_dict_store_to_b2z_memory);
-    s_teardown();
+    RUN_TEST(test_dict_store_to_b2z_memory);
 
     /* b2z tests */
-    mu_run_test(test_dict_store_new_b2z);
-    s_teardown();
+    RUN_TEST(test_dict_store_new_b2z);
 
-    mu_run_test(test_dict_store_set_b2z);
-    s_teardown();
+    RUN_TEST(test_dict_store_set_b2z);
 
-    mu_run_test(test_dict_store_open_b2z);
-    s_teardown();
+    RUN_TEST(test_dict_store_open_b2z);
 
     /* b2d tests */
-    mu_run_test(test_dict_store_new_b2d);
-    s_teardown();
+    RUN_TEST(test_dict_store_new_b2d);
 
-    mu_run_test(test_dict_store_open_b2d);
-    s_teardown();
+    RUN_TEST(test_dict_store_open_b2d);
 
-    mu_run_test(test_dict_store_to_b2z);
-    s_teardown();
+    RUN_TEST(test_dict_store_to_b2z);
 
-    mu_run_test(test_dict_store_to_b2d);
-    s_teardown();
+    RUN_TEST(test_dict_store_to_b2d);
 
-    mu_run_test(test_dict_store_embed);
-    s_teardown();
+    RUN_TEST(test_dict_store_embed);
 
     return EXIT_SUCCESS;
 }
