@@ -201,6 +201,7 @@ list(APPEND SOURCES
     blosc/directories.c
     blosc/blosc2-stdio.c
     blosc/b2nd.c
+    blosc/b2nd-constructors.c
     blosc/b2nd_utils.c
 )
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
@@ -361,6 +362,36 @@ if(COMPILER_SUPPORT_ALTIVEC)
 endif()
 
 # add libraries for dependencies that are not CMake targets
+set(BLOSC2_MINIEXPR_ROOT "" CACHE PATH
+    "Optional prebuilt miniexpr source/install root for b2nd ramp constructors")
+if(BLOSC2_MINIEXPR_ROOT)
+    get_filename_component(_miniexpr_root "${BLOSC2_MINIEXPR_ROOT}"
+        ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
+    find_path(BLOSC2_MINIEXPR_INCLUDE_DIR miniexpr_artifact.h
+        HINTS "${_miniexpr_root}/src" "${_miniexpr_root}/include" REQUIRED)
+    find_library(BLOSC2_MINIEXPR_LIBRARY NAMES miniexpr
+        HINTS "${_miniexpr_root}/build" "${_miniexpr_root}/lib" REQUIRED)
+    find_library(BLOSC2_MINIEXPR_ARTIFACT_LIBRARY NAMES miniexpr_artifact
+        HINTS "${_miniexpr_root}/build" "${_miniexpr_root}/lib" REQUIRED)
+    foreach(_target blosc2_shared blosc2_static blosc_testing)
+        if(TARGET ${_target})
+            target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
+            target_include_directories(${_target} PRIVATE "${BLOSC2_MINIEXPR_INCLUDE_DIR}")
+            target_link_libraries(${_target} PRIVATE
+                "${BLOSC2_MINIEXPR_ARTIFACT_LIBRARY}" "${BLOSC2_MINIEXPR_LIBRARY}"
+                ${CMAKE_DL_LIBS})
+        endif()
+    endforeach()
+    message(STATUS "b2nd ramp constructors: miniexpr backend")
+else()
+    message(STATUS "b2nd ramp constructors: native C backend")
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    set_property(SOURCE b2nd-constructors.c APPEND PROPERTY COMPILE_OPTIONS "-ffp-contract=off")
+elseif(MSVC)
+    set_property(SOURCE b2nd-constructors.c APPEND PROPERTY COMPILE_OPTIONS "/fp:precise")
+endif()
+
 if(BUILD_SHARED)
     target_link_libraries(blosc2_shared PRIVATE ${LIBS})
     target_include_directories(blosc2_shared PRIVATE ${BLOSC_INCLUDE_DIRS})

@@ -4,6 +4,12 @@ Release notes for C-Blosc2
 Changes from 3.8.0 to 3.8.1
 ===========================
 
+* Add `b2nd_linspace()` and `b2nd_arange()` floating-point constructors, with
+  logical C-order generation directly into compressed chunks. Support float32
+  and float64, padded multidimensional layouts, and non-native byte order.
+  Optionally use prebuilt miniexpr ramp kernels via `BLOSC2_MINIEXPR_ROOT`.
+  Update `bench/sum_linspace.c` to use the public b2nd constructor.
+
 * **Zstd 1.6.0** (security). Update the bundled/fetched Zstandard to 1.6.0, which
   fixes CVE-2026-124851 (streaming decompression of malformed data could expose
   uninitialized memory) along with several other memory-safety fixes. Upgrading

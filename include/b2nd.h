@@ -228,6 +228,36 @@ BLOSC_EXPORT int b2nd_nans(b2nd_context_t *ctx, b2nd_array_t **array);
 BLOSC_EXPORT int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void *fill_value);
 
 /**
+ * @brief Create evenly spaced floating-point values in logical C order.
+ *
+ * The number of samples is the product of ctx's shape. With endpoint true,
+ * stop is included (and explicitly stored for more than one sample); otherwise
+ * it is excluded. A zero-sized dimension yields no samples; one sample is start.
+ * A rank-zero context describes one scalar sample.
+ * ctx must specify a NumPy-format float32/float64 dtype with matching typesize.
+ * Parameters and intermediates are doubles, with a final cast to the output
+ * dtype. Non-native byte order is supported. start and stop must be finite.
+ * Storage, filters, codec and threading are taken from ctx without modification.
+ * A user compression prefilter is not supported. No full-array buffer is used.
+ *
+ * @return 0 on success, a negative error code on failure. *array is NULL on
+ * failure. The caller owns the result and frees it with b2nd_free().
+ */
+BLOSC_EXPORT int b2nd_linspace(b2nd_context_t *ctx, b2nd_array_t **array,
+                             double start, double stop, bool endpoint);
+
+/**
+ * @brief Create start + i * step values in logical C order, excluding stop.
+ *
+ * The sequence length max(0, ceil((stop - start) / step)) must equal the product
+ * of ctx's shape. Negative steps are supported. All parameters must be finite,
+ * step must be nonzero, and the quotient must be finite.
+ * Dtypes, storage, ownership and errors follow b2nd_linspace().
+ */
+BLOSC_EXPORT int b2nd_arange(b2nd_context_t *ctx, b2nd_array_t **array,
+                           double start, double stop, double step);
+
+/**
  * @brief Free an array.
  *
  * @param array The array.

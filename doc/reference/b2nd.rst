@@ -43,6 +43,41 @@ Constructors
 .. doxygenfunction:: b2nd_zeros
 .. doxygenfunction:: b2nd_nans
 .. doxygenfunction:: b2nd_full
+.. doxygenfunction:: b2nd_linspace
+.. doxygenfunction:: b2nd_arange
+
+Floating-point sequence constructors
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``b2nd_linspace(ctx, &array, start, stop, endpoint)`` uses the product of the
+context's shape as its sample count. ``b2nd_arange(ctx, &array, start, stop,
+step)`` requires its computed sequence length to match that product; a mismatch
+is an error rather than an implicit reshape. Both fill in logical C order,
+independent of chunk/block layout, and support NumPy-format float32 and float64
+dtypes (including explicit byte order). The context's compression typesize must
+match the dtype. Shape ``{0}`` is empty; rank zero is a scalar.
+
+Parameters and intermediate arithmetic use doubles, followed by a cast to the
+output dtype. Integer/complex outputs and user compression prefilters are not
+supported. The caller's codec, filters, compression level, threading and storage
+settings are preserved. Only chunk/block-sized scratch storage is allocated.
+On error the result pointer is NULL; the context remains reusable. As with
+other storage constructors, a failure after opening persistent storage can leave
+a partial file, which the caller may remove.
+
+These constructors work in ordinary builds without extra dependencies. To use
+miniexpr's ahead-of-time SIMD ramp kernels, configure with
+``-DBLOSC2_MINIEXPR_ROOT=/path/to/miniexpr``. This optional dependency must already
+be built, including ``miniexpr_artifact``; the path may be a source tree with
+libraries under ``build/``, or an installation with headers/libraries under
+``include/`` and ``lib/``. No miniexpr types appear in the public API.
+
+For the billion-element creation/sum benchmark, build the ``sum_linspace``
+target and run ``build/bench/sum_linspace``. It inherits
+``BLOSC2_MINIEXPR_ROOT`` and uses ``b2nd_linspace`` for creation and miniexpr's
+pairwise reduction API for the sum. To benchmark the native C constructors
+instead, leave ``BLOSC2_MINIEXPR_ROOT`` empty and set only
+``-DBENCH_MINIEXPR_ROOT=/path/to/miniexpr``.
 
 From/To buffer
 ~~~~~~~~~~~~~~
