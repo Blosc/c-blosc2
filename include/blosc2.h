@@ -2330,9 +2330,29 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char
  * If the super-chunk is on-disk, the data continues there for a later
  * re-opening.
  *
- * @return 0 if success.
+ * @return 0 if success. If closing or releasing the underlying I/O resources
+ * fails, a non-zero error code is returned (memory resources are still freed).
  */
 BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
+
+/**
+ * @brief Flush pending writes of a super-chunk to persistent storage.
+ *
+ * For a disk-based frame, this synchronizes written data to the underlying
+ * storage (via `fsync()` / `_commit()` or `msync()`) and closes any cached
+ * writable handle so that delayed write errors (such as NFS disk quota
+ * exceeded, `EDQUOT`, or `ENOSPC` reported only on `fsync()`/`close()`) are
+ * detected and returned here rather than being lost when freeing the
+ * super-chunk.
+ *
+ * A no-op returning 0 for in-memory super-chunks, views, and read-only
+ * handles that have not written to the file.
+ *
+ * @param schunk The super-chunk to flush.
+ *
+ * @return 0 on success; a negative error code otherwise.
+ */
+BLOSC_EXPORT int blosc2_schunk_flush(blosc2_schunk *schunk);
 
 /**
  * @brief Append an existing @p chunk to a super-chunk.

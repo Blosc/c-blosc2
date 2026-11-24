@@ -40,6 +40,7 @@
 #include <sys/stat.h>
 #if defined(_WIN32)
 #include <windows.h>
+#include <io.h>
 #include <malloc.h>
 // See https://github.com/Blosc/python-blosc2/issues/359#issuecomment-2625380236
 #define stat _stat64
@@ -50,6 +51,7 @@
 #include <sys/sysmacros.h>
 #endif
 #include <sys/file.h>
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <unistd.h>
 #if !defined(O_CLOEXEC)
@@ -408,11 +410,37 @@ static void frame_reader_adopt(blosc2_frame_s* frame, const blosc2_io* io,
 }
 
 
-/* Drop the cached handle; caller must hold read_fp_mutex.  Returns false when
-   the handle is checked out and @p force is not set, i.e. nothing was closed. */
-static bool frame_reader_close_locked(blosc2_frame_s* frame, bool force) {
+/* Synchronize a stdio FILE* to persistent storage. */
+static int fd_fsync(FILE *file) {
+  if (file == NULL) {
+    return BLOSC2_ERROR_FILE_WRITE;
+  }
+#if defined(_WIN32)
+  int fd = _fileno(file);
+  if (fd < 0 || _commit(fd) != 0) {
+    return BLOSC2_ERROR_FILE_WRITE;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+#else
+  int fd = fileno(file);
+  if (fd < 0) {
+    return BLOSC2_ERROR_FILE_WRITE;
+  }
+  int rc;
+  do {
+    rc = fsync(fd);
+  } while (rc < 0 && errno == EINTR);
+  return rc == 0 ? BLOSC2_ERROR_SUCCESS : BLOSC2_ERROR_FILE_WRITE;
+#endif
+}
+
+
+/* Drop the cached handle; caller must hold read_fp_mutex.  Returns 1 when the
+   handle is checked out and @p force is not set (nothing closed), 0 on success,
+   or a negative error code if closing failed. */
+static int frame_reader_close_locked(blosc2_frame_s* frame, bool force) {
   if (frame->read_fp == NULL) {
-    return true;
+    return BLOSC2_ERROR_SUCCESS;
   }
   if (frame->read_fp_refs > 0 && !force) {
     /* A caller up the stack is reading through it (frame_to_schunk holds it
@@ -421,44 +449,58 @@ static bool frame_reader_close_locked(blosc2_frame_s* frame, bool force) {
        release would then close it a second time.  Leave it: the operation in
        flight finishes on the file it started on, and the next revalidate --
        past that release -- drops it. */
-    return false;
+    return 1;
   }
   /* read_fp only ever comes from the filesystem backend, so close it directly:
      blosc2_get_io_cb() would return NULL after a blosc2_destroy(), and then the
      descriptor would leak while its cache slot got handed back anyway. */
-  blosc2_stdio_close(frame->read_fp);
+  int close_rc = blosc2_stdio_close(frame->read_fp);
   frame->read_fp = NULL;
   frame->read_fp_refs = 0;
 #if !defined(_WIN32)
   reader_cache_return();
 #endif
-  return true;
+  if (close_rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot close the cached frame reader handle.");
+    return BLOSC2_ERROR_FILE_WRITE;
+  }
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 
 /* Drop the cached writable handle (which flushes it on NFS) and forget the file
    size; caller must hold read_fp_mutex.  Writes to a frame are serialized by
    its callers, so no write can be using the handle meanwhile. */
-static void frame_writer_close_locked(blosc2_frame_s* frame) {
+static int frame_writer_close_locked(blosc2_frame_s* frame) {
+  int rc = BLOSC2_ERROR_SUCCESS;
   if (frame->write_fp != NULL) {
     /* Only the filesystem backend ever populates write_fp */
-    blosc2_stdio_close(frame->write_fp);
+    int close_rc = blosc2_stdio_close(frame->write_fp);
     frame->write_fp = NULL;
 #if !defined(_WIN32)
     reader_cache_return();
 #endif
+    if (close_rc != 0) {
+      BLOSC_TRACE_ERROR("Cannot close the cached frame writer handle.");
+      rc = BLOSC2_ERROR_FILE_WRITE;
+    }
   }
   frame->write_fp_stale = false;
   frame->file_end = 0;
+  return rc;
 }
 
 
 /* See frame.h */
-void frame_reader_invalidate(blosc2_frame_s* frame) {
+int frame_reader_invalidate(blosc2_frame_s* frame) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  frame_writer_close_locked(frame);
-  frame_reader_close_locked(frame, true);
+  int w_rc = frame_writer_close_locked(frame);
+  int r_rc = frame_reader_close_locked(frame, true);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  if (w_rc < 0) {
+    return w_rc;
+  }
+  return r_rc < 0 ? r_rc : BLOSC2_ERROR_SUCCESS;
 }
 
 
@@ -543,10 +585,18 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
   const blosc2_io* io = frame->schunk->storage->io;
 #if defined(_WIN32)
   // Same reason as for readers: a cached handle would block unlink/rename
-  return io_cb->open(frame->urlpath, "rb+", io->params);
+  void* fp = io_cb->open(frame->urlpath, "rb+", io->params);
+  if (fp != NULL) {
+    frame->needs_sync = true;
+  }
+  return fp;
 #else
   if (!writer_cacheable(frame, io)) {
-    return io_cb->open(frame->urlpath, "rb+", io->params);
+    void* fp = io_cb->open(frame->urlpath, "rb+", io->params);
+    if (fp != NULL) {
+      frame->needs_sync = true;
+    }
+    return fp;
   }
   // Writes to one frame are serialized by its callers; the mutex only guards
   // against readers flagging the handle stale (and teardown) meanwhile
@@ -560,13 +610,20 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb) {
                   io_cb->open(frame->urlpath, "rb+", io->params));
   }
   void* fp = frame->write_fp;
+  if (fp != NULL) {
+    frame->needs_sync = true;
+  }
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (fp != NULL) {
     return fp;
   }
   // Budget exhausted (or the cached open failed): a private per-call handle,
   // which frame_writer_release() closes
-  return io_cb->open(frame->urlpath, "rb+", io->params);
+  fp = io_cb->open(frame->urlpath, "rb+", io->params);
+  if (fp != NULL) {
+    frame->needs_sync = true;
+  }
+  return fp;
 #endif
 }
 
@@ -590,6 +647,7 @@ static bool frame_writer_adopt(blosc2_frame_s* frame, const blosc2_io* io, void*
   if (adopted) {
     cache_install(&frame->write_fp, &frame->write_fp_dev, &frame->write_fp_ino, fp);
     frame->write_fp_stale = false;
+    frame->needs_sync = true;
     /* Each update reads the header first, and the first read would open the
        file once more for the cached reader (another OPEN, and a CLOSE at the
        end, on NFS).  A duplicate of the writer's descriptor serves as well. */
@@ -611,25 +669,112 @@ static bool frame_writer_adopt(blosc2_frame_s* frame, const blosc2_io* io, void*
 
 
 /* See frame.h */
-void frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp) {
+int frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp) {
   if (fp == NULL) {
-    return;
+    return BLOSC2_ERROR_SUCCESS;
   }
   // write_fp is only ever read under the mutex, as read_fp is
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
   bool is_cached = (fp == frame->write_fp);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
   if (!is_cached) {
-    io_cb->close(fp);
+    if (io_cb->close(fp) != 0) {
+      BLOSC_TRACE_ERROR("Cannot close the frame writer handle.");
+      return BLOSC2_ERROR_FILE_WRITE;
+    }
   }
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 
 /* See frame.h */
-void frame_writer_close(blosc2_frame_s* frame) {
+int frame_writer_close(blosc2_frame_s* frame) {
   blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
-  frame_writer_close_locked(frame);
+  int rc = frame_writer_close_locked(frame);
   blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+  return rc;
+}
+
+
+/* See frame.h */
+int frame_flush(blosc2_frame_s* frame) {
+  if (frame == NULL || frame->cframe != NULL || frame->urlpath == NULL ||
+      frame->schunk == NULL || frame->schunk->storage == NULL ||
+      frame->schunk->storage->io == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  const blosc2_io* io = frame->schunk->storage->io;
+  if (io->id == BLOSC2_IO_FILESYSTEM) {
+    blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+    if (frame->write_fp != NULL) {
+      blosc2_stdio_file* wfp = (blosc2_stdio_file*)frame->write_fp;
+      int sync_rc = fd_fsync(wfp->file);
+      int close_rc = frame_writer_close_locked(frame);
+      if (sync_rc == BLOSC2_ERROR_SUCCESS && close_rc == BLOSC2_ERROR_SUCCESS) {
+        frame->needs_sync = false;
+      }
+      blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+      return sync_rc < 0 ? sync_rc : close_rc;
+    }
+    bool need = frame->needs_sync;
+    blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+    if (need && !frame->sframe) {
+      FILE* f = fopen(frame->urlpath, "rb+");
+      if (f == NULL) {
+        BLOSC_TRACE_ERROR("Cannot open %s for flushing.", frame->urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+      }
+      int sync_rc = fd_fsync(f);
+      int close_rc = (fclose(f) == 0) ? BLOSC2_ERROR_SUCCESS : BLOSC2_ERROR_FILE_WRITE;
+      if (sync_rc < 0) {
+        return sync_rc;
+      }
+      if (close_rc < 0) {
+        BLOSC_TRACE_ERROR("Cannot close %s after flushing.", frame->urlpath);
+        return close_rc;
+      }
+      blosc2_pthread_mutex_lock(&frame->read_fp_mutex);
+      frame->needs_sync = false;
+      blosc2_pthread_mutex_unlock(&frame->read_fp_mutex);
+    }
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  if (io->id == BLOSC2_IO_FILESYSTEM_MMAP) {
+    blosc2_stdio_mmap* mmap_file = (blosc2_stdio_mmap*)io->params;
+    if (mmap_file != NULL && mmap_file->addr != NULL && !mmap_file->is_memory_only) {
+#if defined(_WIN32)
+      if (mmap_file->access_flags == PAGE_READWRITE) {
+        if (!FlushViewOfFile(mmap_file->addr, mmap_file->file_size)) {
+          BLOSC_TRACE_ERROR("Cannot flush the memory-mapped file view.");
+          return BLOSC2_ERROR_FILE_WRITE;
+        }
+        if (mmap_file->fd >= 0 && _commit(mmap_file->fd) != 0) {
+          BLOSC_TRACE_ERROR("Cannot commit the memory-mapped file descriptor.");
+          return BLOSC2_ERROR_FILE_WRITE;
+        }
+      }
+#else
+      if (mmap_file->access_flags & PROT_WRITE) {
+        if (mmap_file->file_size > 0 && msync(mmap_file->addr, mmap_file->file_size, MS_SYNC) < 0) {
+          BLOSC_TRACE_ERROR("Cannot sync the memory-mapped file to disk (error: %s).", strerror(errno));
+          return BLOSC2_ERROR_FILE_WRITE;
+        }
+        if (mmap_file->file != NULL) {
+          int sync_rc = fd_fsync(mmap_file->file);
+          if (sync_rc < 0) {
+            BLOSC_TRACE_ERROR("Cannot fsync the memory-mapped file (error: %s).", strerror(errno));
+            return sync_rc;
+          }
+        }
+      }
+#endif
+    }
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  return BLOSC2_ERROR_SUCCESS;
 }
 
 
@@ -863,19 +1008,19 @@ int frame_unlock(blosc2_frame_s* frame) {
   // Hand our writes over before the next lock holder looks: closing the cached
   // writer is what pushes them to the server on NFS (close-to-open consistency).
   // A no-op unless this handle wrote since it last let go of the lock.
-  frame_writer_close(frame);
+  int close_rc = frame_writer_close(frame);
   if (frame_os_unlock(frame) < 0) {
     BLOSC_TRACE_ERROR("Cannot unlock the frame.");
     return BLOSC2_ERROR_LOCK;
   }
-  return BLOSC2_ERROR_SUCCESS;
+  return close_rc;
 }
 
 
 /* Free memory from a frame. */
 int frame_free(blosc2_frame_s* frame) {
 
-  frame_reader_invalidate(frame);
+  int rc = frame_reader_invalidate(frame);
   blosc2_pthread_mutex_destroy(&frame->read_fp_mutex);
 
   if (frame->locking && frame->lock_fd != -1) {
@@ -901,7 +1046,7 @@ int frame_free(blosc2_frame_s* frame) {
 
   free(frame);
 
-  return 0;
+  return rc;
 }
 
 
@@ -1746,10 +1891,13 @@ int update_frame_len(blosc2_frame_s* frame, int64_t len) {
     int64_t swap_len;
     to_big(&swap_len, &len, sizeof(int64_t));
     int64_t wbytes = io_cb->write(&swap_len, 1, sizeof(int64_t), io_pos, fp);
-    frame_writer_release(frame, io_cb, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
     if (wbytes != sizeof(int64_t)) {
       BLOSC_TRACE_ERROR("Cannot write the frame length in header.");
       return BLOSC2_ERROR_FILE_WRITE;
+    }
+    if (close_rc < 0) {
+      return close_rc;
     }
   }
   return rc;
@@ -1988,7 +2136,11 @@ int frame_update_trailer(blosc2_frame_s* frame, blosc2_schunk* schunk) {
       return BLOSC2_ERROR_FILE_TRUNCATE;
     }
     frame->file_end = trunc_pos;
-    frame_writer_release(frame, io_cb, fp);
+    if (frame_writer_release(frame, io_cb, fp) < 0) {
+      frame->file_end = 0;
+      free(trailer);
+      return BLOSC2_ERROR_FILE_WRITE;
+    }
 
   }
   free(trailer);
@@ -2413,7 +2565,11 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
       rc = BLOSC2_ERROR_FILE_OPEN;
       goto failed;
     }
-    io_cb->write(h2, h2len, 1, io_pos, fp);
+    if (io_cb->write(h2, h2len, 1, io_pos, fp) != 1) {
+      BLOSC_TRACE_ERROR("Cannot write the header to %s.", frame->urlpath);
+      rc = BLOSC2_ERROR_FILE_WRITE;
+      goto failed;
+    }
     io_pos += h2len;
   }
 
@@ -2429,7 +2585,11 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
       if (frame->urlpath == NULL) {
         memcpy(frame->cframe + h2len + coffset, data_chunk, (size_t)chunk_cbytes);
       } else {
-        io_cb->write(data_chunk, chunk_cbytes, 1, io_pos, fp);
+        if (io_cb->write(data_chunk, chunk_cbytes, 1, io_pos, fp) != 1) {
+          BLOSC_TRACE_ERROR("Cannot write chunk %" PRId64 " to %s.", i, frame->urlpath);
+          rc = BLOSC2_ERROR_FILE_WRITE;
+          goto failed;
+        }
         io_pos += chunk_cbytes;
       }
       coffset += chunk_cbytes;
@@ -2448,11 +2608,24 @@ int64_t frame_from_schunk(blosc2_schunk *schunk, blosc2_frame_s *frame) {
   }
   else {
     if (off_cbytes > 0) {
-      io_cb->write(off_chunk, off_cbytes, 1, io_pos, fp);
+      if (io_cb->write(off_chunk, off_cbytes, 1, io_pos, fp) != 1) {
+        BLOSC_TRACE_ERROR("Cannot write offsets chunk to %s.", frame->urlpath);
+        rc = BLOSC2_ERROR_FILE_WRITE;
+        goto failed;
+      }
+    }
+    if (!frame->sframe) {
+      frame->needs_sync = true;
     }
     // Only a handle opened readable above can be adopted
     if (!frame_writer_adopt(frame, io, fp)) {
-      io_cb->close(fp);
+      int close_rc = io_cb->close(fp);
+      fp = NULL;
+      if (close_rc != 0) {
+        BLOSC_TRACE_ERROR("Cannot close the frame file %s.", frame->urlpath);
+        rc = BLOSC2_ERROR_FILE_WRITE;
+        goto failed;
+      }
     }
     fp = NULL;
     // The file was created from scratch, so its size is exactly what we wrote
@@ -2757,8 +2930,17 @@ int frame_update_header(blosc2_frame_s* frame, blosc2_schunk* schunk, bool new) 
       return BLOSC2_ERROR_FILE_OPEN;
     }
     int64_t io_pos = frame->file_offset;
-    io_cb->write(h2, h2len, 1, io_pos, fp);
-    frame_writer_release(frame, io_cb, fp);
+    int64_t wbytes = io_cb->write(h2, h2len, 1, io_pos, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (wbytes != 1) {
+      BLOSC_TRACE_ERROR("Cannot write the header to %s.", frame->urlpath);
+      free(h2);
+      return BLOSC2_ERROR_FILE_WRITE;
+    }
+    if (close_rc < 0) {
+      free(h2);
+      return close_rc;
+    }
   }
   else {
     if (new) {
@@ -4782,10 +4964,13 @@ int64_t frame_fill_special(blosc2_frame_s* frame, int64_t nitems, int special_va
       io_pos = frame->file_offset + header_len + cbytes;
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
     if (wbytes != (size_t)new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FRAME_SPECIAL;
+    }
+    if (close_rc < 0) {
+      return close_rc;
     }
   }
 
@@ -5066,9 +5251,9 @@ void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schu
       }
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
-    if (wbytes != new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (wbytes != new_off_cbytes || close_rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot write or close the offsets in frame.");
       frame->file_end = 0;
       goto failed;
     }
@@ -5469,7 +5654,10 @@ static int fill_from_schunk_unlocked(blosc2_frame_s* frame, blosc2_schunk* schun
   }
   free(off_chunk);
   if (fp != NULL) {
-    frame_writer_release(frame, io_cb, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (rc >= 0 && close_rc < 0) {
+      rc = close_rc;
+    }
   }
   if (rc >= 0) {
     rc = tally_finish(&tally, frame, schunk, header_len + tally.cbytes + off_cbytes + frame->trailer_len);
@@ -5805,9 +5993,9 @@ void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       }
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
-    if (wbytes != new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (wbytes != new_off_cbytes || close_rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot write or close the offsets in frame.");
       frame->file_end = 0;
       goto failed;
     }
@@ -6289,9 +6477,9 @@ void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blo
       io_pos = frame->file_offset + header_len + new_cbytes;
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
-    if (wbytes != new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (wbytes != new_off_cbytes || close_rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot write or close the offsets in frame.");
       frame->file_end = 0;
       goto failed;
     }
@@ -6513,7 +6701,10 @@ static int frame_compact(blosc2_frame_s* frame, blosc2_schunk* schunk) {
 
   out:
   if (fp != NULL) {
-    frame_writer_release(frame, io_cb, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (rc >= 0 && close_rc < 0) {
+      rc = close_rc;
+    }
   }
   free(off_chunk);
   free(offsets);
@@ -6694,9 +6885,9 @@ void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* s
       io_pos = frame->file_offset + header_len + cbytes;
     }
     wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
-    if (wbytes != (size_t)new_off_cbytes) {
-      BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
+    int close_rc = frame_writer_release(frame, io_cb, fp);
+    if (wbytes != (size_t)new_off_cbytes || close_rc < 0) {
+      BLOSC_TRACE_ERROR("Cannot write or close the offsets in frame.");
       goto failed;
     }
     // Invalidate the cache for chunk offsets
@@ -6857,10 +7048,13 @@ int frame_reorder_offsets(blosc2_frame_s* frame, const int64_t* offsets_order, b
       io_pos = frame->file_offset + header_len + cbytes;
     }
     int64_t wbytes = io_cb->write(off_chunk, 1, new_off_cbytes, io_pos, fp);  // the new offsets
-    frame_writer_release(frame, io_cb, fp);
+    int close_rc = frame_writer_release(frame, io_cb, fp);
     if (wbytes != new_off_cbytes) {
       BLOSC_TRACE_ERROR("Cannot write the offsets to frame.");
       return BLOSC2_ERROR_FILE_WRITE;
+    }
+    if (close_rc < 0) {
+      return close_rc;
     }
   }
 

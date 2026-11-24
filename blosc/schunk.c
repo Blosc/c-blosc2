@@ -664,8 +664,8 @@ int64_t frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
   }
   int64_t io_pos = 0;
   int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
-  io_cb->close(fp);
-  if (nitems != 1) {
+  int close_rc = io_cb->close(fp);
+  if (nitems != 1 || close_rc != 0) {
     BLOSC_TRACE_ERROR("Cannot write the frame to %s.", urlpath);
     return BLOSC2_ERROR_FILE_WRITE;
   }
@@ -715,8 +715,8 @@ int64_t append_frame_to_file(blosc2_frame_s* frame, const char* urlpath) {
         return BLOSC2_ERROR_FILE_READ;
     }
     int64_t nitems = io_cb->write(frame->cframe, frame->len, 1, io_pos, fp);
-    io_cb->close(fp);
-    if (nitems != 1) {
+    int close_rc = io_cb->close(fp);
+    if (nitems != 1 || close_rc != 0) {
         BLOSC_TRACE_ERROR("Cannot append the frame to %s.", urlpath);
         return BLOSC2_ERROR_FILE_WRITE;
     }
@@ -853,7 +853,10 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
 
   // If it is a view, the frame belongs to original array and should not be freed
   if (schunk->frame != NULL && !schunk->view) {
-    frame_free((blosc2_frame_s *) schunk->frame);
+    int rc = frame_free((blosc2_frame_s *) schunk->frame);
+    if (rc < 0 && err == 0) {
+      err = rc;
+    }
   }
 
   schunk_free_vlmetalayers(schunk);
@@ -861,6 +864,15 @@ int blosc2_schunk_free(blosc2_schunk *schunk) {
   free(schunk);
 
   return err;
+}
+
+
+int blosc2_schunk_flush(blosc2_schunk *schunk) {
+  BLOSC_ERROR_NULL(schunk, BLOSC2_ERROR_NULL_POINTER);
+  if (schunk->view || schunk->frame == NULL) {
+    return BLOSC2_ERROR_SUCCESS;
+  }
+  return frame_flush((blosc2_frame_s *) schunk->frame);
 }
 
 

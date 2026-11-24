@@ -799,14 +799,24 @@ int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int64_t offset) 
 int b2nd_free(b2nd_array_t *array) {
   BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
 
+  int rc = BLOSC2_ERROR_SUCCESS;
   if (array) {
     if (array->sc != NULL) {
-      blosc2_schunk_free(array->sc);
+      rc = blosc2_schunk_free(array->sc);
+      if (rc > 0) {
+        rc = BLOSC2_ERROR_FAILURE;
+      }
     }
     free(array->dtype);
     free(array);
   }
-  return BLOSC2_ERROR_SUCCESS;
+  return rc;
+}
+
+
+int b2nd_flush(b2nd_array_t *array) {
+  BLOSC_ERROR_NULL(array, BLOSC2_ERROR_NULL_POINTER);
+  return blosc2_schunk_flush(array->sc);
 }
 
 

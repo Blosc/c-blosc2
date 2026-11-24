@@ -232,9 +232,23 @@ BLOSC_EXPORT int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void
  *
  * @param array The array.
  *
- * @return An error code.
+ * @return 0 on success, or a negative error code if freeing the underlying
+ * super-chunk resources fails (the array struct itself is still freed).
  */
 BLOSC_EXPORT int b2nd_free(b2nd_array_t *array);
+
+/**
+ * @brief Flush pending writes of an array to persistent storage.
+ *
+ * Synchronizes written data of an on-disk array and closes any cached writable
+ * handle so delayed I/O errors (such as NFS quota exceeded reported at
+ * `fsync()`/`close()`) are caught explicitly before calling b2nd_free().
+ *
+ * @param array The array to flush.
+ *
+ * @return 0 on success; a negative error code otherwise.
+ */
+BLOSC_EXPORT int b2nd_flush(b2nd_array_t *array);
 
 /**
  * @brief Create a b2nd array from a super-chunk. It can only be used if the array

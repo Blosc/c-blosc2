@@ -95,6 +95,7 @@ typedef struct {
   int64_t nholes;           //!< Number of holes
   int64_t holes_cap;        //!< Capacity of `holes`, in pairs
   bool holes_lost;          //!< Some hole is missing from `holes` (out of memory, or a refresh)
+  bool needs_sync;          //!< Whether the frame has writes not yet flushed with frame_flush()
 } blosc2_frame_s;
 
 
@@ -266,8 +267,10 @@ void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void
  * access reopens it.
  * Unconditional: only for teardown and for write paths that recreate the file,
  * where no read can be in flight.
+ *
+ * @return 0 on success, or a negative error code if closing a handle failed.
  */
-void frame_reader_invalidate(blosc2_frame_s* frame);
+int frame_reader_invalidate(blosc2_frame_s* frame);
 
 /**
  * @brief Drop the cached read handle if it no longer refers to the file at the
@@ -301,14 +304,25 @@ void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb);
 /**
  * @brief Counterpart of frame_writer_acquire(): closes @p fp unless it is the
  * frame's cached writable handle.  Also fine for sframe index handles.
+ *
+ * @return 0 on success, or a negative error code if closing @p fp failed.
  */
-void frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
+int frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
 
 /**
  * @brief Close the frame's cached writable handle, if any, which pushes its
  * writes to the server on NFS (close-to-open consistency).
+ *
+ * @return 0 on success, or a negative error code if closing failed.
  */
-void frame_writer_close(blosc2_frame_s* frame);
+int frame_writer_close(blosc2_frame_s* frame);
+
+/**
+ * @brief Flush pending writes of a disk-based frame to persistent storage.
+ *
+ * @return 0 on success, or a negative error code otherwise.
+ */
+int frame_flush(blosc2_frame_s* frame);
 
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);

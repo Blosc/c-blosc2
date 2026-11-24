@@ -135,9 +135,13 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
   }
   int64_t io_pos = 0;
   int64_t wbytes = io_cb->write(chunk, 1, cbytes, io_pos, fpc);
-  io_cb->close(fpc);
+  int close_rc = io_cb->close(fpc);
   if (wbytes != cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+    return NULL;
+  }
+  if (close_rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot close the chunkfile after writing.");
     return NULL;
   }
 
