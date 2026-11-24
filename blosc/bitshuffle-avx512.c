@@ -82,26 +82,37 @@ int64_t bshuf_trans_bit_byte_AVX512(const void* in, void* out, const size_t size
 
 /* Transpose bits within elements. */
 int64_t bshuf_trans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                                    const size_t elem_size) {
+                                    const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
-  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bit_byte_AVX512(out, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
-  free(tmp_buf);
 
   return count;
 
 }
+
+/* Transpose the 8x8 bit matrix in each 64-bit lane (as TRANS_BIT_8X8). */
+static inline __m512i trans_bit_8x8_AVX512(__m512i x) {
+  __m512i t;
+  t = _mm512_and_si512(_mm512_xor_si512(x, _mm512_srli_epi64(x, 7)),
+                       _mm512_set1_epi64(0x00AA00AA00AA00AALL));
+  x = _mm512_xor_si512(x, _mm512_xor_si512(t, _mm512_slli_epi64(t, 7)));
+  t = _mm512_and_si512(_mm512_xor_si512(x, _mm512_srli_epi64(x, 14)),
+                       _mm512_set1_epi64(0x0000CCCC0000CCCCLL));
+  x = _mm512_xor_si512(x, _mm512_xor_si512(t, _mm512_slli_epi64(t, 14)));
+  t = _mm512_and_si512(_mm512_xor_si512(x, _mm512_srli_epi64(x, 28)),
+                       _mm512_set1_epi64(0x00000000F0F0F0F0LL));
+  x = _mm512_xor_si512(x, _mm512_xor_si512(t, _mm512_slli_epi64(t, 28)));
+  return x;
+}
+
 
 /* Shuffle bits within the bytes of eight element blocks. */
 int64_t bshuf_shuffle_bit_eightelem_AVX512(const void* in, void* out, const size_t size,
@@ -120,7 +131,24 @@ int64_t bshuf_shuffle_bit_eightelem_AVX512(const void* in, void* out, const size
   __m512i zmm;
   __mmask64 bt;
 
-  if (elem_size % 8) {
+  if (elem_size <= 2) {
+    // Each 8-byte word holds the 8 bit rows of 8 one-byte elements, or of
+    // the low or the high bytes of 8 two-byte elements: transposing its
+    // bits gives those bytes.
+    for (ii = 0; ii + 63 < nbyte; ii += 64) {
+      zmm = trans_bit_8x8_AVX512(_mm512_loadu_si512((__m512i *) &in_b[ii]));
+      if (elem_size == 2) {
+        // Each 128-bit lane is [low bytes, high bytes] for ONE group of
+        // eight elements.  Both unpacks intentionally stay within that lane.
+        zmm = _mm512_unpacklo_epi8(zmm, _mm512_unpackhi_epi64(zmm, zmm));
+      }
+      _mm512_storeu_si512((__m512i *) &out_b[ii], zmm);
+    }
+    if (ii < nbyte) {
+      bshuf_shuffle_bit_eightelem_AVX(&in_b[ii], &out_b[ii],
+                                      (nbyte - ii) / elem_size, elem_size);
+    }
+  } else if (elem_size % 8) {
     return bshuf_shuffle_bit_eightelem_AVX(in, out, size, elem_size);
   } else {
     const __m512i mask = _mm512_set1_epi8(0);
@@ -143,20 +171,16 @@ int64_t bshuf_shuffle_bit_eightelem_AVX512(const void* in, void* out, const size
 
 /* Untranspose bits within elements. */
 int64_t bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                                      const size_t elem_size) {
+                                      const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
   count = bshuf_trans_byte_bitrow_AVX(in, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count =  bshuf_shuffle_bit_eightelem_AVX512(tmp_buf, out, size, elem_size);
 
-  free(tmp_buf);
   return count;
 }
 
@@ -168,13 +192,13 @@ const bool is_bshuf_AVX512 = false;
 
 int64_t
 bshuf_trans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                            const size_t elem_size) {
+                            const size_t elem_size, void* tmp_buf) {
   abort();
 }
 
 int64_t
 bshuf_untrans_bit_elem_AVX512(const void* in, void* out, const size_t size,
-                              const size_t elem_size) {
+                              const size_t elem_size, void* tmp_buf) {
   abort();
 }
 

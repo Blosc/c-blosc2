@@ -81,7 +81,21 @@ typedef struct {
   void* read_fp;            //!< Cached "rb" handle for the frame file; NULL if none open
   int32_t read_fp_refs;     //!< Outstanding frame_reader_acquire() calls on read_fp
   bool read_fp_nocache;     //!< The handle cache was full for this frame; do not ask again
-  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp and its bookkeeping
+  uint64_t read_fp_dev;     //!< Device of cached read_fp (POSIX)
+  uint64_t read_fp_ino;     //!< Inode of cached read_fp (POSIX)
+  blosc2_pthread_mutex_t read_fp_mutex;  //!< Guards read_fp, write_fp and their bookkeeping
+  void* write_fp;           //!< Cached "rb+" handle for the frame file; NULL if none open
+  bool write_fp_nocache;    //!< The handle budget was exhausted for this frame; do not ask again
+  bool write_fp_stale;      //!< The file was replaced; the writer reopens it on its next acquire
+  uint64_t write_fp_dev;    //!< Device of cached write_fp (POSIX)
+  uint64_t write_fp_ino;    //!< Inode of cached write_fp (POSIX)
+  int64_t file_end;         //!< Size of the frame file as we last left it; <= 0 if unknown
+  int32_t updates_depth;    //!< Depth of frame_begin_updates(); while > 0, resized chunks leave holes
+  int64_t* holes;           //!< The holes left so far, as (offset, length) pairs
+  int64_t nholes;           //!< Number of holes
+  int64_t holes_cap;        //!< Capacity of `holes`, in pairs
+  bool holes_lost;          //!< Some hole is missing from `holes` (out of memory, or a refresh)
+  bool needs_sync;          //!< Whether the frame has writes not yet flushed with frame_flush()
 } blosc2_frame_s;
 
 
@@ -170,8 +184,13 @@ get_new_storage(const blosc2_storage *storage, const blosc2_cparams *cdefaults, 
                 const blosc2_io *iodefaults);
 
 void* frame_append_chunk(blosc2_frame_s* frame, void* chunk, blosc2_schunk* schunk);
+int frame_fill_from_schunk(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src);
+int64_t frame_fill_alloc(blosc2_frame_s* frame, blosc2_schunk* schunk, blosc2_schunk* src,
+                         uint8_t* (*alloc)(int64_t len, void* user_data), void* user_data);
 void* frame_insert_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
-void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk);
+/* `cbytes_old` is the size of the chunk replaced, as the counters of `schunk` hold it */
+void* frame_update_chunk(blosc2_frame_s* frame, int64_t nchunk, void* chunk, blosc2_schunk* schunk,
+                         int32_t cbytes_old);
 void* frame_delete_chunk(blosc2_frame_s* frame, int64_t nchunk, blosc2_schunk* schunk);
 int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, blosc2_schunk* schunk);
 
@@ -190,6 +209,28 @@ int frame_reorder_offsets(blosc2_frame_s *frame, const int64_t *offsets_order, b
  * @return BLOSC2_ERROR_SUCCESS on success, or a negative error code on failure.
  */
 int frame_move_range(blosc2_io_cb *io_cb, void *fp, int64_t src_pos, int64_t dst_pos, int64_t length, int64_t cap);
+
+/**
+ * @brief Start a sequence of chunk updates of a frame (see blosc2_schunk_begin_updates()).
+ *
+ * Takes the exclusive frame lock (a no-op without locking).  Until the matching
+ * frame_end_updates(), an update that changes the size of a chunk of a contiguous
+ * frame does not move the rest of the payload: the chunk goes into its old place,
+ * together with the free space right before and after it, when it fits there, else
+ * to the end of the payload, and the space left over stays a hole.  Calls nest.
+ *
+ * @return 0 on success, a negative error code otherwise (nothing has started then).
+ */
+int frame_begin_updates(blosc2_frame_s* frame);
+
+/**
+ * @brief End a frame_begin_updates().  The outermost call closes the holes of the
+ * payload in one pass, in which every chunk moves at most once, and releases the lock.
+ *
+ * @return 0 on success, a negative error code if the holes could not be closed (the
+ * lock is released anyway).
+ */
+int frame_end_updates(blosc2_frame_s* frame, blosc2_schunk* schunk);
 
 /**
  * @brief Get an open "rb" handle for the frame file (regular frames only; sframe
@@ -221,25 +262,91 @@ void* frame_reader_acquire(blosc2_frame_s* frame, const blosc2_io* io);
 void frame_reader_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
 
 /**
- * @brief Close the frame's cached read handle, if any.  Call before the frame
- * file is replaced (rather than rewritten in place) so the next read reopens it.
+ * @brief Close the frame's cached read and write handles, if any.  Call before
+ * the frame file is replaced (rather than rewritten in place) so the next
+ * access reopens it.
  * Unconditional: only for teardown and for write paths that recreate the file,
  * where no read can be in flight.
+ *
+ * @return 0 on success, or a negative error code if closing a handle failed.
  */
-void frame_reader_invalidate(blosc2_frame_s* frame);
+int frame_reader_invalidate(blosc2_frame_s* frame);
 
 /**
  * @brief Drop the cached read handle if it no longer refers to the file at the
  * frame's urlpath, i.e. the frame file was unlinked and recreated, or renamed
- * over.  Also sets @p frame->force_refresh so the cached metadata is reloaded
- * even when the replacement happens to have the same length.  Call before any
- * read that the frame's cached state is derived from.  No-op where no handle is
- * cached (Windows, non-filesystem backends, cframes).
+ * over, and flag the cached write handle for reopening in that case.  Also sets
+ * @p frame->force_refresh so the cached metadata is reloaded even when the
+ * replacement happens to have the same length.  Call before any read that the
+ * frame's cached state is derived from.  No-op where no handle is cached
+ * (Windows, non-filesystem backends, cframes).
  */
 void frame_reader_revalidate(blosc2_frame_s* frame);
 
+/**
+ * @brief Get a writable ("rb+") handle on the frame file (regular frames only).
+ * For the filesystem backend on POSIX the handle is opened once and kept until
+ * the frame is freed, its file replaced, or a frame lock released (with
+ * locking on, it is only kept while the lock is held): every
+ * close() of a written file is a synchronous flush on NFS, and a frame update
+ * used to open and close the file four times.  It draws on the same descriptor
+ * budget as the cached read handle (see frame_reader_acquire()), and falls back
+ * to a private per-call handle when that is exhausted.  Other backends and
+ * Windows always get a private per-call handle, as before.
+ *
+ * Writes to one frame must be serialized by the caller.  Give the handle back
+ * with frame_writer_release().
+ *
+ * @return The handle, or NULL if it could not be opened.
+ */
+void* frame_writer_acquire(blosc2_frame_s* frame, const blosc2_io_cb* io_cb);
+
+/**
+ * @brief Counterpart of frame_writer_acquire(): closes @p fp unless it is the
+ * frame's cached writable handle.  Also fine for sframe index handles.
+ *
+ * @return 0 on success, or a negative error code if closing @p fp failed.
+ */
+int frame_writer_release(blosc2_frame_s* frame, const blosc2_io_cb* io_cb, void* fp);
+
+/**
+ * @brief Close the frame's cached writable handle, if any, which pushes its
+ * writes to the server on NFS (close-to-open consistency).
+ *
+ * @return 0 on success, or a negative error code if closing failed.
+ */
+int frame_writer_close(blosc2_frame_s* frame);
+
+/**
+ * @brief Flush pending writes of a disk-based frame to persistent storage.
+ *
+ * @return 0 on success, or a negative error code otherwise.
+ */
+int frame_flush(blosc2_frame_s* frame);
+
 int frame_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
 int frame_get_lazychunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t **chunk, bool *needs_free);
+
+/**
+ * @brief Where chunks nchunks[0..n) of a contiguous frame on disk are in its file: ranges[2 k] and ranges[2 k + 1]
+ * get the position and the size of chunk nchunks[k] (see blosc2_schunk_get_chunk_range()).
+ */
+int frame_get_chunk_ranges(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, int64_t *ranges);
+
+/**
+ * @brief The special value of chunks nchunks[0..n) of a frame: special[k] gets BLOSC2_SPECIAL_ZERO, _UNINIT or
+ * _NAN if the frame codes chunk nchunks[k] in its index instead of storing it, else 0. Reads no chunk data.
+ */
+int frame_get_chunks_special(blosc2_frame_s *frame, const int64_t *nchunks, int64_t n, uint8_t *special);
+
+/**
+ * @brief Copy the header of chunk @p nchunk into @p header, which holds
+ * BLOSC_EXTENDED_HEADER_LENGTH bytes: the same bytes that frame_get_lazychunk()
+ * starts with, for a fraction of the cost where nothing else is needed.
+ *
+ * @return The cbytes of the chunk, or a negative value on error.
+ */
+int frame_get_chunk_header(blosc2_frame_s* frame, int64_t nchunk, uint8_t* header);
 int frame_decompress_chunk(blosc2_context* dctx, blosc2_frame_s* frame, int64_t nchunk,
                            void *dest, int32_t nbytes);
 

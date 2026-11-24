@@ -51,6 +51,11 @@ int main(int argc, char* argv[]) {
 
   /* Open an existing super-chunk that is on-disk (frame). */
   blosc2_schunk* schunk = blosc2_schunk_open(argv[1]);
+  if (schunk == NULL) {
+    fprintf(stderr, "Cannot open the frame in %s\n", argv[1]);
+    blosc2_destroy();
+    return -1;
+  }
 
   data = (char*)malloc(schunk->chunksize);
 

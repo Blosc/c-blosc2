@@ -21,6 +21,7 @@ short).
 .. doxygenfunction:: blosc2_schunk_copy
 .. doxygenfunction:: blosc2_schunk_from_buffer
 .. doxygenfunction:: blosc2_schunk_to_buffer
+.. doxygenfunction:: blosc2_schunk_to_buffer_alloc
 .. doxygenfunction:: blosc2_schunk_to_file
 .. doxygenfunction:: blosc2_schunk_append_file
 
@@ -31,6 +32,10 @@ short).
 .. doxygenfunction:: blosc2_schunk_fill_special
 
 .. doxygenfunction:: blosc2_schunk_append_buffer
+
+.. doxygenfunction:: blosc2_schunk_insert_buffer
+
+.. doxygenfunction:: blosc2_schunk_update_buffer
 
 .. doxygenfunction:: blosc2_schunk_get_slice_buffer
 .. doxygenfunction:: blosc2_schunk_get_sparse_buffer
@@ -48,6 +53,7 @@ Dealing with chunks
 
 .. doxygenfunction:: blosc2_schunk_get_chunk
 .. doxygenfunction:: blosc2_schunk_get_lazychunk
+.. doxygenfunction:: blosc2_schunk_get_chunk_range
 .. doxygenfunction:: blosc2_schunk_get_vlblock
 .. doxygenfunction:: blosc2_schunk_decompress_chunk
 .. doxygenfunction:: blosc2_schunk_append_chunk
@@ -67,6 +73,12 @@ Frame specific functions
 ------------------------
 
 .. doxygenfunction:: blosc2_frame_get_offsets
+
+Batch updates
+-------------
+
+.. doxygenfunction:: blosc2_schunk_begin_updates
+.. doxygenfunction:: blosc2_schunk_end_updates
 
 Locking
 -------

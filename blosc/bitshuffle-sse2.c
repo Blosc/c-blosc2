@@ -23,12 +23,15 @@
 
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
+#include "shuffle-sse2.h"
+#include <string.h>
 #include <stdlib.h>
 
 /* Make sure SSE2 is available for the compilation target and compiler. */
 #if defined(__SSE2__)
 
 #include <emmintrin.h>
+#include "bitshuffle-constant.h"
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -202,7 +205,7 @@ int64_t bshuf_trans_byte_elem_SSE_64(const void* in, void* out, const size_t siz
 
 /* Transpose bytes within elements using the best SSE algorithm available. */
 int64_t bshuf_trans_byte_elem_SSE(const void* in, void* out, const size_t size,
-                                  const size_t elem_size) {
+                                  const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
@@ -232,8 +235,6 @@ int64_t bshuf_trans_byte_elem_SSE(const void* in, void* out, const size_t size,
   // Multiple of power of 2: transpose hierarchically.
   {
     size_t nchunk_elem;
-    void* tmp_buf = malloc(size * elem_size);
-    if (tmp_buf == NULL) return -1;
 
     if ((elem_size % 8) == 0) {
       nchunk_elem = elem_size / 8;
@@ -256,7 +257,6 @@ int64_t bshuf_trans_byte_elem_SSE(const void* in, void* out, const size_t size,
       bshuf_trans_elem(tmp_buf, out, 2, nchunk_elem, size);
     }
 
-    free(tmp_buf);
     return count;
   }
 }
@@ -269,7 +269,6 @@ int64_t bshuf_trans_bit_byte_SSE(const void* in, void* out, const size_t size,
   size_t ii, kk;
   const char* in_b = (const char*) in;
   char* out_b = (char*) out;
-  uint16_t* out_ui16;
 
   int64_t count;
 
@@ -280,13 +279,15 @@ int64_t bshuf_trans_bit_byte_SSE(const void* in, void* out, const size_t size,
   __m128i xmm;
   int32_t bt;
 
-  for (ii = 0; ii + 15 < nbyte; ii += 16) {
+  ii = bshuf_emit_constant_prefix(in, out, nbyte);
+  if (ii == nbyte) return nbyte;
+  for (; ii + 15 < nbyte; ii += 16) {
     xmm = _mm_loadu_si128((__m128i *) &in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
       bt = _mm_movemask_epi8(xmm);
       xmm = _mm_slli_epi16(xmm, 1);
-      out_ui16 = (uint16_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
-      *out_ui16 = bt;
+      uint16_t bits = (uint16_t)bt;
+      memcpy(out_b + ((7 - kk) * nbyte + ii) / 8, &bits, sizeof(bits));
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -297,22 +298,31 @@ int64_t bshuf_trans_bit_byte_SSE(const void* in, void* out, const size_t size,
 
 /* Transpose bits within elements. */
 int64_t bshuf_trans_bit_elem_SSE(const void* in, void* out, const size_t size,
-                                 const size_t elem_size) {
+                                 const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
-  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  if ((elem_size == 1 || elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    const uint8_t* bytes = (const uint8_t*)in;
+    if (elem_size != 1) {
+      shuffle_sse2((int32_t)elem_size, (int32_t)(size * elem_size), in, tmp_buf);
+      bytes = (const uint8_t*)tmp_buf;
+    }
+    /* Bit rows of each byte plane are already in their final wire order. */
+    for (size_t j = 0; j < elem_size; ++j) {
+      count = bshuf_trans_bit_byte_SSE(bytes + j * size, (uint8_t*)out + j * size, size, 1);
+      CHECK_ERR(count);
+    }
+    return size * elem_size;
+  }
+  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bit_byte_SSE(out, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
-  free(tmp_buf);
 
   return count;
 }
@@ -320,8 +330,11 @@ int64_t bshuf_trans_bit_elem_SSE(const void* in, void* out, const size_t size,
 
 /* For data organized into a row for each bit (8 * elem_size rows), transpose
  * the bytes. */
-int64_t bshuf_trans_byte_bitrow_SSE(const void* in, void* out, const size_t size,
-                                    const size_t elem_size) {
+static inline __m128i trans_bit_8x8_SSE(__m128i x);
+
+/* transpose_bits is only true for a single byte plane (elem_size == 1). */
+static int64_t trans_byte_bitrow_SSE(const void* in, void* out, const size_t size,
+                                     const size_t elem_size, const bool transpose_bits) {
 
   size_t ii, jj;
   const char* in_b = (const char*) in;
@@ -381,6 +394,15 @@ int64_t bshuf_trans_byte_bitrow_SSE(const void* in, void* out, const size_t size
       g1 = _mm_unpacklo_epi32(g0, h0);
       h1 = _mm_unpackhi_epi32(g0, h0);
 
+      if (transpose_bits) {
+#define STORE_BYTES(v, k) _mm_storeu_si128((__m128i*)(out_b + (jj + (k)) * 8), trans_bit_8x8_SSE(v))
+        STORE_BYTES(a1, 0); STORE_BYTES(b1, 2);
+        STORE_BYTES(c1, 4); STORE_BYTES(d1, 6);
+        STORE_BYTES(e1, 8); STORE_BYTES(f1, 10);
+        STORE_BYTES(g1, 12); STORE_BYTES(h1, 14);
+#undef STORE_BYTES
+        continue;
+      }
       // We don't have a storeh instruction for integers, so interpret
       // as a float. Have a storel (_mm_storel_epi64).
       as = (__m128 *) &a1;
@@ -419,9 +441,40 @@ int64_t bshuf_trans_byte_bitrow_SSE(const void* in, void* out, const size_t size
       out_b[jj * nrows + ii + 5] = in_b[(ii + 5)*nbyte_row + jj];
       out_b[jj * nrows + ii + 6] = in_b[(ii + 6)*nbyte_row + jj];
       out_b[jj * nrows + ii + 7] = in_b[(ii + 7)*nbyte_row + jj];
+      if (transpose_bits) {
+        uint64_t x, t;
+        memcpy(&x, out_b + jj * 8, 8);
+        TRANS_BIT_8X8(x, t);
+        memcpy(out_b + jj * 8, &x, 8);
+      }
     }
   }
   return size * elem_size;
+}
+
+int64_t bshuf_trans_byte_bitrow_SSE(const void* in, void* out, const size_t size,
+                                  const size_t elem_size) {
+  return trans_byte_bitrow_SSE(in, out, size, elem_size, false);
+}
+
+/* Decode one byte plane without materializing the transposed bit rows. */
+int64_t bshuf_untrans_bit_byte_SSE(const void* in, void* out, const size_t size) {
+  return trans_byte_bitrow_SSE(in, out, size, 1, true);
+}
+
+/* Transpose the 8x8 bit matrix in each 64-bit lane (as TRANS_BIT_8X8). */
+static inline __m128i trans_bit_8x8_SSE(__m128i x) {
+  __m128i t;
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 7)),
+                    _mm_set1_epi64x(0x00AA00AA00AA00AALL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 7)));
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 14)),
+                    _mm_set1_epi64x(0x0000CCCC0000CCCCLL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 14)));
+  t = _mm_and_si128(_mm_xor_si128(x, _mm_srli_epi64(x, 28)),
+                    _mm_set1_epi64x(0x00000000F0F0F0F0LL));
+  x = _mm_xor_si128(x, _mm_xor_si128(t, _mm_slli_epi64(t, 28)));
+  return x;
 }
 
 
@@ -434,6 +487,7 @@ int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t 
   // With a bit of care, this could be written such that such that it is
   // in_buf = out_buf safe.
   const char* in_b = (const char*) in;
+  char* out_b = (char*) out;
   uint16_t* out_ui16 = (uint16_t*) out;
 
   size_t ii, jj, kk;
@@ -442,7 +496,23 @@ int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t 
   __m128i xmm;
   int32_t bt;
 
-  if (elem_size % 2) {
+  if (elem_size <= 2) {
+    // Each 8-byte word holds the 8 bit rows of 8 one-byte elements, or of
+    // the low or the high bytes of 8 two-byte elements: transposing its
+    // bits gives those bytes.
+    for (ii = 0; ii + 15 < nbyte; ii += 16) {
+      xmm = trans_bit_8x8_SSE(_mm_loadu_si128((__m128i *) &in_b[ii]));
+      if (elem_size == 2) {
+        // interleave the low bytes (first word) and high bytes (second word)
+        xmm = _mm_unpacklo_epi8(xmm, _mm_unpackhi_epi64(xmm, xmm));
+      }
+      _mm_storeu_si128((__m128i *) &out_b[ii], xmm);
+    }
+    if (ii < nbyte) {
+      bshuf_shuffle_bit_eightelem_scal(&in_b[ii], &out_b[ii],
+                                       (nbyte - ii) / elem_size, elem_size);
+    }
+  } else if (elem_size % 2) {
     bshuf_shuffle_bit_eightelem_scal(in, out, size, elem_size);
   } else {
     for (ii = 0; ii + 8 * elem_size - 1 < nbyte;
@@ -464,20 +534,24 @@ int64_t bshuf_shuffle_bit_eightelem_SSE(const void* in, void* out, const size_t 
 
 /* Untranspose bits within elements. */
 int64_t bshuf_untrans_bit_elem_SSE(const void* in, void* out, const size_t size,
-                                   const size_t elem_size) {
+                                   const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
+  if (elem_size == 1) return bshuf_untrans_bit_byte_SSE(in, out, size);
+  if ((elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    for (size_t j = 0; j < elem_size; ++j) {
+      bshuf_untrans_bit_byte_SSE((const uint8_t*)in + j * size, (uint8_t*)tmp_buf + j * size, size);
+    }
+    unshuffle_sse2((int32_t)elem_size, (int32_t)(size * elem_size), tmp_buf, out);
+    return size * elem_size;
+  }
   count = bshuf_trans_byte_bitrow_SSE(in, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count =  bshuf_shuffle_bit_eightelem_SSE(tmp_buf, out, size, elem_size);
-
-  free(tmp_buf);
 
   return count;
 }
@@ -488,15 +562,19 @@ const bool is_bshuf_SSE = true;
 
 const bool is_bshuf_SSE = false;
 
+int64_t bshuf_untrans_bit_byte_SSE(const void* in, void* out, const size_t size) {
+  abort();
+}
+
 int64_t
 bshuf_trans_bit_elem_SSE(const void* in, void* out, const size_t size,
-                         const size_t elem_size) {
+                         const size_t elem_size, void* tmp_buf) {
   abort();
 }
 
 int64_t
 bshuf_untrans_bit_elem_SSE(const void* in, void* out, const size_t size,
-                           const size_t elem_size) {
+                           const size_t elem_size, void* tmp_buf) {
   abort();
 }
 

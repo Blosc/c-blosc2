@@ -10,6 +10,7 @@
 
 #include "frame.h"
 #include "blosc2.h"
+#include "blosc-checked.h"
 
 #include <inttypes.h>
 #include <limits.h>
@@ -29,18 +30,19 @@
 static char* sframe_make_index_path(const char* urlpath) {
   size_t path_len = strlen(urlpath);
   size_t suffix_len = strlen("/chunks.b2frame");
-  if (path_len > SIZE_MAX - suffix_len - 1) {
+  size_t total_len;
+  if (!blosc2_checked_add_size(path_len, suffix_len + 1, &total_len)) {
     BLOSC_TRACE_ERROR("Index path length overflows size limits");
     return NULL;
   }
 
-  char* index_path = malloc(path_len + suffix_len + 1);
+  char* index_path = malloc(total_len);
   if (index_path == NULL) {
     return NULL;
   }
 
-  int written = snprintf(index_path, path_len + suffix_len + 1, "%s/chunks.b2frame", urlpath);
-  if (written < 0 || (size_t)written >= path_len + suffix_len + 1) {
+  int written = snprintf(index_path, total_len, "%s/chunks.b2frame", urlpath);
+  if (written < 0 || (size_t)written >= total_len) {
     BLOSC_TRACE_ERROR("Error building index path");
     free(index_path);
     return NULL;
@@ -59,12 +61,12 @@ static char* sframe_make_chunk_path(const char* urlpath, int64_t nchunk) {
   size_t path_len = strlen(urlpath);
   size_t suffix_len = strlen("/.chunk");
   size_t chunk_hex_len = 8;
-  if (path_len > SIZE_MAX - suffix_len - chunk_hex_len - 1) {
+  size_t total_len;
+  if (!blosc2_checked_add_size(path_len, suffix_len + chunk_hex_len + 1, &total_len)) {
     BLOSC_TRACE_ERROR("Chunk path length overflows size limits");
     return NULL;
   }
 
-  size_t total_len = path_len + suffix_len + chunk_hex_len + 1;
   char* chunk_path = malloc(total_len);
   if (chunk_path == NULL) {
     return NULL;
@@ -133,9 +135,13 @@ void* sframe_create_chunk(blosc2_frame_s* frame, uint8_t* chunk, int64_t nchunk,
   }
   int64_t io_pos = 0;
   int64_t wbytes = io_cb->write(chunk, 1, cbytes, io_pos, fpc);
-  io_cb->close(fpc);
+  int close_rc = io_cb->close(fpc);
   if (wbytes != cbytes) {
     BLOSC_TRACE_ERROR("Cannot write the full chunk.");
+    return NULL;
+  }
+  if (close_rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot close the chunkfile after writing.");
     return NULL;
   }
 
@@ -227,17 +233,22 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
   }
 
   int64_t chunk_cbytes = io_cb->size(fpc);
-  if (chunk_cbytes < BLOSC_MIN_HEADER_LENGTH) {
+  if (chunk_cbytes < BLOSC_MIN_HEADER_LENGTH || chunk_cbytes > INT32_MAX) {
     // A valid chunk file always starts with a Blosc header; a smaller (e.g. empty)
     // file means the on-disk state changed under us (another handle replaced this
     // chunk) or the file is corrupted.  Fail the same way as frame_get_lazychunk().
-    BLOSC_TRACE_ERROR("Chunkfile is too small to contain a valid chunk.");
+    BLOSC_TRACE_ERROR("Chunkfile is too small or too large to contain a valid chunk.");
     io_cb->close(fpc);
     return BLOSC2_ERROR_FILE_READ;
   }
 
   if (io_cb->is_allocation_necessary) {
     *chunk = malloc((size_t)chunk_cbytes);
+    if (*chunk == NULL) {
+      BLOSC_TRACE_ERROR("Cannot allocate memory for chunk.");
+      io_cb->close(fpc);
+      return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
     *needs_free = true;
   }
   else {
@@ -249,8 +260,26 @@ int32_t sframe_get_chunk(blosc2_frame_s* frame, int64_t nchunk, uint8_t** chunk,
   io_cb->close(fpc);
   if (rbytes != chunk_cbytes) {
     BLOSC_TRACE_ERROR("Cannot read the chunk out of the chunkfile.");
+    if (*needs_free) {
+      free(*chunk);
+      *chunk = NULL;
+      *needs_free = false;
+    }
     return BLOSC2_ERROR_FILE_READ;
   }
 
-  return (int32_t)chunk_cbytes;
+  // The chunk header must not claim more bytes than the chunkfile holds
+  int32_t header_cbytes;
+  int rc = blosc2_cbuffer_sizes(*chunk, NULL, &header_cbytes, NULL);
+  if (rc < 0 || header_cbytes > chunk_cbytes) {
+    BLOSC_TRACE_ERROR("Invalid chunk size in chunkfile for chunk %" PRId64 ".", nchunk);
+    if (*needs_free) {
+      free(*chunk);
+      *chunk = NULL;
+      *needs_free = false;
+    }
+    return rc < 0 ? rc : BLOSC2_ERROR_INVALID_HEADER;
+  }
+
+  return header_cbytes;
 }

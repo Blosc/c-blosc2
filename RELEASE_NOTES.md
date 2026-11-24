@@ -1,10 +1,497 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.3.5 to 3.3.6
+Changes from 3.8.0 to 3.8.1
 ===========================
 
-#XXX version-specific blurb XXX#
+* **Zstd 1.6.0** (security). Update the bundled/fetched Zstandard to 1.6.0, which
+  fixes CVE-2026-124851 (streaming decompression of malformed data could expose
+  uninitialized memory) along with several other memory-safety fixes. Upgrading
+  is highly recommended. Zstd now disables legacy format support by default.
+
+Changes from 3.7.0 to 3.8.0
+===========================
+
+* **BloscLZ 2.7.0**. Major compression and decompression speedups on x86-64
+  (SSE2/SSSE3/AVX2) and ARM64 (NEON): 6-byte hashing, bounded head/tail probe,
+  low-level hash table floor, early-exit entropy probe, exponential skip ramp,
+  hoisted prevhash, backward match extension, bulk literal copies, NEON match
+  and run detection (also in `get_run()`), 2/4-byte pattern broadcast, and
+  `pshufb`/NEON fast match copying.
+* **Faster fused SHUFFLE+BYTEDELTA**. Add AVX2 implementation, optimize x86-64
+  SSE2/SSSE3/AVX2 backward paths, accelerate ARM64 NEON backward decoding with
+  record-parallel prefix sums, add a zero-high-planes fast path, and fix
+  missing `shuffle_bytedelta_neon_*` symbols on non-Apple ARM64 builds (#883).
+* **Lower threading and hot-path overhead**. Run worker `tid 0` directly on the
+  calling thread, spawn `nthreads - 1` workers in the shared thread pool, skip
+  redundant wakeups, guard the POSIX shared thread pool under `!_WIN32` for
+  MSVC, reuse thread-local scratch buffers in `schunk_compress_store()`, remove
+  hot-path `BLOSC_TRACE_INFO` calls in the disposable prefilter loop, and use
+  `clock_gettime()` on macOS while skipping unused compression timestamps.
+* **ZFP buffer bounds fix and build option**. Check compressed size against
+  `output_len` (and reject `output_len <= 0`) before copying in
+  `zfp_acc_compress`, `zfp_prec_compress`, and `zfp_rate_compress`, fixing a
+  heap buffer overflow especially visible with 8-bit ZFP bitstream word size
+  (#887, #888). Add `PREFER_EXTERNAL_ZFP` CMake option for parity with
+  `PREFER_EXTERNAL_{LZ4,ZLIB,ZSTD}` (#886).
+* **Portability fixes**. Mark `print_error()` in `include/blosc2.h` as
+  `static inline` so unoptimized GCC builds of shared libraries/plugins do not
+  emit spurious undefined `_blosc2_error_string` references (#884). Fall back
+  to `dup()` + `FD_CLOEXEC` in `frame.c` and `prefetch.c` when
+  `F_DUPFD_CLOEXEC` is unavailable at compile time or rejected with `EINVAL` at
+  runtime (#885).
+
+Changes from 3.6.2 to 3.7.0
+===========================
+
+* **Faster shuffle and bitshuffle**. Speed up shuffle and unshuffle for 2-, 4-,
+  8-, and 16-byte elements on NEON, SSE2, and AVX2. Accelerate bitshuffle and
+  bitunshuffle with SIMD, including a bitshuffle fast path for constant
+  byte-plane prefixes. Enable fused SHUFFLE+BYTEDELTA by default and extend
+  it to SSSE3 and 2-byte groups.
+* **BloscLZ 2.6.0**. Improve match finding on periodic filtered data, reuse
+  worker-local hash tables, and enable decoder fast paths on ARM64 and AMD64.
+* **Less worker setup and synchronization**. Reuse compression state for
+  independent blocks with bundled LZ4, and claim the next block while reserving
+  compressed output to reduce scheduler lock acquisitions.
+* **Full-write prefilters**. The new `blosc2_set_prefilter_full_write()` lets a
+  compression context skip zero-initializing prefilter output when the callback
+  writes every byte it returns, including padding. Existing prefilters still
+  receive zeroed output by default. B2ND slice gathering uses the opt-in for
+  fully overwritten blocks.
+* **Safer chunk decoding**. Validate the stored size of special-value chunks
+  against the supplied buffer even when the lazy flag is set (#881). Size
+  worker scratch buffers for both the block size and element width, and handle
+  allocation failures so later jobs can retry (#882).
+
+Changes from 3.6.1 to 3.6.2
+===========================
+
+* Update bundled LZ4 from 1.10.0 to 1.11.1.
+
+Changes from 3.6.0 to 3.6.1
+===========================
+
+This is a bugfix and performance release that optimizes read-ahead prefetching
+for memory-mapped frames on GPFS (IBM Storage Scale), avoiding page faults by
+populating mappings with `madvise(MADV_POPULATE_READ)` on Linux.
+
+* **Prefetching on GPFS via memory mapping population**: For frames read through
+  the mmap I/O backend (`BLOSC2_IO_FILESYSTEM_MMAP`) on GPFS, read-ahead threads now
+  populate the mapping directly using `madvise(MADV_POPULATE_READ)` (Linux >= 5.14)
+  instead of `read()`. Because GPFS caches read data in its internal pagepool rather
+  than the kernel page cache, populating the mapping avoids costly page faults and
+  speeds up multi-dimensional slice reads by 1.10x–1.34x (#880).
+
+* **Cached filesystem type checks**: Filesystem type queries via `statx()` are now
+  cached per thread across the last 4 accessed devices. This avoids redundant
+  `fstatfs()` RPC roundtrips to servers on remote filesystems such as NFS, preventing
+  I/O latency regressions on cached patch reads (#880).
+
+* **Kernel `MADV_POPULATE_READ` runtime detection**: Added a one-time per-process probe
+  to verify kernel support for `MADV_POPULATE_READ`. When unsupported (Linux < 5.14),
+  read-ahead threads safely fall back to reading chunks without issuing superfluous
+  page-cache queries via `cachestat()` (#880).
+
+* **New `BLOSC_PREFETCH_POPULATE` environment variable**: Setting
+  `BLOSC_PREFETCH_POPULATE=1` forces memory-mapped frame prefetching to populate
+  mappings via `madvise(MADV_POPULATE_READ)` across all filesystems, while `0`
+  disables it completely (#880).
+
+* **Fixed test build under Clang on Linux**: Defined `_GNU_SOURCE` in
+  `tests/b2nd/test_b2nd_prefetch.c` so `madvise()` is exposed when building with Clang
+  under `-D_XOPEN_SOURCE=600` (#880).
+
+Changes from 3.5.0 to 3.6.0
+===========================
+
+This minor release delivers significant improvements across robustness, concurrency,
+multiprocess safety, and performance. Highlights include full fork() safety for shared
+thread pools and reader caches, race-free lazy initialization of the library and plugins,
+hardening of frame parsing and orthogonal selections against corrupt or malicious inputs,
+consistent frame serialization preserving stored chunks across all storage layouts,
+a new b2nd sub-box slice extraction API (`b2nd_get_slice_cbuffer_into()`), and widespread
+SIMD and memory-allocation optimizations.
+
+* **New public APIs**:
+  - `b2nd_get_slice_cbuffer_into()`: Extracts an ND slice directly
+    into a sub-box of an existing, larger C-order destination buffer (e.g. for batch slots,
+    padded arrays, or multi-channel buffers) without zeroing surrounding memory or allocating
+    temporaries (#845).
+  - `blosc2_schunk_insert_buffer()` and `blosc2_schunk_update_buffer()`: Insert or update
+    uncompressed data into a super-chunk directly, reusing the calling thread's compression
+    buffers instead of allocating per-chunk temporaries (#868).
+  - `blosc2_schunk_begin_updates()` and `blosc2_schunk_end_updates()`: Bracket multiple chunk
+    modifications into a single atomic pass, taking an exclusive lock and compacting any freed
+    frame space in one efficient pass (#858).
+
+* **Behaviour change: serializing keeps the chunks as stored, also with a
+  postfilter.**  `blosc2_schunk_to_buffer()`, `blosc2_schunk_to_buffer_alloc()`,
+  `blosc2_schunk_to_file()`, `blosc2_schunk_append_file()`, `b2nd_to_cframe()`,
+  `b2nd_save()` and `b2nd_save_append()` now write the chunks as they are stored
+  for every storage.  Before, they wrote the postfilter's output for a
+  super-chunk with a postfilter unless it was an in-memory contiguous frame
+  (`b2nd_save()` always did), so the result depended on the storage and the
+  function, and setting the postfilter again on the loaded super-chunk applied
+  it twice.  Code that loads such a frame without setting the postfilter again
+  now reads the stored values instead of the postfiltered ones.  To serialize
+  the postfiltered values, serialize a `blosc2_schunk_copy()` (or `b2nd_copy()`)
+  of the super-chunk, which applies the postfilter as before (except for
+  super-chunks with variable-length blocks, whose chunks are always copied as
+  they are).  Super-chunks without filters give the same frames as before, and
+  with a prefilter or a postfilter, serializing no longer decompresses and
+  recompresses every chunk, which makes it much faster (#858).
+
+* **Robustness & Frame Validation**:
+  - Fixed a critical out-of-bounds indexing and buffer validation vulnerability in
+    `b2nd_get_orthogonal_selection()` and `b2nd_set_orthogonal_selection()`. Negative
+    indices and indices equal to array shape are now rejected, and buffer dimensions
+    and sizes are properly validated against stride overflows (#864).
+  - Prevented segmentation faults (SEGV) when copying damaged frames where chunk loading
+    aborts mid-way: chunk pointers are now calloc'd and checked so the error path
+    frees only allocated chunks (#869).
+  - Hardened frame reading against corrupted/damaged files: fixed improper freeing
+    of mmap buffers in `read_lazy_chunk_bytes()`, prevented NULL pointer dereferences
+    in `frame_get_lazychunk()` on incomplete reads, validated block sizes against chunk
+    bounds, checked for 64-bit stride arithmetic overflows, and rejected b2nd metalayers
+    that contradict super-chunk chunk counts (#871).
+  - Prevented null-pointer dereferences and crashes when dynamically loading broken
+    or incomplete filter, codec, or tuner plugins (#873).
+  - Fixed resource leaks on error paths of `blosc2_create_cctx()` and
+    `blosc2_create_dctx()`: contexts, preparams, postparams, and mutexes are now
+    reliably freed when initialization fails (#868).
+  - Isolated variable-length metalayer (`vlmetalayer`) contents from compression/decompression
+    filters: prefilters and postfilters now run only on user chunk data, never modifying
+    metalayers (#857).
+
+* **Concurrency, Thread Safety & Fork Safety**:
+  - Initialized the library and dynamic plugins in a thread-safe manner, eliminating races,
+    deadlocks, and segfaults when worker threads make their first Blosc calls concurrently without
+    prior `blosc2_init()`: `blosc2_init()`, `blosc2_destroy()`, and `fork()` now synchronize under
+    a statically initialized lock with acquire/release barriers, dynamic plugins are loaded exactly
+    once under a plugin lock, and `blosc2_list_compressors()` returns an immutable compile-time
+    constant (#875).
+  - Ensured thread-safe lazy initialization of shuffle/bitshuffle implementations across
+    multiple threads using `pthread_once()` / `InitOnceExecuteOnce()` (#872).
+  - Added full fork() safety for shared thread pools: child processes cleanly abandon parent
+    thread pools and start with an empty registry and new epoch, preventing hangs or crashes
+    when workers are accessed in forked children (#852).
+  - Synchronized reader cache access across `fork()`: reader cache lock is held across `fork()`
+    to prevent handle corruption in parent and child processes (#852).
+  - Isolated read-ahead threads per slice: each concurrent slice read receives its own share
+    of prefetch threads, avoiding worker thread starvation (#854).
+  - Cached unused thread pools across context destructions in `release_thread_backend()`
+    (retaining up to 2 pools), eliminating repeated thread spawn/join overhead in workloads
+    using short-lived contexts such as single-call Python decompressions (#865).
+  - Resolved a lock contention regression introduced in 3.5.0 in `parallel_blosc()`:
+    workers are now woken with `pthread_cond_broadcast()` after unlocking the pool mutex,
+    restoring multi-threaded scaling on small workloads with few blocks (#878).
+  - Dropped unused `idle_cv` condition variable in shared thread pools to eliminate a
+    ThreadSanitizer data race (#859).
+
+* **Performance & SIMD Optimizations**:
+  - Accelerated run-length detection in `get_run()` by comparing 64 bytes per iteration
+    with SSE2 and ARM NEON intrinsics, yielding 5.5%–8% faster compression on repetitive
+    data while eliminating an unaligned pointer cast (#874).
+  - Vectorized the final transposition step of bitunshuffle for 1-byte and 2-byte
+    elements using AVX-512, AVX2, and SSE2 bit-matrix transpositions, accelerating
+    bitunshuffle for small element sizes (#867).
+  - Optimized bitshuffle memory usage by reusing the thread context scratch buffer (`tmp4`)
+    instead of allocating and freeing a temporary buffer per block, eliminating heap trimming
+    and minor page faults (#860).
+  - Merged contiguous trailing dimensions in orthogonal selection copies (`copy_block_buffer_data()`),
+    accelerating channels-last image selections (e.g. `(1, 128, 128, 3)` uint8 blocks) by ~4.7x (#861).
+  - Merged contiguous dimensions in b2nd box copies (`b2nd_copy_buffer2()`) and zeroing
+    (`b2nd_zero_box()`), replacing multidimensional loops with single `memcpy`/`memset` runs (#851).
+  - Accelerated short row copies in `b2nd_copy_buffer2()`: rows up to 64 bytes are copied
+    with fixed-size moves without `memcpy()` overhead, unified across up to 16 dimensions (#846).
+  - Skipped decompression of zero and uninitialized special chunks in b2nd slice reads, directly
+    zeroing destination boxes (or entire slice with `memset` when >= 25% zeros) (#844).
+  - Improved slice memory efficiency in `b2nd_get_slice()` by reusing the thread-local
+    scratch buffer (`blosc2_tmp_malloc`/`blosc2_tmp_free`), avoiding repeated malloc/free
+    cycles and glibc page fault thrashing (#866).
+  - Kept serial `thread_context` per OS thread instead of reallocating it per context (#849).
+  - Reused chunk compression buffers across writes in `compress_chunks_into_frame()` (#850).
+  - Closed frame slice holes once across the entire write instead of per chunk (#847).
+  - Optimized prefetch cache checking: check only needed blocks of partly read chunks for
+    page-cache residency, eliminating residency check overhead for cached slices (#862).
+  - Streamlined frame file opening: open with `fstat()` to avoid `SEEK_END` seeks, request
+    head and tail hints upon opening with prefetch, and skip advisory start hints on unmapped
+    stdio frame files (#853, #877).
+
+* **Documentation & Examples**:
+  - Added examples demonstrating `blosc2_schunk_insert_buffer()` and `blosc2_schunk_update_buffer()` (#855).
+  - Added examples demonstrating `blosc2_schunk_begin_updates()` and `blosc2_schunk_end_updates()` (#856).
+  - Documented open-time hints in `blosc2_set_prefetch()` (#853).
+
+Changes from 3.4.1 to 3.5.0
+===========================
+
+This minor release introduces new APIs and delivers major performance enhancements,
+particularly for frame slicing, serialization, read-ahead prefetching, and I/O
+handling on local disks and NFS, alongside bug and leak fixes.
+
+* Open frames through Windows file symlinks even when CRT path metadata reports
+  a zero size; validate and cache the size of the opened target instead.
+
+* **Read-ahead for slices of frames on disk**, off by default: with
+  `blosc2_set_prefetch(nthreads, max_ahead, piece_size)` (or the
+  `BLOSC_PREFETCH` environment variable), `b2nd_get_slice_cbuffer()`,
+  `b2nd_get_slice()`, `b2nd_get_orthogonal_selection()` and
+  `blosc2_schunk_get_slice_buffer()` read the chunks a slice needs and that
+  are not in the page cache with a few background threads, in pieces of at
+  most `piece_size` bytes (1 MiB by default) and in the order they decompress
+  them, at most `max_ahead` bytes ahead, and decompress each chunk as soon as
+  it is in.  Of chunks that a slice of an array covers only in part, only the
+  blocks it needs are read (after the chunk's header).  Without it every block
+  of a cold slice is a synchronous read of at most the kernel's read-ahead
+  window, which on network file systems is one round trip each.  Cold patches
+  of 3D images on NFS got 3-5x faster, on a local NVMe disk 1.5-3x.  See
+  `README_THREADED.rst` for which settings to use.  POSIX only (Linux, macOS);
+  a no-op on Windows.
+* **New `blosc2_schunk_to_buffer_alloc()`**: serializes a super-chunk into a
+  contiguous frame in memory that the caller provides through a callback,
+  called once with the exact length (e.g. the final `bytes` object of a
+  binding), which saves copying the frame afterwards.  Unless the super-chunk
+  already is an in-memory frame, the frame is written there in place.  It is
+  the same frame that `blosc2_schunk_to_buffer()` returns.
+* **New `blosc2_schunk_get_chunk_range()`**: where a chunk of a super-chunk in
+  a contiguous frame on disk is in its file (offset and size), from the frame
+  header and the chunk index, so that callers can read or prefetch the chunks
+  they need themselves.
+* **The shuffle filter no longer slows down 1-byte types**: for
+  `typesize == 1` (uint8, int8, bool, ...) a byte shuffle is the identity, but
+  the SIMD dispatchers fell back to the generic routine, which copied every
+  byte on its own.  With SHUFFLE in the pipeline (the python-blosc2 default)
+  this made compression of uint8 data about 2x and decompression about 3.5x
+  slower than without a filter.  The filter pipeline now skips a byte shuffle
+  of 1-byte elements, and `blosc2_shuffle()`/`blosc2_unshuffle()` copy the
+  block in that case.  The compressed format is unchanged.
+* **The documentation of `blosc2_schunk_update_chunk()` states who owns the
+  chunk**, in the words already used for appending and inserting: with
+  `copy=false` the super-chunk owns the chunk only after a successful call;
+  after a failed one the caller keeps it and must free it.
+* **Faster b2nd slices**: `b2nd_get_slice_cbuffer()` and
+  `b2nd_set_slice_cbuffer()` decompress (compress) every chunk that lies in
+  the slice and forms one run of the buffer straight into (from) the caller's
+  buffer, and a read no longer zeroes the part of the buffer that the slice
+  fills.  For chunks read or written in part, the worker threads copy each
+  block between the buffer and the block they decode (encode), instead of the
+  calling thread going through a chunk-sized scratch.  On Linux, a fresh read
+  buffer of 4 MB or more that gets transparent huge pages is prefaulted from
+  the calling thread, as threads faulting on the same huge page together spend
+  most of the read in the kernel.  With 28 threads, reading a 315 MB array
+  went from 41 to 24 ms, a random 128^3 patch from 1.9 to 1.0 ms, and writing
+  the whole array from 94 to 75 ms.  `blosc2_schunk_get_slice_buffer()`
+  decompresses large parts of chunks with the context threads (half of an
+  8 MB chunk: 0.53 to 0.16 ms).
+* **Faster frame copies, serialization and saves**: `blosc2_schunk_copy()`
+  into a new contiguous frame (behind `blosc2_schunk_to_buffer()` of anything
+  but an in-memory frame, `blosc2_schunk_to_file()` and `b2nd_copy()` to a
+  file) writes every chunk once, straight from the source, and the offsets,
+  header and trailer once at the end, instead of appending the chunks one by
+  one; the frames are byte-identical.  Serializing a 315 MB array (241 MB
+  compressed) went from 103 to 54 ms (15 ms with
+  `blosc2_schunk_to_buffer_alloc()`), saving it to a file from 57 to 45 ms,
+  the raw write speed of the disk.
+* **Writes to on-disk frames read chunk headers only**: appending, inserting,
+  updating and deleting a chunk read whole chunks (a reference chunk for one
+  flags byte, the replaced chunk for its sizes, twice for an update); they now
+  read the 32-byte chunk headers.  Writing a whole 315 MB array on disk takes
+  20-31% less time on local disks and 38% less on NFS.
+* **Chunk-sized temporaries are reused**: b2nd slice reads and writes on
+  frames, and the chunk reads of on-disk frames, take their buffers from a
+  per-thread cache instead of a malloc/free per call, whose memory glibc gave
+  back to the kernel each time, so that it was page-faulted in again: 16 slice
+  writes on an on-disk array went from 71 to 38 ms.  The cache holds at most
+  four buffers of 64 KB to 32 MB and 64 MB per thread; it is freed when the
+  thread exits and, for the calling thread, by `blosc2_destroy()`.  Not on
+  Windows.
+* **Fewer opens on NFS**: opening a frame file with the default backend keeps
+  the handle that read its header as the cached reader, and creating one keeps
+  the creating handle as the cached writer (and reads through a duplicate of
+  it).  Opening costs one OPEN/CLOSE round trip instead of two, creating an
+  array 4 RPCs instead of 9.
+* **Locked slice reads see one state of the frame**: with locking on,
+  `b2nd_get_slice_cbuffer()` and `blosc2_schunk_get_slice_buffer()` hold the
+  shared frame lock from the refresh of the shape (counters) to the last chunk
+  read, and `b2nd_set_slice_cbuffer()` refreshes under its exclusive lock.
+  Before, every chunk access took the lock on its own, so a writer could
+  shrink or rewrite the frame in the middle of a read ("nchunk exceeds the
+  number of chunks", or chunks of different versions).  Unlocked handles are
+  unchanged.
+* **Frame offsets are always compressed with typesize 8**: insert, update,
+  delete and reorder now pin it as append did.  Frames differ from before
+  only when the `BLOSC_TYPESIZE` environment variable is set (they were
+  readable either way).
+* **Uninitialized chunks read as zeros on every b2nd slice path**: reads of
+  part of a chunk made by `b2nd_uninit()` could return stale scratch memory,
+  and a partial write into such a chunk stored it around the slice.
+* **Fixed chunks with a dictionary that could not be read back**: with
+  `use_dict` (LZ4, LZ4HC, ZSTD), data that did not compress was stored as is,
+  but the chunk kept the dictionary flag, so decompressing it failed with
+  `BLOSC2_ERROR_CODEC_DICT`.  Such chunks are now written without the flag,
+  and the ones written before are readable again.  Chunks that compress with
+  a dictionary are unchanged.
+* **Fixed**: leaks on error paths of `blosc2_schunk_new()` (and of
+  `frame_from_schunk()` behind it), `b2nd_empty()` and friends,
+  `b2nd_copy()` (which also handed the freed array back), `b2nd_full()`,
+  `b2nd_concatenate()`, `blosc2_schunk_set_slice_buffer()` and the extension
+  of a b2nd array by `b2nd_resize()`; `frame_delete_chunk()` leaked the new
+  offsets chunk on its later error paths, and a failed realloc there lost an
+  in-memory frame; `blosc2_schunk_copy()` left a pointer to its own stack in
+  the storage it was passed; a recompressing `blosc2_schunk_copy()` padded a
+  shorter last chunk with the tail of the previous one; frames without chunks
+  `memcpy()`ed a NULL offsets chunk; a masked read that failed before
+  decompressing left the block mask on the context, so the next
+  decompression skipped blocks (also in a failed orthogonal selection, which
+  leaked its buffers too), and `blosc2_set_maskout()` left a freed mask there
+  when its allocation failed.
+* **Fixed divide-by-zero on slice operations**: in
+  `blosc2_schunk_get_slice_buffer()`, `blosc2_schunk_set_slice_buffer()`,
+  `frame_get_slice()`, and `frame_set_slice()`, an invalid chunk with
+  `chunksize <= 0` caused a floating-point exception (division by zero).
+  These functions now validate `chunksize > 0` before computing coordinates
+  and safely return `BLOSC2_ERROR_INVALID_PARAM` (#834).
+* **CMake modernization and warning cleanup**: silenced CMake policy CMP0218
+  warnings and configured `CMAKE_POLICY_VERSION_MINIMUM` to suppress compatibility
+  deprecation warnings for bundled third-party subprojects on CMake 3.31+.
+
+Changes from 3.4.0 to 3.4.1
+===========================
+
+This is a bugfix release that brings substantial performance improvements for
+in-place writes to on-disk contiguous frames (especially on NFS), security and
+robustness fixes for sparse frames, fixes for filter pipelines with 3 or more
+filters alongside multithreaded DELTA decoding, and an example for sparse
+coordinate handling.
+
+* **Faster in-place writes to on-disk contiguous frames, especially on NFS**:
+  appending, inserting, updating or deleting a chunk (and so b2nd
+  `set_slice`) opened and closed the frame file four times and truncated it on
+  every trailer update.  On NFS each close is a synchronous flush to the
+  server, which made such writes cost about 20 ms per chunk whatever its size.
+  With the default filesystem backend on POSIX, a frame now keeps one writable
+  handle open, truncates the file only when the frame got shorter, and checks
+  for a replaced file with `statx(STATX_INO)` on Linux, which does not flush
+  pending writes.  A chunk write on NFS now costs about 1 ms of I/O; local
+  disks gain about 1.4x.  Other NFS clients now see the data when the kernel
+  writes it back, or at the latest when the frame is freed, rather than after
+  every update; with `BLOSC_LOCKING` it is still flushed when the lock is
+  released.  The writable handle comes out of the same budget as the cached
+  read handle (`BLOSC_MAX_CACHED_READERS`), so a schunk that has been written
+  to can hold two file descriptors.
+* **Security fix for sparse (directory) frame chunk reading**:
+  `sframe_get_chunk()` and `frame_decompress_chunk()` now validate that the
+  chunk's compressed length (`cbytes`) recorded in the chunk header does not
+  exceed the actual size of the chunk file on disk.  Previously, a truncated or
+  crafted chunk file could cause an out-of-bounds heap read during decompression
+  (#822).  Thanks to Mar Dominguez (@mardgez).
+* **Fix filter pipeline buffer cycling and multithreaded DELTA decoding**:
+  - In `pipeline_forward()`, cycling buffers now strictly alternates between
+    thread-local scratch buffers so the caller's read-only input buffer is never
+    recycled as a destination buffer when 3 or more filters are active.
+    Previously, the 3rd active filter overwrote block 0 of the input buffer,
+    corrupting the reference block used by subsequent blocks in the DELTA filter
+    (#820).
+  - In `pipeline_backward()`, prevented destination buffer aliasing across
+    multiple out-of-place backward filters, ensured intermediate buffers are
+    copied before in-place DELTA decoding, and postponed signaling `dref`
+    readiness until block 0 completes its entire backward pipeline.
+* Added a new example demonstrating sparse coordinates storage and retrieval
+  (`examples/sparse_coords.c`).
+
+Changes from 3.3.5 to 3.4.0
+===========================
+
+This is a minor release introducing an opt-in Blosc1-compatible chunk writer,
+bounded-memory APIs for variable-length block decompression, as well as
+important bug fixes and robustness improvements in DELTA filter decoding, blocksize
+tuning, ZFP codec handling, b2nd slicing, and thread management.
+
+* **New opt-in writer for Blosc1 (C-Blosc 1.x compatible) chunks**:
+  `blosc2_ctx_set_blosc1_format()` makes a compression context write chunks in
+  format version 2 with the 16-byte header, which C-Blosc 1.x can decode (stock
+  C-Blosc2 chunks, even with `BLOSC_BLOSC1_COMPAT`, cannot be). Besides the
+  header, such chunks follow the version 2 bitshuffle rule (a block is
+  bit-shuffled only if its number of elements is a multiple of 8) and only split
+  blocks that a C-Blosc 1.x reader also splits. Only plain shuffle/bitshuffle with
+  the blosclz, lz4, lz4hc, zlib and zstd codecs are supported; anything else
+  (other filters including delta, other codecs, dictionaries, variable-length
+  blocks) fails with an error. Off by default, no ABI change. The
+  `BLOSC_BLOSC1_COMPAT` environment variable now enables the same mode for
+  `blosc1_compress()` (it previously only dropped the extended header, still
+  writing a format version 5 chunk), so delta there is now an error.
+  `blosc2_ctx_get_blosc1_format()` reports whether a context is in this mode. The
+  filter may be in any slot of the pipeline; a prefilter is applied as usual.
+  Thanks to Mark Kittisopikul (@mkitti).
+* Added `blosc2_vlblock_get_nbytes_ctx()` to query one block's uncompressed size
+  without payload, dictionary, or scratch allocation. Lazy queries read only
+  the selected four-byte prefix.
+* Added `blosc2_vldecompress_block_into_ctx()` for single-block decompression
+  into a caller-owned buffer. Capacity is checked before dictionary/scratch
+  allocation, and scratch is sized from the admitted block. Both APIs support
+  ordinary and lazy VL chunks. The existing allocating API is unchanged.
+* **Fixed DELTA filter decoding on partial chunks, maskout, and getitem**:
+  When an array compressed with the DELTA filter was sliced or read partially,
+  non-zero blocks could be corrupted because DELTA encodes blocks > 0 relative
+  to block 0. If block 0 was masked out or omitted (such as in `b2nd`'s compact
+  read path for small block fractions, or in block-level getitem), subsequent
+  blocks decoded against uninitialized memory. b2nd now disables the compact
+  path for DELTA and always unmasks block 0, and `_blosc_getitem` and
+  `blosc2_decompress_block_ctx` fall back to full chunk decompression when DELTA
+  is active. Destination pointers and sizes are reset after fallback decompression
+  to avoid leaving dangling references on reused contexts. Fixes Blosc/python-blosc2#740.
+  Thanks to Karol Gotkowski (@Karol-G) for reporting this issue.
+* **Fixed bit-shuffled Blosc1 chunks with leftover bytes being decoded incorrectly**:
+  When reading a chunk with format version 2 whose bit-shuffled blocks have a
+  number of elements that is a multiple of 8, the bytes left over after the last
+  whole element were not copied to the output, so the end of the buffer was
+  garbage while the call reported success. They are now copied, as C-Blosc 1.x
+  does. See #812. Thanks to Mark Kittisopikul (@mkitti).
+* **Fixed chunks that could not be read back when the requested block size was not a
+  multiple of the typesize**: the tuner rounds a requested block size down to a multiple
+  of the typesize, but the chunk header recorded the size that had been asked for, so a
+  reader cut the chunk into blocks of a different size and failed (error -3, or wrong
+  data) with every filter and codec. The header now records the block size that is used.
+  Thanks to Mark Kittisopikul (@mkitti).
+* **Fixed the block size of buffers with a typesize above `BLOSC_MAX_TYPESIZE`**: such
+  buffers are stored as a stream of bytes with a typesize of 1, but the tuner chose the
+  block size with the large typesize and only then was it capped. A buffer shorter than
+  the typesize was split into blocks of one byte (200 bytes of typesize 300 took 1831
+  bytes) and a longer one got a block size that was a multiple of the large typesize.
+  The typesize is now capped before the tuner runs, so that it is blocked exactly like a
+  typesize of 1. Thanks to Mark Kittisopikul (@mkitti).
+* `blosc2_compress_ctx()` with a typesize of 0 stopped with SIGFPE (a division by
+  zero when choosing the block size). It now returns `BLOSC2_ERROR_INVALID_PARAM`.
+  Thanks to Mark Kittisopikul (@mkitti).
+* **Hardened ZFP codec against bitstream over-read and invalid metadata**:
+  ZFP bitstream decompression now operates from a zero-padded buffer sized to
+  `zfp_stream_maximum_size()`, preventing out-of-bounds heap reads when 64-bit
+  word reads extend past unaligned payloads (`blocks * bits` not a multiple of 64).
+  Also guarded against word-alignment over-read in `zfp_getcell()`, removed
+  redundant stream opens, validated metalayer bounds via `b2nd_deserialize_meta_inline`,
+  and rejected non-positive blockshapes and invalid `ndim`.
+  Thanks to @kalt2212 and Farkhalit Rida (@fr-manvi).
+* **Hardened `b2nd_get_slice_nchunks` bounds handling and allocation**:
+  Clamped slice bounds against negative values and `extshape`, sized `chunks_idx`
+  from slice bounding boxes to prevent mismatch overflows, protected against
+  multiplication overflow on 32-bit platforms, and handled empty slices and
+  shrinking reallocations without memory leaks.
+  Thanks to Farkhalit Rida (@fr-manvi).
+* **Rejected split blocks where streams do not cover blocksize**:
+  In `blosc_d`, decompression verifies that `neblock * nstreams == bsize` and returns
+  `BLOSC2_ERROR_DATA` if split streams fail to cover the full block, avoiding leaving
+  bytes unwritten in destination buffers (backported from C-Blosc #407).
+  Thanks to @suraiya-ctrl.
+* **Avoided unused parallel work for small block counts**:
+  Single-block compression and decompression jobs remain serial when `nthreads > 1`,
+  avoiding worker thread pool startup and overhead when threads cannot be used.
+  Parallel dispatch also caps worker entries to `min(nthreads, nblocks)`.
+  Fixed thread backend initialization on Windows. Thanks to
+  Johnny Kao (@johnny-kao).
+* Added `examples/vlchunks.c` illustrating variable-length chunk usage, updates,
+  compression, and verification. Thanks to Lance Uymatiao (@lanceu0128).
 
 Changes from 3.3.4 to 3.3.5
 ===========================

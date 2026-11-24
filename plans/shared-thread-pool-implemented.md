@@ -41,12 +41,12 @@ list (`shared_pools`) protected by `pool_registry_mutex`.
 nthreads          – number of worker threads
 shutdown          – flag to signal workers to exit
 context_refs      – how many contexts currently reference this pool
+                    (protected by pool_registry_mutex)
 active_jobs       – queue entries in flight (enqueued but not yet completed)
 threads[]         – worker pthread handles
 thread_contexts[] – per-worker scratch (tmp buffers, tid, owner_pool)
-mutex             – protects the job queue and active_jobs
+mutex             – protects shutdown, the job queue and active_jobs
 work_cv           – workers wait here for new work
-idle_cv           – signalled when active_jobs drops to 0
 job_queue_head/tail – singly-linked FIFO of pending job entries
 next              – link to the next pool in the global registry
 ```
@@ -124,8 +124,7 @@ Each worker thread runs an infinite loop:
    `thcontext->tid = logical_tid`.
 5. Call `t_blosc_do_job(thcontext)` — the same work function used by
    the callback backend.
-6. After the job, decrement `pool->active_jobs`; signal `pool->idle_cv`
-   if everything is idle.
+6. After the job, decrement `pool->active_jobs`.
 
 ### Block Assignment
 
@@ -146,9 +145,14 @@ modes:
 
 1. Locks `pool_registry_mutex`.
 2. Decrements `pool->context_refs`.
-3. If refs reach 0 **and** the pool is idle (no in-flight jobs), unlinks
-   the pool from `shared_pools` and calls `destroy_shared_pool()`.
-4. Otherwise the pool stays alive for other contexts to use.
+3. The pool stays registered when its refs reach 0, so that later contexts
+   with the same nthreads reuse its threads (contexts that live for one call
+   would otherwise start and join them every time).  The pool moves to the
+   front of `shared_pools`; if more than `BLOSC2_UNUSED_POOLS_MAX` pools have
+   no refs, the ones released longest ago are unlinked and destroyed (after
+   unlocking).
+
+`blosc2_free_resources()` destroys all pools without refs.
 
 ### Shutdown
 
@@ -190,10 +194,10 @@ contexts without interference:
    used for static block partitioning and user-visible `preparams.tid` /
    `postparams.tid`.
 
-3. **Refcount-driven pool lifetime.**  Pools are created on first use and
-   destroyed when the last referencing context detaches *and* the pool is
-   idle.  `blosc2_destroy()` acts as a final sweep for any pools that
-   remain at shutdown.
+3. **Pools outlive their contexts.**  Pools are created on first use and
+   kept when the last referencing context detaches (up to
+   `BLOSC2_UNUSED_POOLS_MAX` unused ones), until `blosc2_free_resources()`
+   or `blosc2_destroy()`, which destroys every pool at shutdown.
 
 4. **`g_initlib` guard.**  Prevents use-after-free if a context outlives
    `blosc2_destroy()`.  The context can still be freed (memory is

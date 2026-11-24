@@ -111,13 +111,22 @@ CUTEST_TEST_TEST(shape_overflow) {
 
   // Products fit int32, but extchunknitems * typesize exceeds INT32_MAX.  This
   // one is a legitimate array to build; only the oversized chunk buffer that
-  // get_slice would allocate has to be refused, instead of truncated.
+  // get_slice would allocate has to be refused, instead of truncated.  No
+  // super-chunk can hold a chunk that big, so the missing chunk is rejected
+  // first; two chunks of different sizes (no fixed chunksize to check) still
+  // let the array through to get_slice.
   {
     int64_t shape[1] = {1073741952};
     int32_t chunkshape[1] = {1073741952};
     int32_t blockshape[1] = {128};
     array = NULL; schunk = NULL;
     rc = from_crafted_meta(1, shape, chunkshape, blockshape, 4, &array, &schunk);
+    CUTEST_ASSERT("array without its chunk must be rejected", rc < 0 && array == NULL);
+    uint8_t bytes[8] = {0};
+    CUTEST_ASSERT("cannot append chunks", schunk != NULL &&
+                  blosc2_schunk_append_buffer(schunk, bytes, 4) == 1 &&
+                  blosc2_schunk_append_buffer(schunk, bytes, 8) == 2);
+    rc = b2nd_from_schunk(schunk, &array);
     CUTEST_ASSERT("array with an oversized chunk should still deserialize", rc == 0);
     CUTEST_ASSERT("array must exist", array != NULL);
 

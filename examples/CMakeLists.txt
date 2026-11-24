@@ -2,7 +2,7 @@
 set(EXAMPLES contexts instrument_codec delta_schunk_ex multithread simple frame_metalayers
     noinit find_roots schunk_simple frame_simple schunk_postfilter urcodecs urfilters frame_vlmetalayers
     sframe_simple frame_backed_schunk compress_file decompress_file frame_offset frame_roundtrip get_set_slice get_blocksize
-    vlblocks file-locking)
+    vlblocks vlchunks sparse_coords file-locking schunk_buffer deferred_updates)
 
 add_subdirectory(b2nd)
 
@@ -56,5 +56,8 @@ if(BUILD_TESTS)
                     COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${example}>)
             endif()
         endforeach()
+        # decompress_file reads the frame that compress_file writes: never run them at the same time
+        set_tests_properties(test_example_compress_file PROPERTIES FIXTURES_SETUP example_cmakecache_frame)
+        set_tests_properties(test_example_decompress_file PROPERTIES FIXTURES_REQUIRED example_cmakecache_frame)
     endif()
 endif()

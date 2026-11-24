@@ -1,28 +1,24 @@
-# Announcing C-Blosc2 3.3.5
+# Announcing C-Blosc2 3.8.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-This is a bugfix and maintenance release fixing robustness and security issues
-discovered via OSS-Fuzz.
+C-Blosc2 3.8.0 delivers major SIMD optimizations in BloscLZ 2.7.0 and fused
+SHUFFLE+BYTEDELTA across x86-64 and ARM64, lower thread-pool overhead, and
+important security and portability fixes.
 
-First, an integer overflow in the BloscLZ decompressor's long-match length
-accumulation loop was fixed. A crafted input with excessive continuation bytes
-could wrap a 32-bit length past `INT32_MAX` into negative values, bypassing bounds
-checks and leading to a heap buffer overflow. Length bounds are now verified
-prior to addition.
-
-Second, input buffer size validation was added to the ZFP codec decompressors
-(`zfp_acc_decompress`, `zfp_prec_decompress`, `zfp_rate_decompress`). Previously,
-crafted frames with high metadata values could cause ZFP's bitstream reader to
-read beyond buffer bounds. The required bitstream size is now validated against
-the input length prior to decompression.
-
-Third, a potential division-by-zero (floating-point exception) in
-`frame_get_chunk()` and `frame_get_lazychunk()` when encountering crafted frames
-with `chunksize <= 0` during special-value chunk retrieval was guarded.
-
-There are no API or format changes in this release.
+- BloscLZ 2.7.0 speeds up both compression and decompression on x86-64
+  (SSE2/SSSE3/AVX2) and ARM64 (NEON) with improved match finding, run
+  detection, and vectorized literal/match copying.
+- Fused SHUFFLE+BYTEDELTA gains an AVX2 path, faster x86-64 and NEON backward
+  decoders, a zero-high-planes fast path, and fixes missing NEON symbols on
+  ARM64 Linux (#883).
+- Reduced shared thread-pool overhead by running worker 0 on the calling
+  thread, spawning `nthreads - 1` workers, and reusing thread-local scratch
+  buffers.
+- Fixed a heap buffer overflow in the ZFP compressors when compressed output
+  exceeds `output_len` (#887, #888), added `PREFER_EXTERNAL_ZFP` (#886), and
+  fixed portability issues on older macOS / unoptimized GCC builds (#884, #885).
 
 For more info, see the release notes in:
 

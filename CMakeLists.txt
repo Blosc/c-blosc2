@@ -43,6 +43,8 @@
 #       when found, use the installed Zlib/Zlib-ng libs instead of fetching upstream sources
 #   PREFER_EXTERNAL_ZSTD: default OFF
 #       when found, use the installed Zstd libs instead of fetching upstream sources
+#   PREFER_EXTERNAL_ZFP: default OFF
+#       when found, use the installed ZFP libs instead of fetching upstream sources
 #   TEST_INCLUDE_BENCH_SHUFFLE_1: default ON
 #       add a test that runs the benchmark program passing "shuffle" with 1
 #       thread as second parameter
@@ -78,6 +80,7 @@ if(NOT WIN32)
 endif()
 
 cmake_minimum_required(VERSION 3.16.3)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
 if(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.4)
   cmake_policy(SET CMP0063 NEW)
 endif()
@@ -128,6 +131,8 @@ option(PREFER_EXTERNAL_ZLIB
     "Find and use external ZLIB library instead of fetching sources." OFF)
 option(PREFER_EXTERNAL_ZSTD
     "Find and use external ZSTD library instead of fetching sources." OFF)
+option(PREFER_EXTERNAL_ZFP
+    "Find and use external ZFP library instead of fetching sources." OFF)
 option(WITH_ZLIB_OPTIM
     "Set WITH_OPTIM for ZLIB, turning off is useful for compiling for wasm32 targets." ON)
 
@@ -138,7 +143,7 @@ set(BLOSC_ENABLE_ZFP "AUTO" CACHE STRING
     "ZFP codec support: AUTO enables it when available, ON requires it, OFF disables it.")
 set_property(CACHE BLOSC_ENABLE_ZFP PROPERTY STRINGS AUTO ON OFF)
 
-set(BLOSC_LZ4_VERSION "1.10.0" CACHE STRING
+set(BLOSC_LZ4_VERSION "1.11.1" CACHE STRING
     "lz4 version to use when fetching internal sources.")
 set(BLOSC_LZ4_SOURCE_DIR "" CACHE PATH
     "Optional local lz4 checkout to use instead of downloading sources.")
@@ -146,7 +151,7 @@ set(BLOSC_ZLIBNG_VERSION "2.3.3" CACHE STRING
     "zlib-ng version to use when fetching internal sources.")
 set(BLOSC_ZLIBNG_SOURCE_DIR "" CACHE PATH
     "Optional local zlib-ng checkout to use instead of downloading sources.")
-set(BLOSC_ZSTD_VERSION "1.5.7" CACHE STRING
+set(BLOSC_ZSTD_VERSION "1.6.0" CACHE STRING
     "zstd version to use when fetching internal sources.")
 set(BLOSC_ZSTD_SOURCE_DIR "" CACHE PATH
     "Optional local zstd checkout to use instead of downloading sources.")
@@ -407,7 +412,7 @@ if(NOT DEACTIVATE_ZSTD)
             message(STATUS "Using zstd ${BLOSC_ZSTD_VERSION} via FetchContent download")
             FetchContent_Declare(
                 zstd
-                URL "https://github.com/facebook/zstd/archive/refs/tags/v${BLOSC_ZSTD_VERSION}.tar.gz"
+                URL "https://github.com/meta/zstd/archive/refs/tags/v${BLOSC_ZSTD_VERSION}.tar.gz"
                 DOWNLOAD_EXTRACT_TIMESTAMP TRUE
                 SOURCE_SUBDIR build/cmake)
         endif()
@@ -453,7 +458,7 @@ if(BUILD_PLUGINS AND NOT BLOSC_ENABLE_ZFP STREQUAL "OFF")
     set(BLOSC_ALLOW_BUNDLED_ZFP FALSE)
     if(BLOSC_DEPENDENCY_MODE STREQUAL "EXTERNAL")
         set(BLOSC_FIND_EXTERNAL_ZFP TRUE)
-    elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO")
+    elseif(BLOSC_DEPENDENCY_MODE STREQUAL "AUTO" OR PREFER_EXTERNAL_ZFP)
         set(BLOSC_FIND_EXTERNAL_ZFP TRUE)
         set(BLOSC_ALLOW_BUNDLED_ZFP TRUE)
     else()

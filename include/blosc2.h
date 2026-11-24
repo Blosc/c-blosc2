@@ -81,12 +81,12 @@ extern "C" {
 
 
 /* Version numbers */
-#define BLOSC2_VERSION_MAJOR    3  /* for major interface/format changes  */
-#define BLOSC2_VERSION_MINOR    3  /* for minor interface/format changes  */
-#define BLOSC2_VERSION_RELEASE  6  /* for tweaks, bug-fixes, or development */
+#define BLOSC2_VERSION_MAJOR    4  /* for major interface/format changes  */
+#define BLOSC2_VERSION_MINOR    0  /* for minor interface/format changes  */
+#define BLOSC2_VERSION_RELEASE  0  /* for tweaks, bug-fixes, or development */
 
-#define BLOSC2_VERSION_STRING   "3.3.6.dev"  /* string version.  Sync with above! */
-#define BLOSC2_VERSION_DATE     "$Date:: 2026-09-24 #$"    /* date version year-month-day */
+#define BLOSC2_VERSION_STRING   "4.0.0.alpha1"  /* string version.  Sync with above! */
+#define BLOSC2_VERSION_DATE     "$Date:: 2026-11-24 #$"    /* date version year-month-day */
 
 
 /* Tracing macros */
@@ -521,8 +521,8 @@ BLOSC_EXPORT const char *blosc2_error_string(int error_code);
  * @param rc The error code to get the string representation for.
  * @return A pointer to a static string representing the error code.
  */
-static char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
-static char *print_error(int rc) {
+static inline char *print_error(int rc) BLOSC_ATTRIBUTE_UNUSED;
+static inline char *print_error(int rc) {
   // TODO: remove this function, use blosc2_error_string only
   return (char *) blosc2_error_string(rc);
 }
@@ -534,6 +534,10 @@ static char *print_error(int rc) {
  * You must call this previous to any other Blosc call, unless you want
  * Blosc to be used simultaneously in a multi-threaded environment, in
  * which case you can use the #blosc2_compress_ctx #blosc2_decompress_ctx pair.
+ *
+ * The **BLOSC_PREFETCH** environment variable, set to a number of threads, turns on read-ahead for frames on disk
+ * here, and **BLOSC_PREFETCH_POPULATE** says for which memory-mapped frames it populates the mapping (see
+ * #blosc2_set_prefetch).
  *
  * @sa #blosc2_destroy
  */
@@ -630,6 +634,10 @@ BLOSC_EXPORT void blosc2_destroy(void);
  * #blosc1_set_compressor, #blosc1_set_blocksize and
  * #blosc2_set_nthreads. *BLOSC_CLEVEL*, *BLOSC_SHUFFLE*, *BLOSC_DELTA* and
  * *BLOSC_TYPESIZE* environment vars will also be honored.
+ *
+ * * **BLOSC_BLOSC1_COMPAT=(ANY VALUE)**: The chunk is written in the Blosc1 format,
+ * as if #blosc2_ctx_set_blosc1_format() had been called, so that C-Blosc 1.x can
+ * decode it.  Also honored together with *BLOSC_NOLOCK*.
  *
  * @endparblock
  *
@@ -754,14 +762,91 @@ BLOSC_EXPORT int16_t blosc2_get_nthreads(void);
 /**
  * @brief Initialize a pool of threads for compression/decompression. If
  * @p nthreads is 1, then the serial version is chosen and a possible
- * previous existing pool is ended. If this is not called, @p nthreads
- * is set to 1 internally.
+ * previous existing pool is released (#blosc2_free_resources ends the
+ * pools that are no longer used). If this is not called, @p nthreads
+ * is set to 1 internally. The threads are per process; a child process
+ * created with fork() starts its own threads on first use (see
+ * README_THREADED.rst).
  *
  * @param nthreads The number of threads to use.
  *
  * @return The previous number of threads.
  */
 BLOSC_EXPORT int16_t blosc2_set_nthreads(int16_t nthreads);
+
+
+/**
+ * @brief Default for the @p max_ahead parameter of #blosc2_set_prefetch.
+ */
+#define BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT ((int64_t)64 * 1024 * 1024)
+
+/**
+ * @brief Most read-ahead threads #blosc2_set_prefetch accepts.
+ */
+#define BLOSC2_PREFETCH_MAX_NTHREADS 256
+
+/**
+ * @brief Default for the @p piece_size parameter of #blosc2_set_prefetch.
+ */
+#define BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT (1024 * 1024)
+
+/**
+ * @brief Smallest @p piece_size #blosc2_set_prefetch accepts.
+ */
+#define BLOSC2_PREFETCH_MIN_PIECE_SIZE (64 * 1024)
+
+/**
+ * @brief Read ahead when reading slices of arrays and super-chunks stored in contiguous frames on disk with the
+ * default filesystem or the memory-mapped I/O: #b2nd_get_slice_cbuffer, #b2nd_get_slice,
+ * #b2nd_get_orthogonal_selection and #blosc2_schunk_get_slice_buffer.
+ *
+ * Without read-ahead, a slice reads the blocks it needs one after the other, each with at most the kernel's read-ahead
+ * window per read; on a network file system every such read is a round trip.  With read-ahead, the chunks the slice
+ * needs (and that are not in the page cache yet) are read by up to @p nthreads background threads in pieces of at most
+ * @p piece_size bytes, in the order the slice decompresses them and at most @p max_ahead bytes ahead of it, and each
+ * chunk is decompressed as soon as its bytes are in.  Of a chunk that a slice (#b2nd_get_slice_cbuffer,
+ * #b2nd_get_slice) covers only in part, only the blocks it needs are read, after the chunk's header (which says where
+ * they are; one round trip more when it is not cached).  The data goes to the page cache (memory-mapped reads stay
+ * zero-copy); pages that are cached already are not read again (asked with cachestat() on Linux >= 6.5, else
+ * mincore()).  On Linux the kernel answers that only for files the process owns or may write to (before 6.5: only
+ * files it owns); other files are read again even when cached, which is correct but costs a copy.
+ *
+ * Opening a frame file gets its start and its end (header, trailer and chunk index) in one round trip, also with
+ * read-ahead off; with read-ahead on, a file of up to 1 MiB (from the frame's offset on) is asked for whole.
+ *
+ * Reads that are not cached get faster on any storage, most on high-latency ones; 4 threads and the default piece
+ * size give most of the speed.  The threads mostly wait for the storage, but the kernel spends CPU on every byte they
+ * read; README_THREADED.rst has which settings to use when.
+ *
+ * On GPFS (IBM Storage Scale) read() does not fill the page cache but a cache of GPFS's own, so for a frame read
+ * through the mmap I/O (#BLOSC2_IO_FILESYSTEM_MMAP) the threads populate its mapping there instead
+ * (madvise(MADV_POPULATE_READ), Linux >= 5.14), cached pages included: the slice then finds the pages mapped and does
+ * not fault on them (builds with glibc >= 2.28 recognize GPFS).  The **BLOSC_PREFETCH_POPULATE** environment
+ * variable, read at #blosc2_init, does this for the memory-mapped frames on every file system when set to 1, and for
+ * none when set to 0.
+ *
+ * How many threads: each slice being read gets up to @p nthreads read-ahead threads, and slices that threads of the
+ * process read at the same time get theirs each.  So a process runs up to @p nthreads times the number of slices it
+ * reads at once, at most #BLOSC2_PREFETCH_MAX_NTHREADS in all: a program that reads with one thread has @p nthreads
+ * of them, one that reads with 8 threads at once up to 8 x @p nthreads.  Decompression threads (`nthreads` of
+ * #blosc2_dparams) are separate and do not count: they decompress a chunk while the read-ahead threads fetch the next
+ * ones.  Read-ahead threads are started as needed and run until #blosc2_destroy (lowering the number does not stop
+ * them), each keeping a buffer as large as the largest piece it has read.
+ *
+ * Off by default; the **BLOSC_PREFETCH** environment variable, set to a number of threads, turns it on at
+ * #blosc2_init.  The setting and the threads are per process; a child process created with fork() starts its own
+ * threads on first use.  Supported on POSIX systems; elsewhere (Windows) this has no effect.
+ *
+ * @param nthreads Read-ahead threads per slice being read (see above), at most #BLOSC2_PREFETCH_MAX_NTHREADS; 0 turns
+ * read-ahead off.
+ * @param max_ahead Most bytes read ahead of the chunk being decompressed (0 for the default,
+ * #BLOSC2_PREFETCH_MAX_AHEAD_DEFAULT).
+ * @param piece_size Largest read handed to one thread, in bytes (0 for the default,
+ * #BLOSC2_PREFETCH_PIECE_SIZE_DEFAULT; at least #BLOSC2_PREFETCH_MIN_PIECE_SIZE).
+ *
+ * @return The previous number of threads, or a negative error code.
+ */
+BLOSC_EXPORT int blosc2_set_prefetch(int nthreads, int64_t max_ahead, int64_t piece_size);
 
 
 /**
@@ -865,6 +950,11 @@ BLOSC_EXPORT int blosc2_get_complib_info(const char* compname, char** complib,
 /**
  * @brief Free possible memory temporaries and thread resources. Use this
  * when you are not going to use Blosc for a long while.
+ *
+ * Blosc's own thread pools (not on Windows) that no context uses any more
+ * are kept, a few of them with the temporaries of their threads, so that
+ * contexts created later with the same number of threads do not start new
+ * threads; this function ends them.
  *
  * @return A 0 if succeeds, in case of problems releasing the resources,
  * it returns a negative number.
@@ -1023,7 +1113,8 @@ typedef struct {
   //!< The IO name.
   bool is_allocation_necessary;
   //!< If true, the caller needs to allocate data for the read function (ptr argument). If false, the read function
-  //!< takes care of memory allocation and stores the address in the allocated_ptr argument.
+  //!< stores in the ptr argument the address of memory that it owns (the caller must not free it), or NULL when
+  //!< it cannot read the requested bytes: check the returned count before using it.
   blosc2_open_cb open;
   //!< The IO open callback.
   blosc2_close_cb close;
@@ -1261,6 +1352,25 @@ static const blosc2_dparams BLOSC2_DPARAMS_DEFAULTS = {1, NULL, NULL, NULL, 8};
  * @sa #blosc2_compress
  */
 BLOSC_EXPORT blosc2_context* blosc2_create_cctx(blosc2_cparams cparams);
+
+/**
+ * @brief Opt a compression context's prefilter out of output zero-initialization.
+ * @since 3.7.0
+ *
+ * With @p enabled true, the prefilter must initialize every byte of
+ * `params->output[0..params->output_size)` on each successful call whose output
+ * is retained, including padding and skipped blocks. It must not rely on the
+ * output's previous contents. This does not make the output disposable.
+ *
+ * The default is false, preserving zero-initialization for existing callbacks.
+ * Configure this only while the context is idle. The setting is context-local:
+ * it is not copied by blosc2_ctx_get_cparams() and must be reapplied after
+ * recreating a context. Disabling it restores the default behavior.
+ *
+ * @return 0 on success; BLOSC2_ERROR_INVALID_PARAM for a NULL or decompression
+ * context, or when enabling the setting without a prefilter.
+ */
+BLOSC_EXPORT int blosc2_set_prefilter_full_write(blosc2_context *ctx, bool enabled);
 
 /**
  * @brief Create a context for *_ctx() decompression functions.
@@ -1595,11 +1705,52 @@ BLOSC_EXPORT int blosc2_vlchunk_get_nblocks(const void* src, int32_t srcsize,
  *   VL blocks or if @p nblock is out of range.
  */
 BLOSC_EXPORT int blosc2_vldecompress_block_ctx(blosc2_context* context,
-                                               const void* src,
-                                               int32_t srcsize,
-                                               int32_t nblock,
-                                               uint8_t** dest,
-                                               int32_t* destsize);
+                                             const void* src, int32_t srcsize,
+                                             int32_t nblock, uint8_t** dest,
+                                             int32_t* destsize);
+
+/**
+ * @brief Query the uncompressed size of one VL block, without allocating
+ * payload, dictionary, or decompression scratch buffers.
+ *
+ * @param context A decompression context. For lazy chunks it must be associated
+ * with the owning SChunk through blosc2_dparams.schunk.
+ * @param src A compressed VL chunk, or a lazy chunk.
+ * @param srcsize Actual source buffer length (the size returned by
+ * #blosc2_schunk_get_lazychunk for lazy chunks, not header cbytes).
+ * @param nblock Zero-based block index.
+ * @param nbytes Receives the selected block size on success; unchanged on error.
+ * @return 0 on success, a negative error code on failure.
+ *
+ * Lazy queries read only the selected four-byte size prefix. This is an
+ * admission query, not full payload validation; decompression revalidates the
+ * size. Source buffers, contexts and backing storage must not be modified
+ * concurrently. The context is not reinitialized by this query.
+ */
+BLOSC_EXPORT int blosc2_vlblock_get_nbytes_ctx(blosc2_context* context,
+                                            const void* src, int32_t srcsize,
+                                            int32_t nblock, int32_t* nbytes);
+
+/**
+ * @brief Decompress one VL block into a caller-owned buffer.
+ *
+ * Parameters have the same meaning as #blosc2_vlblock_get_nbytes_ctx.
+ * @param dest Caller-provided output buffer, which must not overlap src.
+ * @param destsize Capacity of dest in bytes.
+ * @return Bytes decompressed, or a negative error code. An insufficient
+ * destination returns BLOSC2_ERROR_WRITE_BUFFER before dictionary or scratch
+ * allocation. The output buffer may be partially modified on other errors.
+ *
+ * Never writes beyond destsize. Decompression scratch is sized from the
+ * selected admitted block, not other blocks. Lazy spans are checked against
+ * their chunk and owning frame before reading. This is not a total-memory
+ * budget: block tables, compressed input, dictionaries, and codec internals
+ * have separate allocations. No output buffer is allocated by this function.
+ */
+BLOSC_EXPORT int blosc2_vldecompress_block_into_ctx(blosc2_context* context,
+                                                 const void* src, int32_t srcsize,
+                                                 int32_t nblock, void* dest,
+                                                 int32_t destsize);
 
 /**
  * @brief Create a chunk made of zeros.
@@ -1910,6 +2061,14 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_new(blosc2_storage *storage);
  * @param schunk The super-chunk to be copied.
  * @param storage The storage properties.
  *
+ * @remark If @p schunk has a postfilter, the copy holds the data as read from
+ * @p schunk, i.e. the output of the postfilter (except with variable-length
+ * blocks, whose chunks are always copied as they are).  The copy does not
+ * inherit the postfilter: it reads that output as it is, unless
+ * @p storage sets a postfilter in its dparams, which then runs on it again.
+ * To serialize the chunks as they are stored instead, see
+ * blosc2_schunk_to_buffer().
+ *
  * @return The new super-chunk.
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_copy(blosc2_schunk *schunk, blosc2_storage *storage);
@@ -1979,6 +2138,51 @@ BLOSC_EXPORT int blosc2_schunk_lock(blosc2_schunk *schunk);
 BLOSC_EXPORT int blosc2_schunk_unlock(blosc2_schunk *schunk);
 
 /**
+ * @brief Start a sequence of chunk updates of a super-chunk.
+ *
+ * A contiguous frame keeps its chunks back to back, so an update that changes
+ * the compressed size of a chunk moves everything stored behind it: updating
+ * all n chunks one by one moves ~n^2/2 chunks.  Between
+ * blosc2_schunk_begin_updates() and blosc2_schunk_end_updates(), such an
+ * update moves nothing else.  The chunk goes into its old place when it fits
+ * there (together with the free space right before and after it), else to the
+ * end of the frame, and the space left over stays free until
+ * blosc2_schunk_end_updates() closes all of it in one pass, in which every
+ * chunk moves at most once.  The frame is valid at every point in between,
+ * just larger, and `cbytes` includes the free space until the end.
+ *
+ * Writing functions that update several chunks (b2nd_set_slice_cbuffer(),
+ * b2nd_set_orthogonal_selection(), b2nd_resize(),
+ * blosc2_schunk_set_slice_buffer()) do this by themselves; use it to bracket
+ * a sequence of such calls or of blosc2_schunk_update_chunk() calls.
+ *
+ * It also takes the exclusive frame lock, as blosc2_schunk_lock() does, until
+ * blosc2_schunk_end_updates().  Brackets nest.  For super-chunks that are not
+ * contiguous frames this is just the lock (a no-op without locking).  A frame
+ * whose bracket is never closed stays valid; its free space just stays, like
+ * the space of deleted chunks.
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code otherwise (then nothing has started).
+ */
+BLOSC_EXPORT int blosc2_schunk_begin_updates(blosc2_schunk *schunk);
+
+/**
+ * @brief End a sequence of chunk updates started with blosc2_schunk_begin_updates().
+ *
+ * The outermost call closes the free space that the updates left in a
+ * contiguous frame (moving each chunk at most once; a frame on disk is cut to
+ * its new length) and releases the lock.
+ *
+ * @param schunk The super-chunk.
+ *
+ * @return 0 on success; a negative error code otherwise.  The lock is released
+ * either way.
+ */
+BLOSC_EXPORT int blosc2_schunk_end_updates(blosc2_schunk *schunk);
+
+/**
  * @brief Re-sync the cached counters (nchunks, nbytes, cbytes) and
  * metalayers of a disk-based super-chunk when another handle — possibly in
  * another process — has changed it.
@@ -2042,32 +2246,75 @@ BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_udio(const char* urlpath, const b
  */
 BLOSC_EXPORT blosc2_schunk* blosc2_schunk_open_offset_udio(const char* urlpath, int64_t offset, const blosc2_io *udio);
 
-/* @brief Convert a super-chunk into a contiguous frame buffer.
+/**
+ * @brief Convert a super-chunk into a contiguous frame buffer.
  *
  * @param schunk The super-chunk to convert.
  * @param cframe The address of the destination buffer (output).
  * @param needs_free The pointer to a boolean indicating if it is the user's
  * responsibility to free the resulting @p cframe buffer or not.
  *
+ * @remark The frame holds the chunks as they are stored, whatever the storage of
+ * @p schunk: a postfilter of @p schunk is not applied (unlike in
+ * blosc2_schunk_copy()), and it is not part of the frame either, so a
+ * super-chunk made from the frame reads the stored values until the same
+ * postfilter is set on it again.  For a frame with the postfiltered values,
+ * serialize a blosc2_schunk_copy() of @p schunk.  The same holds for
+ * blosc2_schunk_to_buffer_alloc(), blosc2_schunk_to_file() and
+ * blosc2_schunk_append_file().
+ *
  * @return If successful, return the size of the (frame) @p cframe buffer.
  * Else, a negative value.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_to_buffer(blosc2_schunk* schunk, uint8_t** cframe, bool* needs_free);
 
-/* @brief Store a super-chunk into a file.
+/**
+ * @brief Convert a super-chunk into a contiguous frame in a buffer provided by the caller.
+ *
+ * The frame is the same that blosc2_schunk_to_buffer() returns, but it goes into
+ * memory that the caller owns, e.g. the final destination of the serialized
+ * super-chunk, which saves copying it there afterwards.  Unless the super-chunk
+ * already is a frame in memory, the frame is moreover written in place instead
+ * of being built first.
+ *
+ * @param schunk The super-chunk to convert.
+ * @param alloc Called once with the exact length of the frame; it returns a buffer
+ * of (at least) that many bytes, or NULL to give up.
+ * @param user_data Passed on to @p alloc.
+ *
+ * @remark Like blosc2_schunk_to_buffer(), it writes the chunks as they are
+ * stored, without applying a postfilter of @p schunk.
+ *
+ * @return If successful, return the size of the frame written into the buffer.
+ * Else (also when @p alloc returns NULL), a negative value.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_to_buffer_alloc(blosc2_schunk* schunk,
+                                                   uint8_t* (*alloc)(int64_t len, void* user_data),
+                                                   void* user_data);
+
+/**
+ * @brief Store a super-chunk into a file.
  *
  * @param schunk The super-chunk to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark The file holds the same frame that blosc2_schunk_to_buffer()
+ * returns: the chunks as they are stored, without applying a postfilter of
+ * @p schunk.
  *
  * @return If successful, return the size of the (fileframe) in @p urlpath.
  * Else, a negative value.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_to_file(blosc2_schunk* schunk, const char* urlpath);
 
-/* @brief Append a super-chunk into a file.
+/**
+ * @brief Append a super-chunk into a file.
  *
  * @param schunk The super-chunk to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark It appends the same frame that blosc2_schunk_to_buffer() returns:
+ * the chunks as they are stored, without applying a postfilter of @p schunk.
  *
  * @return If successful, return the offset where @p schunk has been appended in @p urlpath.
  * Else, a negative value.
@@ -2083,16 +2330,37 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_file(blosc2_schunk* schunk, const char
  * If the super-chunk is on-disk, the data continues there for a later
  * re-opening.
  *
- * @return 0 if success.
+ * @return 0 if success. If closing or releasing the underlying I/O resources
+ * fails, a non-zero error code is returned (memory resources are still freed).
  */
 BLOSC_EXPORT int blosc2_schunk_free(blosc2_schunk *schunk);
+
+/**
+ * @brief Flush pending writes of a super-chunk to persistent storage.
+ *
+ * For a disk-based frame, this synchronizes written data to the underlying
+ * storage (via `fsync()` / `_commit()` or `msync()`) and closes any cached
+ * writable handle so that delayed write errors (such as NFS disk quota
+ * exceeded, `EDQUOT`, or `ENOSPC` reported only on `fsync()`/`close()`) are
+ * detected and returned here rather than being lost when freeing the
+ * super-chunk.
+ *
+ * A no-op returning 0 for in-memory super-chunks, views, and read-only
+ * handles that have not written to the file.
+ *
+ * @param schunk The super-chunk to flush.
+ *
+ * @return 0 on success; a negative error code otherwise.
+ */
+BLOSC_EXPORT int blosc2_schunk_flush(blosc2_schunk *schunk);
 
 /**
  * @brief Append an existing @p chunk to a super-chunk.
  *
  * @param schunk The super-chunk where the chunk will be appended.
- * @param chunk The @p chunk to append.  An internal copy is made, so @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to append. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
@@ -2105,8 +2373,9 @@ BLOSC_EXPORT int64_t blosc2_schunk_append_chunk(blosc2_schunk *schunk, uint8_t *
   *
   * @param schunk The super-chunk where the chunk will be updated.
   * @param nchunk The position where the chunk will be updated.
-  * @param chunk The new @p chunk. If an internal copy is made, the @p chunk can be reused or
-  * freed if desired.
+  * @param chunk The new @p chunk. If @p copy is true, an internal copy is made, so
+  * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+  * to the super-chunk on success; on error, the caller retains ownership.
   * @param copy Whether the chunk should be copied internally or can be used as-is.
   *
   * @return The number of chunks in super-chunk. If some problem is
@@ -2117,10 +2386,11 @@ BLOSC_EXPORT int64_t blosc2_schunk_update_chunk(blosc2_schunk *schunk, int64_t n
 /**
  * @brief Insert a chunk at a specific position in a super-chunk.
  *
- * @param schunk The super-chunk where the chunk will be appended.
+ * @param schunk The super-chunk where the chunk will be inserted.
  * @param nchunk The position where the chunk will be inserted.
- * @param chunk The @p chunk to insert. If an internal copy is made, the @p chunk can be reused or
- * freed if desired.
+ * @param chunk The @p chunk to insert. If @p copy is true, an internal copy is made, so
+ * @p chunk can be reused or freed if desired. If @p copy is false, ownership is transferred
+ * to the super-chunk on success; on error, the caller retains ownership.
  * @param copy Whether the chunk should be copied internally or can be used as-is.
  *
  * @return The number of chunks in super-chunk. If some problem is
@@ -2150,6 +2420,44 @@ BLOSC_EXPORT int64_t blosc2_schunk_delete_chunk(blosc2_schunk *schunk, int64_t n
  * detected, this number will be negative.
  */
 BLOSC_EXPORT int64_t blosc2_schunk_append_buffer(blosc2_schunk *schunk, const void *src, int32_t nbytes);
+
+/**
+ * @brief Compress a @p src data buffer and insert it as a new chunk at a specific
+ * position in a super-chunk.
+ *
+ * Same as compressing @p src with the super-chunk's context and inserting the
+ * result with blosc2_schunk_insert_chunk(), but frames are written from a
+ * compression buffer that the calling thread reuses, not a new one per chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be inserted.
+ * @param nchunk The position where the chunk will be inserted.
+ * @param src The buffer of data to compress.
+ * @param nbytes The size of the @p src buffer.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_insert_buffer(blosc2_schunk *schunk, int64_t nchunk,
+                                                 const void *src, int32_t nbytes);
+
+/**
+ * @brief Compress a @p src data buffer and replace the chunk at a specific
+ * position in a super-chunk with it.
+ *
+ * Same as compressing @p src with the super-chunk's context and storing the
+ * result with blosc2_schunk_update_chunk(), but frames are written from a
+ * compression buffer that the calling thread reuses, not a new one per chunk.
+ *
+ * @param schunk The super-chunk where the chunk will be updated.
+ * @param nchunk The position of the chunk to update.
+ * @param src The buffer of data to compress.
+ * @param nbytes The size of the @p src buffer.
+ *
+ * @return The number of chunks in super-chunk. If some problem is
+ * detected, this number will be negative.
+ */
+BLOSC_EXPORT int64_t blosc2_schunk_update_buffer(blosc2_schunk *schunk, int64_t nchunk,
+                                                 const void *src, int32_t nbytes);
 
 /**
  * @brief Decompress and return the @p nchunk chunk of a super-chunk.
@@ -2235,6 +2543,25 @@ BLOSC_EXPORT int blosc2_schunk_get_chunk(blosc2_schunk *schunk, int64_t nchunk, 
  */
 BLOSC_EXPORT int blosc2_schunk_get_lazychunk(blosc2_schunk *schunk, int64_t nchunk, uint8_t **chunk,
                                              bool *needs_free);
+
+/**
+ * @brief Where a chunk of a super-chunk stored in a contiguous frame on disk is in its file.
+ *
+ * This lets callers read (or ask the operating system to read ahead) the bytes of the chunks they will need,
+ * e.g. in parallel, without reading any chunk to find them: the answer comes from the frame header and the chunk
+ * index, which opening the frame has read already (and which stay in the page cache).
+ *
+ * @param schunk The super-chunk.
+ * @param nchunk The chunk.
+ * @param offset Position of its first byte in the file.
+ * @param nbytes Its size in the file: the distance to the next chunk, which is the compressed size for chunks
+ * written in order and otherwise at most the largest possible chunk size.  0 for chunks that the index codes as a
+ * special value (zeros, NaNs, uninitialized), which have no bytes in the file.
+ *
+ * @return 0 on success, or a negative error code (e.g. for super-chunks in memory or in sparse frames).
+ */
+BLOSC_EXPORT int blosc2_schunk_get_chunk_range(blosc2_schunk *schunk, int64_t nchunk, int64_t *offset,
+                                               int64_t *nbytes);
 
 /**
  * @brief Decompress a single variable-length block from a schunk chunk.
@@ -2509,7 +2836,8 @@ BLOSC_EXPORT int blosc2_vlmeta_exists(blosc2_schunk *schunk, const char *name);
  * @param content The content to be added.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
- * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used. Their prefilter, if any, is not applied (the content
+ * is not chunk data).
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
@@ -2525,7 +2853,8 @@ BLOSC_EXPORT int blosc2_vlmeta_add(blosc2_schunk *schunk, const char *name,
  * @param content The new content of the variable-length metalayer.
  * @param content_len The length of the content.
  * @param cparams The parameters for compressing the variable-length metalayer content. If NULL,
- * the `BLOSC2_CPARAMS_DEFAULTS` will be used.
+ * the `BLOSC2_CPARAMS_DEFAULTS` will be used. Their prefilter, if any, is not applied (the content
+ * is not chunk data).
  *
  * @return If successful, the index of the variable-length metalayer. Else, return a negative value.
  */
@@ -2547,6 +2876,8 @@ BLOSC_EXPORT int blosc2_vlmeta_update(blosc2_schunk *schunk, const char *name,
  * @note For disk-based super-chunks, this checks whether another handle has
  * rewritten the frame and, if so, re-reads the cached metalayers first, so
  * updates made through other handles (or processes) become visible.
+ *
+ * @note The postfilter of the super-chunk is not applied (the content is not chunk data).
  *
  * @return If successful, the index of the new variable-length metalayer. Else, return a negative value.
  */
@@ -2677,6 +3008,40 @@ BLOSC_EXPORT void blosc1_set_blocksize(size_t blocksize);
   * This function should always succeed.
  */
 BLOSC_EXPORT void blosc1_set_splitmode(int splitmode);
+
+/**
+ * @brief Make a compression context write Blosc1 chunks.
+ *
+ * The chunks use format version 2 and the 16-byte header, so that they can also be
+ * decoded by C-Blosc 1.x.  They are not byte-identical to what C-Blosc 1.x would write.
+ * Contexts do not write Blosc1 chunks by default.
+ *
+ * The chunk format has room for a plain shuffle or bitshuffle filter, in whichever slot of
+ * the filter pipeline it is, and for the blosclz, lz4, lz4hc, zlib and zstd codecs.  A
+ * compression call on a context that has any other filter or more than one filter, another
+ * codec, a dictionary or variable-length blocks fails with an error.  A prefilter is applied
+ * as usual: the chunk records nothing about it, so a reader gets the prefiltered data.
+ *
+ * @param context A compression context.
+ * @param enable Whether to write Blosc1 chunks.
+ *
+ * @return 0 on success, a negative error code otherwise.
+ *
+ * @sa #blosc2_ctx_get_blosc1_format
+ */
+BLOSC_EXPORT int blosc2_ctx_set_blosc1_format(blosc2_context* context, bool enable);
+
+/**
+ * @brief Query whether a compression context writes Blosc1 chunks.
+ *
+ * @param context A compression context.
+ *
+ * @return true if the context is set to write Blosc1 chunks, false if it is not or if
+ * @p context is NULL.
+ *
+ * @sa #blosc2_ctx_set_blosc1_format
+ */
+BLOSC_EXPORT bool blosc2_ctx_get_blosc1_format(const blosc2_context* context);
 
 
 /**

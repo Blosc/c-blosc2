@@ -75,38 +75,20 @@ shuffle2_avx2(uint8_t* const dest, const uint8_t* const src,
               const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 2;
   int32_t j;
-  int k;
-  __m256i ymm0[2], ymm1[2];
-
-  /* Create the shuffle mask.
-     NOTE: The XMM/YMM 'set' intrinsics require the arguments to be ordered from
-     most to least significant (i.e., their order is reversed when compared to
-     loading the mask from an array). */
-  const __m256i shmask = _mm256_set_epi8(
-      0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
-      0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00,
-      0x0f, 0x0d, 0x0b, 0x09, 0x07, 0x05, 0x03, 0x01,
-      0x0e, 0x0c, 0x0a, 0x08, 0x06, 0x04, 0x02, 0x00);
+  const __m256i mask = _mm256_set1_epi16(0x00ff);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m256i)) {
-    /* Fetch 32 elements (64 bytes) then transpose bytes, words and double words. */
-    for (k = 0; k < 2; k++) {
-      ymm0[k] = _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype) + (k * sizeof(__m256i))));
-      ymm1[k] = _mm256_shuffle_epi8(ymm0[k], shmask);
-    }
-
-    ymm0[0] = _mm256_permute4x64_epi64(ymm1[0], 0xd8);
-    ymm0[1] = _mm256_permute4x64_epi64(ymm1[1], 0x8d);
-
-    ymm1[0] = _mm256_blend_epi32(ymm0[0], ymm0[1], 0xf0);
-    ymm0[1] = _mm256_blend_epi32(ymm0[0], ymm0[1], 0x0f);
-    ymm1[1] = _mm256_permute4x64_epi64(ymm0[1], 0x4e);
+    /* Fetch 32 elements (64 bytes), pack low/high bytes, and fix cross-lane order. */
+    __m256i y0 = _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype)));
+    __m256i y1 = _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype) + sizeof(__m256i)));
+    __m256i lo = _mm256_permute4x64_epi64(
+        _mm256_packus_epi16(_mm256_and_si256(y0, mask), _mm256_and_si256(y1, mask)), 0xd8);
+    __m256i hi = _mm256_permute4x64_epi64(
+        _mm256_packus_epi16(_mm256_srli_epi16(y0, 8), _mm256_srli_epi16(y1, 8)), 0xd8);
 
     /* Store the result vectors */
-    uint8_t* const dest_for_jth_element = dest + j;
-    for (k = 0; k < 2; k++) {
-      _mm256_storeu_si256((__m256i*)(dest_for_jth_element + (k * total_elements)), ymm1[k]);
-    }
+    _mm256_storeu_si256((__m256i*)(dest + j), lo);
+    _mm256_storeu_si256((__m256i*)(dest + j + total_elements), hi);
   }
 }
 
@@ -123,18 +105,20 @@ shuffle4_avx2(uint8_t* const dest, const uint8_t* const src,
      NOTE: The XMM/YMM 'set' intrinsics require the arguments to be ordered from
      most to least significant (i.e., their order is reversed when compared to
      loading the mask from an array). */
+  const __m256i shmask = _mm256_set_epi8(
+      0x0f, 0x0b, 0x07, 0x03, 0x0e, 0x0a, 0x06, 0x02,
+      0x0d, 0x09, 0x05, 0x01, 0x0c, 0x08, 0x04, 0x00,
+      0x0f, 0x0b, 0x07, 0x03, 0x0e, 0x0a, 0x06, 0x02,
+      0x0d, 0x09, 0x05, 0x01, 0x0c, 0x08, 0x04, 0x00);
   const __m256i mask = _mm256_set_epi32(
       0x07, 0x03, 0x06, 0x02, 0x05, 0x01, 0x04, 0x00);
 
   for (i = 0; i < vectorizable_elements; i += sizeof(__m256i)) {
-    /* Fetch 32 elements (128 bytes) then transpose bytes and words. */
+    /* Fetch 32 elements (128 bytes) then transpose bytes and words within 128-bit lanes. */
     for (j = 0; j < 4; j++) {
-      ymm0[j] = _mm256_loadu_si256((__m256i*)(src + (i * bytesoftype) + (j * sizeof(__m256i))));
-      ymm1[j] = _mm256_shuffle_epi32(ymm0[j], 0xd8);
-      ymm0[j] = _mm256_shuffle_epi32(ymm0[j], 0x8d);
-      ymm0[j] = _mm256_unpacklo_epi8(ymm1[j], ymm0[j]);
-      ymm1[j] = _mm256_shuffle_epi32(ymm0[j], 0x04e);
-      ymm0[j] = _mm256_unpacklo_epi16(ymm0[j], ymm1[j]);
+      ymm0[j] = _mm256_shuffle_epi8(
+          _mm256_loadu_si256((__m256i*)(src + (i * bytesoftype) + (j * sizeof(__m256i)))),
+          shmask);
     }
     /* Transpose double words */
     for (j = 0; j < 2; j++) {
@@ -165,13 +149,23 @@ shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
   int32_t j;
   int k, l;
   __m256i ymm0[8], ymm1[8];
+  const __m256i shmask_in = _mm256_set_epi8(
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00,
+      0x0f, 0x07, 0x0e, 0x06, 0x0d, 0x05, 0x0c, 0x04,
+      0x0b, 0x03, 0x0a, 0x02, 0x09, 0x01, 0x08, 0x00);
+  const __m256i shmask_out = _mm256_set_epi8(
+      0x0f, 0x0e, 0x07, 0x06, 0x0d, 0x0c, 0x05, 0x04,
+      0x0b, 0x0a, 0x03, 0x02, 0x09, 0x08, 0x01, 0x00,
+      0x0f, 0x0e, 0x07, 0x06, 0x0d, 0x0c, 0x05, 0x04,
+      0x0b, 0x0a, 0x03, 0x02, 0x09, 0x08, 0x01, 0x00);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m256i)) {
     /* Fetch 32 elements (256 bytes) then transpose bytes. */
     for (k = 0; k < 8; k++) {
-      ymm0[k] = _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype) + (k * sizeof(__m256i))));
-      ymm1[k] = _mm256_shuffle_epi32(ymm0[k], 0x4e);
-      ymm1[k] = _mm256_unpacklo_epi8(ymm0[k], ymm1[k]);
+      ymm1[k] = _mm256_shuffle_epi8(
+          _mm256_loadu_si256((__m256i*)(src + (j * bytesoftype) + (k * sizeof(__m256i)))),
+          shmask_in);
     }
     /* Transpose words */
     for (k = 0, l = 0; k < 4; k++, l += 2) {
@@ -190,9 +184,8 @@ shuffle8_avx2(uint8_t* const dest, const uint8_t* const src,
       ymm0[k * 2 + 1] = _mm256_unpackhi_epi64(ymm1[k], ymm1[k + 4]);
     }
     for (k = 0; k < 8; k++) {
-      ymm1[k] = _mm256_permute4x64_epi64(ymm0[k], 0x72);
-      ymm0[k] = _mm256_permute4x64_epi64(ymm0[k], 0xD8);
-      ymm0[k] = _mm256_unpacklo_epi16(ymm0[k], ymm1[k]);
+      ymm0[k] = _mm256_shuffle_epi8(
+          _mm256_permute4x64_epi64(ymm0[k], 0xD8), shmask_out);
     }
     /* Store the result vectors */
     uint8_t* const dest_for_jth_element = dest + j;

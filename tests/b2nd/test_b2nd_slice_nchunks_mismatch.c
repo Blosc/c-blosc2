@@ -1,0 +1,152 @@
+/*********************************************************************
+  Blosc - Blocked Shuffling and Compression Library
+
+  Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
+
+  See LICENSE.txt for details about copyright and rights to use.
+**********************************************************************/
+
+/* Regression test for a heap out-of-bounds write in b2nd_get_slice_nchunks().
+   The chunks_idx buffer was sized from schunk->nchunks, while the loop filling
+   it runs once per chunk of the bounding box derived from the b2nd shape and
+   chunkshape.  A container whose metalayer announces more chunks than the
+   frame stores makes that loop write past the end of the allocation, both
+   through the public blosc2_get_slice_nchunks() and through the single-chunk
+   fast path b2nd_to_cbuffer() takes. */
+
+#include "test_common.h"
+
+/* A schunk carrying a b2nd metalayer that announces `nitems` chunks of one
+   item each, with only `nchunks_stored` of them actually appended. */
+static blosc2_schunk *crafted_schunk(int64_t nitems, int64_t nchunks_stored) {
+  int64_t shape[1] = {nitems};
+  int32_t chunkshape[1] = {1};
+  int32_t blockshape[1] = {1};
+  uint8_t *smeta = NULL;
+  int32_t smeta_len = b2nd_serialize_meta(1, shape, chunkshape, blockshape,
+                                          "|u1", DTYPE_NUMPY_FORMAT, &smeta);
+  if (smeta_len < 0) {
+    return NULL;
+  }
+
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = 1;
+  blosc2_storage storage = {.cparams=&cparams, .contiguous=true};
+  blosc2_schunk *schunk = blosc2_schunk_new(&storage);
+  if (schunk == NULL) {
+    free(smeta);
+    return NULL;
+  }
+  int rc = blosc2_meta_add(schunk, "b2nd", smeta, smeta_len);
+  free(smeta);
+  if (rc < 0) {
+    blosc2_schunk_free(schunk);
+    return NULL;
+  }
+
+  uint8_t item = 0xa5;
+  for (int64_t i = 0; i < nchunks_stored; i++) {
+    if (blosc2_schunk_append_buffer(schunk, &item, 1) < 0) {
+      blosc2_schunk_free(schunk);
+      return NULL;
+    }
+  }
+  return schunk;
+}
+
+CUTEST_TEST_SETUP(slice_nchunks_mismatch) {
+  blosc2_init();
+}
+
+CUTEST_TEST_TEST(slice_nchunks_mismatch) {
+  /* A mebichunk announced, one stored: the loop used to push 8 MiB of chunk
+     indexes into an 8-byte allocation, which aborts the test runner.  The
+     array that blosc2_get_slice_nchunks() builds out of the schunk now
+     rejects the missing chunks before that. */
+  const int64_t nitems = 1024 * 1024;
+  blosc2_schunk *schunk = crafted_schunk(nitems, 1);
+  CUTEST_ASSERT("cannot build the crafted schunk", schunk != NULL);
+  CUTEST_ASSERT("the frame should hold a single chunk", schunk->nchunks == 1);
+
+  int64_t start = 0;
+  int64_t stop = nitems;
+  int64_t *chunks_idx = NULL;
+  int64_t nchunks = blosc2_get_slice_nchunks(schunk, &start, &stop, &chunks_idx);
+  CUTEST_ASSERT("a schunk without the announced chunks must be rejected", nchunks < 0);
+  CUTEST_ASSERT("no chunk index buffer must be returned", chunks_idx == NULL);
+  blosc2_schunk_free(schunk);
+
+  /* With all its chunks stored, the slice spans every one of them */
+  schunk = crafted_schunk(nitems, 0);
+  CUTEST_ASSERT("cannot build the crafted schunk", schunk != NULL);
+  CUTEST_ASSERT("cannot store the chunks",
+                blosc2_schunk_fill_special(schunk, nitems, BLOSC2_SPECIAL_ZERO, 1) == nitems);
+  nchunks = blosc2_get_slice_nchunks(schunk, &start, &stop, &chunks_idx);
+  CUTEST_ASSERT("the slice should span every announced chunk", nchunks == nitems);
+  CUTEST_ASSERT("no chunk index buffer was returned", chunks_idx != NULL);
+  CUTEST_ASSERT("unexpected first chunk index", chunks_idx[0] == 0);
+  CUTEST_ASSERT("unexpected last chunk index", chunks_idx[nchunks - 1] == nitems - 1);
+  free(chunks_idx);
+  blosc2_schunk_free(schunk);
+
+  /* Same mismatch seen from b2nd_to_cbuffer(): one item announced and no chunk
+     stored, so the single-chunk fast path indexed a zero-sized allocation.  It
+     must now report the missing chunk instead.  b2nd_from_schunk() rejects a
+     schunk without it, so the chunk goes away after the array is built. */
+  blosc2_schunk *empty = crafted_schunk(1, 1);
+  CUTEST_ASSERT("cannot build the empty crafted schunk", empty != NULL);
+  b2nd_array_t *array = NULL;
+  B2ND_TEST_ASSERT(b2nd_from_schunk(empty, &array));
+  CUTEST_ASSERT("cannot delete the only chunk", blosc2_schunk_delete_chunk(array->sc, 0) == 0);
+  uint8_t out = 0;
+  CUTEST_ASSERT("reading an announced but absent chunk must fail",
+                b2nd_to_cbuffer(array, &out, 1) < 0);
+  B2ND_TEST_ASSERT(b2nd_free(array));
+
+  /* Test slice bounds handling: negative indices must fail */
+  int64_t neg_start = -1;
+  int64_t neg_stop = 10;
+  int64_t *dummy_idx = NULL;
+  blosc2_schunk *schunk_bounds = crafted_schunk(10, 10);
+  CUTEST_ASSERT("cannot build schunk_bounds", schunk_bounds != NULL);
+  CUTEST_ASSERT("negative start must fail",
+                blosc2_get_slice_nchunks(schunk_bounds, &neg_start, &neg_stop, &dummy_idx) == BLOSC2_ERROR_INVALID_PARAM);
+
+  /* Empty slice: start >= stop or start >= shape must return 0 chunks and NULL buffer */
+  int64_t empty_start = 5;
+  int64_t empty_stop = 5;
+  int64_t nchunks_empty = blosc2_get_slice_nchunks(schunk_bounds, &empty_start, &empty_stop, &dummy_idx);
+  CUTEST_ASSERT("start == stop must return 0 chunks", nchunks_empty == 0);
+  CUTEST_ASSERT("start == stop must leave chunks_idx NULL", dummy_idx == NULL);
+
+  empty_start = 10;
+  empty_stop = 15;
+  nchunks_empty = blosc2_get_slice_nchunks(schunk_bounds, &empty_start, &empty_stop, &dummy_idx);
+  CUTEST_ASSERT("start >= shape must return 0 chunks", nchunks_empty == 0);
+  CUTEST_ASSERT("start >= shape must leave chunks_idx NULL", dummy_idx == NULL);
+
+  /* Out-of-bounds stop clamping: stop well beyond shape must not cause oversized allocation */
+  int64_t large_start = 0;
+  int64_t large_stop = INT64_MAX / 2;
+  int64_t nchunks_clamped = blosc2_get_slice_nchunks(schunk_bounds, &large_start, &large_stop, &dummy_idx);
+  CUTEST_ASSERT("stop beyond shape must be clamped to array extent", nchunks_clamped == 10);
+  CUTEST_ASSERT("chunks_idx must not be NULL", dummy_idx != NULL);
+  CUTEST_ASSERT("chunks_idx[0] should be 0", dummy_idx[0] == 0);
+  CUTEST_ASSERT("chunks_idx[9] should be 9", dummy_idx[9] == 9);
+  free(dummy_idx);
+  dummy_idx = NULL;
+
+  blosc2_schunk_free(schunk_bounds);
+
+  return 0;
+}
+
+CUTEST_TEST_TEARDOWN(slice_nchunks_mismatch) {
+  blosc2_destroy();
+}
+
+int main(void) {
+  CUTEST_TEST_RUN(slice_nchunks_mismatch);
+}

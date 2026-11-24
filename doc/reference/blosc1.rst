@@ -20,6 +20,8 @@ Main API
 
 .. doxygenfunction:: blosc2_set_nthreads
 
+.. doxygenfunction:: blosc2_set_prefetch
+
 .. doxygentypedef:: blosc_threads_callback
 
 .. doxygenfunction:: blosc2_set_threads_callback

@@ -175,6 +175,172 @@ static int test_blosclz_roundtrip_valid(void) {
   return EXIT_SUCCESS;
 }
 
+/* Exercise vector scan tails, short matches, runs and unaligned inputs.
+ * Allocations end at the last valid byte so ASan also detects overreads. */
+static int test_blosclz_synthetic_roundtrips(void) {
+  const int sizes[] = {16, 17, 31, 32, 33, 63, 64, 65, 127, 128, 129,
+                       255, 256, 257, 352, 1023, 1024, 1025, 16000, 131073};
+  for (size_t s = 0; s < ARRAY_SIZE(sizes); s++) {
+    int size = sizes[s];
+    for (int offset = 0; offset <= 1; offset++) {
+      uint8_t *allocation = malloc((size_t)size + offset);
+      uint8_t *compressed = malloc((size_t)size + size / 20 + 66);
+      uint8_t *decompressed = malloc((size_t)size);
+      if (!allocation || !compressed || !decompressed) {
+        free(allocation);
+        free(compressed);
+        free(decompressed);
+        return EXIT_FAILURE;
+      }
+      uint8_t *src = allocation + offset;
+      for (int pattern = 0; pattern < 7; pattern++) {
+        uint32_t state = 42;
+        int remaining = 0;
+        uint8_t run_value = 0;
+        for (int i = 0; i < size; i++) {
+          state ^= state << 13;
+          state ^= state >> 17;
+          state ^= state << 5;
+          switch (pattern) {
+            case 0: src[i] = 0xa5; break;
+            case 1: src[i] = (uint8_t)(i % 7); break;
+            case 2: src[i] = (uint8_t)((i % 9 == 0) ? i / 9 : i % 9); break;
+            case 3:
+              /* Move the first mismatch through every lane of a 64-byte group. */
+              src[i] = (uint8_t)((i % 256 < 128 + (i / 256) % 64) ? 7 : i / 256);
+              break;
+            case 4: src[i] = (uint8_t)state; break;
+            case 5:
+              if (remaining == 0) {
+                remaining = 1 + (int)(state & 255);
+                run_value++;
+              }
+              src[i] = run_value;
+              remaining--;
+              break;
+            default:
+              /* A vector-aligned run followed immediately by a different run.
+               * The tail must retain the first run's byte, not reload ip[-1]. */
+              src[i] = (uint8_t)(i < 27 ? i : (i < 335 ? 0 : 129));
+              break;
+          }
+        }
+        for (int level = 1; level <= 9; level++) {
+          for (int limited = 0; limited <= 1; limited++) {
+            int capacity = limited ? 66 : size + size / 20 + 66;
+            int csize = blosclz_compress(level, src, size, compressed, capacity, NULL);
+            if (csize == 0) {
+              if (!limited && size >= 1024 && pattern <= 1) {
+                printf("Failed to compress synthetic pattern %d at level %d\n", pattern, level);
+                free(allocation);
+                free(compressed);
+                free(decompressed);
+                return EXIT_FAILURE;
+              }
+              continue;
+            }
+            if (csize < 0 || csize > capacity ||
+                blosclz_decompress(compressed, csize, decompressed, size) != size ||
+                memcmp(src, decompressed, (size_t)size) != 0) {
+              printf("Synthetic roundtrip failed: size=%d offset=%d pattern=%d level=%d cap=%d\n",
+                     size, offset, pattern, level, capacity);
+              free(allocation);
+              free(compressed);
+              free(decompressed);
+              return EXIT_FAILURE;
+            }
+          }
+        }
+      }
+      free(allocation);
+      free(compressed);
+      free(decompressed);
+    }
+  }
+  return EXIT_SUCCESS;
+}
+
+/* Construct streams independently of the encoder, covering both overlap-copy
+ * widths, literal overcopy boundaries and long extension chains. */
+static int test_blosclz_decode_copies(void) {
+  const int lengths[] = {3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33,
+                         63, 64, 65, 255, 256, 257, 2049, 4090, 65536};
+  for (int distance = 1; distance <= 64; distance++) {
+    for (size_t l = 0; l < ARRAY_SIZE(lengths); l++) {
+      int length = lengths[l];
+      for (int tail = 1; tail <= 32; tail += 15) {
+        int nbytes = 64 + length + tail;
+        int capacity = 2 + 64 + 4 + length / 255 + 1 + tail;
+        uint8_t *stream = malloc((size_t)capacity);
+        uint8_t *expected = malloc((size_t)nbytes);
+        if (!stream || !expected) {
+          free(stream);
+          free(expected);
+          return EXIT_FAILURE;
+        }
+        int pos = 0;
+        for (int i = 0; i < 64; i++) {
+          if (i % 32 == 0) {
+            stream[pos++] = 31;  /* 32 literal bytes */
+          }
+          stream[pos++] = expected[i] = (uint8_t)(i * 37 + 11);
+        }
+        stream[0] |= 32;  /* BloscLZ marker */
+        if (length < 9) {
+          stream[pos++] = (uint8_t)((length - 2) << 5);
+        }
+        else {
+          stream[pos++] = 7 << 5;
+          int remaining = length - 9;
+          while (remaining >= 255) {
+            stream[pos++] = 255;
+            remaining -= 255;
+          }
+          stream[pos++] = (uint8_t)remaining;
+        }
+        stream[pos++] = (uint8_t)(distance - 1);
+        for (int i = 64; i < 64 + length; i++) {
+          expected[i] = expected[i - distance];
+        }
+        stream[pos++] = (uint8_t)(tail - 1);
+        for (int i = 0; i < tail; i++) {
+          stream[pos++] = expected[64 + length + i] = (uint8_t)i;
+        }
+        for (int offset = 0; offset <= 1; offset++) {
+          /* No readable/writable suffix padding. */
+          uint8_t *input = malloc((size_t)pos + offset);
+          uint8_t *output = malloc((size_t)nbytes + offset);
+          if (!input || !output) {
+            free(input);
+            free(output);
+            free(stream);
+            free(expected);
+            return EXIT_FAILURE;
+          }
+          memcpy(input + offset, stream, (size_t)pos);
+          int dsize = blosclz_decompress(input + offset, pos, output + offset, nbytes);
+          if (dsize != nbytes || memcmp(output + offset, expected, (size_t)nbytes) != 0 ||
+              blosclz_decompress(input + offset, pos, output + offset, nbytes - 1) != 0 ||
+              blosclz_decompress(input + offset, pos - 1, output + offset, nbytes) != 0) {
+            printf("Decode copy failed: distance=%d length=%d tail=%d offset=%d\n",
+                   distance, length, tail, offset);
+            free(input);
+            free(output);
+            free(stream);
+            free(expected);
+            return EXIT_FAILURE;
+          }
+          free(input);
+          free(output);
+        }
+        free(stream);
+        free(expected);
+      }
+    }
+  }
+  return EXIT_SUCCESS;
+}
+
 int main(void) {
   blosc2_init();
 
@@ -194,6 +360,16 @@ int main(void) {
   }
 
   if (test_blosclz_roundtrip_valid() != EXIT_SUCCESS) {
+    blosc2_destroy();
+    return EXIT_FAILURE;
+  }
+
+  if (test_blosclz_synthetic_roundtrips() != EXIT_SUCCESS) {
+    blosc2_destroy();
+    return EXIT_FAILURE;
+  }
+
+  if (test_blosclz_decode_copies() != EXIT_SUCCESS) {
     blosc2_destroy();
     return EXIT_FAILURE;
   }

@@ -9,6 +9,12 @@
 # A simple way to detect that we are using CMAKE
 add_definitions(-DUSING_CMAKE)
 
+# Internal pair dispatch only: stored filters and public APIs are unchanged.
+option(BLOSC2_FUSED_SHUFFLE_BYTEDELTA "Fuse matching SHUFFLE and BYTEDELTA filters on ARM64/SSSE3" ON)
+if(BLOSC2_FUSED_SHUFFLE_BYTEDELTA)
+    add_compile_definitions(BLOSC_FUSED_SHUFFLE_BYTEDELTA)
+endif()
+
 set(version_string ${BLOSC2_VERSION_MAJOR}.${BLOSC2_VERSION_MINOR}.${BLOSC2_VERSION_PATCH})
 
 # Utils include directory
@@ -32,7 +38,7 @@ if(BUILD_SHARED)
     endif()
     set_target_properties(blosc2_shared PROPERTIES
         VERSION ${version_string}
-        SOVERSION 9  # Change this when an ABI change happens
+        SOVERSION 10  # Change this when an ABI change happens
     )
     target_compile_definitions(blosc2_shared PRIVATE BLOSC_SHARED_LIBRARY)
     target_include_directories(blosc2_shared PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -107,6 +113,11 @@ endif()
 #   "link" dependent targets via target_link_libraries (preferred) and
 #   manually add includes / libs for others
 if(LZ4_FOUND)
+    # The fast-reset extState entry point is a static-only API. Do not require
+    # it from external shared LZ4 libraries, which need not export that symbol.
+    if(LZ4_FETCHED)
+        add_compile_definitions(BLOSC_LZ4_FAST_RESET)
+    endif()
     if(TARGET LZ4::lz4)
         list(APPEND LIBS LZ4::lz4)
     elseif(TARGET lz4_static)
@@ -178,6 +189,7 @@ list(APPEND SOURCES
     blosc/fastcopy.h
     blosc/schunk.c
     blosc/frame.c
+    blosc/prefetch.c
     blosc/stune.c
     blosc/stune.h
     blosc/context.h
@@ -214,7 +226,8 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     endif()
     if(COMPILER_SUPPORT_AVX2)
         message(STATUS "Adding run-time support for AVX2")
-        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c)
+        list(APPEND SOURCES blosc/shuffle-avx2.c blosc/bitshuffle-avx2.c
+             blosc/shuffle-bytedelta-avx2.c blosc/blosclz-avx2.c)
     endif()
     if(COMPILER_SUPPORT_AVX512)
         message(STATUS "Adding run-time support for AVX512")
@@ -223,15 +236,22 @@ if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
 endif()
 if(COMPILER_SUPPORT_NEON)
     message(STATUS "Adding run-time support for NEON")
-    # bitshuffle-neon.c does not offer better speed than generic on arm64 (Mac M1).
-    # Besides, it does not compile on raspberry pi (armv7l), so disable it.
-    list(APPEND SOURCES blosc/shuffle-neon.c)  # blosc/bitshuffle-neon.c)
+    list(APPEND SOURCES blosc/shuffle-neon.c)
+    # The bitshuffle transpose uses AArch64 zip1/zip2 instructions.  Keep
+    # ARMv7 builds on the generic bitshuffle implementation.
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64|AARCH64)$")
+        list(APPEND SOURCES blosc/bitshuffle-neon.c)
+        set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS BITSHUFFLE_NEON_ENABLED)
+    endif()
 endif()
 if(COMPILER_SUPPORT_ALTIVEC)
     message(STATUS "Adding run-time support for ALTIVEC")
     list(APPEND SOURCES blosc/shuffle-altivec.c blosc/bitshuffle-altivec.c)
 endif()
 list(APPEND SOURCES blosc/shuffle.c)
+if(BUILD_PLUGINS)
+    set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_BYTEDELTA_NEON_ENABLED)
+endif()
 
 # Based on the target architecture and hardware features supported
 # by the C compiler, set hardware architecture optimization flags
@@ -263,6 +283,17 @@ if(COMPILER_SUPPORT_SSE2)
     if(SSSE3_FLAG)
         set_source_files_properties( ${PROJECT_SOURCE_DIR}/plugins/filters/bytedelta/bytedelta.c PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}" COMPILE_DEFINITIONS "HAVE_SSSE3=1" )
     endif()
+    if(SSSE3_FLAG)
+        # Keep SSSE3 confined to its translation unit; shuffle.c remains baseline
+        # ISA and selects this implementation only after the runtime CPUID check.
+        # Without an accepted SSSE3 flag the pair stays unavailable and every
+        # call falls back to the staged filters.
+        list(APPEND SOURCES blosc/shuffle-bytedelta-ssse3.c)
+        set_source_files_properties(shuffle-bytedelta-ssse3.c
+            PROPERTIES COMPILE_OPTIONS "${SSSE3_FLAG}")
+        set_property(SOURCE shuffle.c APPEND PROPERTY COMPILE_DEFINITIONS
+            SHUFFLE_BYTEDELTA_SSSE3_ENABLED)
+    endif()
 
     # Define a symbol for the shuffle-dispatch implementation
     # so it knows SSE2 is supported even though that file is
@@ -276,11 +307,11 @@ endif()
 if(COMPILER_SUPPORT_AVX2)
     if(MSVC)
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c
+                shuffle-avx2.c bitshuffle-avx2.c shuffle-bytedelta-avx2.c blosclz-avx2.c
                 PROPERTIES COMPILE_OPTIONS "/arch:AVX2")
     else()
         set_source_files_properties(
-                shuffle-avx2.c bitshuffle-avx2.c
+                shuffle-avx2.c bitshuffle-avx2.c shuffle-bytedelta-avx2.c blosclz-avx2.c
                 PROPERTIES COMPILE_OPTIONS -mavx2)
     endif()
 
@@ -289,7 +320,10 @@ if(COMPILER_SUPPORT_AVX2)
     # compiled without AVX2 support (for portability).
     set_property(
             SOURCE shuffle.c
-            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED)
+            APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX2_ENABLED SHUFFLE_BYTEDELTA_AVX2_ENABLED)
+    set_property(
+            SOURCE blosclz.c blosc2.c
+            APPEND PROPERTY COMPILE_DEFINITIONS BLOSCLZ_AVX2_ENABLED)
 endif()
 if(COMPILER_SUPPORT_AVX512)
     if(MSVC)

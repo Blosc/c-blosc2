@@ -232,9 +232,23 @@ BLOSC_EXPORT int b2nd_full(b2nd_context_t *ctx, b2nd_array_t **array, const void
  *
  * @param array The array.
  *
- * @return An error code.
+ * @return 0 on success, or a negative error code if freeing the underlying
+ * super-chunk resources fails (the array struct itself is still freed).
  */
 BLOSC_EXPORT int b2nd_free(b2nd_array_t *array);
+
+/**
+ * @brief Flush pending writes of an array to persistent storage.
+ *
+ * Synchronizes written data of an on-disk array and closes any cached writable
+ * handle so delayed I/O errors (such as NFS quota exceeded reported at
+ * `fsync()`/`close()`) are caught explicitly before calling b2nd_free().
+ *
+ * @param array The array to flush.
+ *
+ * @return 0 on success; a negative error code otherwise.
+ */
+BLOSC_EXPORT int b2nd_flush(b2nd_array_t *array);
 
 /**
  * @brief Create a b2nd array from a super-chunk. It can only be used if the array
@@ -243,7 +257,9 @@ BLOSC_EXPORT int b2nd_free(b2nd_array_t *array);
  * @param schunk The blosc super-chunk where the b2nd array is stored.
  * @param array The memory pointer where the array will be created.
  *
- * @return An error code.
+ * @return An error code. BLOSC2_ERROR_INVALID_HEADER when the super-chunk contradicts its b2nd metalayer
+ * (fewer chunks than the shape covers, or chunks of another size than the chunk shape times the typesize),
+ * as a damaged frame does. On failure the super-chunk stays with the caller.
  */
 BLOSC_EXPORT int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
 
@@ -254,6 +270,9 @@ BLOSC_EXPORT int b2nd_from_schunk(blosc2_schunk *schunk, b2nd_array_t **array);
  * @param cframe The pointer of the buffer where the in-memory array will be copied.
  * @param cframe_len The length of the in-memory array buffer.
  * @param needs_free Whether the buffer should be freed or not.
+ *
+ * @remark The frame holds the chunks as they are stored, without applying a
+ * postfilter of @p array (see blosc2_schunk_to_buffer()).
  *
  * @return An error code
  */
@@ -299,6 +318,10 @@ BLOSC_EXPORT int b2nd_open_offset(const char *urlpath, b2nd_array_t **array, int
  * @param array The array to be saved.
  * @param urlpath The urlpath where the array will be stored.
  *
+ * @remark It saves the chunks as they are stored, without applying a
+ * postfilter of @p array (like b2nd_to_cframe() and b2nd_save_append(), unlike
+ * b2nd_copy()), as a contiguous or sparse frame like @p array.
+ *
  * @return An error code.
  */
 BLOSC_EXPORT int b2nd_save(const b2nd_array_t *array, char *urlpath);
@@ -308,6 +331,9 @@ BLOSC_EXPORT int b2nd_save(const b2nd_array_t *array, char *urlpath);
  *
  * @param array The array to write.
  * @param urlpath The path for persistent storage.
+ *
+ * @remark It appends the chunks as they are stored, without applying a
+ * postfilter of @p array (see blosc2_schunk_append_file()).
  *
  * @return If successful, return the offset where @p array has been appended in @p urlpath.
  * Else, a negative value.
@@ -444,6 +470,29 @@ BLOSC_EXPORT int b2nd_get_slice_cbuffer(const b2nd_array_t *array, const int64_t
                                         void *buffer, const int64_t *buffershape, int64_t buffersize);
 
 /**
+ * @brief Get a slice from an array into a box of a larger C buffer.
+ *
+ * Like b2nd_get_slice_cbuffer(), but @p buffer may lie inside a larger C-order array of shape @p buffershape:
+ * the slice goes to the box of that array whose first item is at @p buffer, and no other byte of it is read or
+ * written. This decompresses a slice straight into its place in an existing array, e.g. into the interior of a
+ * padded array, into one item of a batch, or into one channel of a multi-channel buffer, without a temporary and
+ * without the extra copy. (b2nd_get_slice_cbuffer() fills the part of its buffer outside the slice with zeros,
+ * so its buffer always starts at the slice.)
+ *
+ * @param array The array from which the slice will be extracted.
+ * @param start The coordinates where the slice will begin (0 <= start <= stop).
+ * @param stop The coordinates where the slice will end (stop <= the array's shape).
+ * @param buffer Where the first item of the slice goes.
+ * @param buffershape The shape of the larger C-order array that @p buffer lies in; at least the slice's shape in
+ * every dimension. Only buffershape[1:] matter for the layout (they give the strides).
+ * @param buffersize The size (in bytes) of the larger array from @p buffer to its end; the slice's box must fit.
+ *
+ * @return An error code. An empty slice writes nothing and succeeds.
+ */
+BLOSC_EXPORT int b2nd_get_slice_cbuffer_into(const b2nd_array_t *array, const int64_t *start, const int64_t *stop,
+                                             void *buffer, const int64_t *buffershape, int64_t buffersize);
+
+/**
  * @brief Set a slice in a b2nd array using a C buffer.
  *
  * @param buffer The buffer where the slice data is.
@@ -468,6 +517,9 @@ BLOSC_EXPORT int b2nd_set_slice_cbuffer(const void *buffer, const int64_t *buffe
  * @return An error code
  *
  * @note The ndim and shape in ctx will be overwritten by the src ctx.
+ *
+ * @remark If @p src has a postfilter, the copy holds its output, as in
+ * blosc2_schunk_copy().
  *
  */
 BLOSC_EXPORT int b2nd_copy(b2nd_context_t *ctx, const b2nd_array_t *src, b2nd_array_t **array);
@@ -590,11 +642,13 @@ BLOSC_EXPORT int b2nd_delete(b2nd_array_t *array, int8_t axis,
  * @brief Get an element selection along each dimension of an array independently.
  *
  * @param array The array to get the data from.
- * @param selection The elements along each dimension.
- * @param selection_size The size of the selection along each dimension.
+ * @param selection The elements along each dimension, each in [0, shape) of its dimension
+ *   (BLOSC2_ERROR_INVALID_INDEX otherwise; negative indexes are not counted from the end).
+ * @param selection_size The size of the selection along each dimension (not negative).
  * @param buffer The buffer for getting the data.
- * @param buffershape The shape of the buffer.
- * @param buffersize The buffer size (in bytes).
+ * @param buffershape The shape of the buffer, at least selection_size on every dimension (the items go to
+ *   the first selection_size[i] positions of each dimension).
+ * @param buffersize The buffer size (in bytes), enough for the selection's last item.
  *
  * @return An error code.
  *
@@ -608,11 +662,13 @@ BLOSC_EXPORT int b2nd_get_orthogonal_selection(const b2nd_array_t *array, int64_
  * @brief Set an element selection along each dimension of an array independently.
  *
  * @param array The array to set the data to.
- * @param selection The elements along each dimension.
- * @param selection_size The size of the selection along each dimension.
+ * @param selection The elements along each dimension, each in [0, shape) of its dimension
+ *   (BLOSC2_ERROR_INVALID_INDEX otherwise; negative indexes are not counted from the end).
+ * @param selection_size The size of the selection along each dimension (not negative).
  * @param buffer The buffer with the data for setting.
- * @param buffershape The shape of the buffer.
- * @param buffersize The buffer size (in bytes).
+ * @param buffershape The shape of the buffer, at least selection_size on every dimension (the items are
+ *   read from the first selection_size[i] positions of each dimension).
+ * @param buffersize The buffer size (in bytes), enough for the selection's last item.
  *
  * @return An error code.
  *

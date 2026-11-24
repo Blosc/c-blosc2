@@ -80,6 +80,73 @@ static int zfp_check_output_size(int deserialize_rc, int8_t ndim,
   return BLOSC2_ERROR_SUCCESS;
 }
 
+/* Allocate a word-aligned, zero-padded input buffer sized to zfp_stream_maximum_size()
+ * and open a bitstream on it to guard against zfp's unbounded word reads. */
+static int zfp_open_padded_stream(const uint8_t *input, int32_t input_len,
+                                  zfp_stream *zfp, const zfp_field *field,
+                                  bitstream **stream_out, uint8_t **padded_buf_out) {
+  *stream_out = NULL;
+  *padded_buf_out = NULL;
+
+  if (input_len < 0) {
+    BLOSC_TRACE_ERROR("ZFP: invalid negative input length %d", input_len);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  /* zfp's bitstream reader fetches whole stream words (up to 64 bits) with no
+   * bounds checking (see stream_read_word() in zfp's bitstream.inl: "buffer
+   * overruns are not caught"), so the decoder can touch bytes past the
+   * validated input_len whenever the consumed bit count is not a whole
+   * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
+   * fixed-precision).  Decompress from a zero-padded copy sized to
+   * zfp_stream_maximum_size() -- zfp's own word-rounded upper bound for
+   * this stream configuration -- so those reads stay inside the
+   * allocation.  This cannot reject legitimate streams: it only widens
+   * the buffer the decoder sees. */
+  size_t zfp_maxin = zfp_stream_maximum_size(zfp, field);
+  if (zfp_maxin == 0) {
+    BLOSC_TRACE_ERROR("ZFP: cannot determine maximum bitstream size");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  size_t padded_len = zfp_maxin;
+  if (padded_len < (size_t) input_len) {
+    padded_len = (size_t) input_len;
+  }
+  if (padded_len > SIZE_MAX - (sizeof(uint64_t) - 1)) {
+    BLOSC_TRACE_ERROR("ZFP: padded input buffer size overflow");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  /* round up to whole 64-bit words */
+  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+  uint8_t *padded_input = malloc(padded_len);
+  if (padded_input == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded input buffer (%zu bytes)", padded_len);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  memcpy(padded_input, input, (size_t) input_len);
+  memset(padded_input + input_len, 0, padded_len - (size_t) input_len);
+  bitstream *stream = stream_open(padded_input, padded_len);
+  if (stream == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
+    free(padded_input);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  zfp_stream_set_bit_stream(zfp, stream);
+  zfp_stream_rewind(zfp);
+
+  *stream_out = stream;
+  *padded_buf_out = padded_input;
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+static void zfp_close_padded_stream(bitstream *stream, uint8_t *padded_buf) {
+  if (stream != NULL) {
+    stream_close(stream);
+  }
+  free(padded_buf);
+}
+
+
 
 int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
                      int32_t output_len, uint8_t meta, blosc2_cparams *cparams, const void *chunk) {
@@ -88,6 +155,9 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
   ZFP_ERROR_NULL(cparams->schunk);
+  if (output_len <= 0) {
+    return 0;
+  }
 
   double tol = (int8_t) meta;
   int8_t ndim;
@@ -219,8 +289,8 @@ int zfp_acc_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
-    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
+  if (zfpsize >= (size_t) input_len || zfpsize > (size_t) output_len) {
+    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input or output buffer! \n");
     free(aux_out);
     return 0;
   }
@@ -269,7 +339,8 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
   double tolerance = pow(10, tol);
 
@@ -290,9 +361,6 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_accuracy(zfp, tolerance);
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -317,15 +385,23 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   size_t blocks = zfp_field_blocks(field);
   size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
-  if (min_bytes < sizeof(uint64_t)) {
-    min_bytes = sizeof(uint64_t);
+  if (min_bytes < 1) {
+    min_bytes = 1;
   }
-  if (input_len < (int32_t) min_bytes) {
+  if (input_len < 0 || (size_t) input_len < min_bytes) {
     BLOSC_TRACE_ERROR("ZFP acc: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -337,7 +413,7 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
@@ -357,6 +433,9 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
   ZFP_ERROR_NULL(cparams->schunk);
+  if (output_len <= 0) {
+    return 0;
+  }
 
   int8_t ndim;
   int64_t *shape = malloc(B2ND_MAX_DIM * sizeof(int64_t));
@@ -512,8 +591,8 @@ int zfp_prec_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
-    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
+  if (zfpsize >= (size_t) input_len || zfpsize > (size_t) output_len) {
+    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input or output buffer! \n");
     free(aux_out);
     return 0;
   }
@@ -560,7 +639,8 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
 
   uint prec;
@@ -607,9 +687,6 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_precision(zfp, prec);
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -634,15 +711,23 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
   size_t blocks = zfp_field_blocks(field);
   size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
-  if (min_bytes < sizeof(uint64_t)) {
-    min_bytes = sizeof(uint64_t);
+  if (min_bytes < 1) {
+    min_bytes = 1;
   }
-  if (input_len < (int32_t) min_bytes) {
+  if (input_len < 0 || (size_t) input_len < min_bytes) {
     BLOSC_TRACE_ERROR("ZFP prec: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -654,7 +739,7 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
@@ -674,6 +759,9 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
   ZFP_ERROR_NULL(output);
   ZFP_ERROR_NULL(cparams);
   ZFP_ERROR_NULL(cparams->schunk);
+  if (output_len <= 0) {
+    return 0;
+  }
 
   double ratio = (double) meta / 100.0;
   int8_t ndim;
@@ -816,8 +904,8 @@ int zfp_rate_compress(const uint8_t *input, int32_t input_len, uint8_t *output,
     free(aux_out);
     return (int) zfpsize;
   }
-  if ((int32_t) zfpsize >= input_len) {
-    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input! \n");
+  if (zfpsize >= (size_t) input_len || zfpsize > (size_t) output_len) {
+    BLOSC_TRACE_ERROR("\n ZFP: Compressed data is bigger than input or output buffer! \n");
     free(aux_out);
     return 0;
   }
@@ -866,7 +954,8 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   zfp_type type;     /* array scalar type */
   zfp_field *field;  /* array meta data */
   zfp_stream *zfp;   /* compressed stream */
-  bitstream *stream; /* bit stream to write to or read from */
+  bitstream *stream = NULL; /* bit stream to write to or read from */
+  uint8_t *padded_input = NULL;
   size_t zfpsize;    /* byte size of compressed stream */
 
   switch (typesize) {
@@ -887,10 +976,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
       ratio * (double) typesize * 8;     // convert from output size / input size to output bits per input value
   zfp = zfp_stream_open(NULL);
   zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
-
-  stream = stream_open((void *) input, input_len);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
 
   switch (ndim) {
     case 1:
@@ -934,7 +1019,6 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
     BLOSC_TRACE_ERROR("ZFP rate: required bits overflow size_t");
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -942,15 +1026,23 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   }
   size_t required_bits = blocks * (size_t) bits;
   size_t required_bytes = (required_bits + CHAR_BIT - 1) / CHAR_BIT;
-  if (required_bytes < sizeof(uint64_t)) {
-    required_bytes = sizeof(uint64_t);
+  if (required_bytes < 1) {
+    required_bytes = 1;
   }
-  if (input_len < (int32_t) required_bytes) {
+  if (input_len < 0 || (size_t) input_len < required_bytes) {
     BLOSC_TRACE_ERROR("ZFP rate: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, required_bytes);
     zfp_field_free(field);
     zfp_stream_close(zfp);
-    stream_close(stream);
+    free(shape);
+    free(chunkshape);
+    free(blockshape);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  if (zfp_open_padded_stream(input, input_len, zfp, field, &stream, &padded_input) != BLOSC2_ERROR_SUCCESS) {
+    zfp_field_free(field);
+    zfp_stream_close(zfp);
     free(shape);
     free(chunkshape);
     free(blockshape);
@@ -962,7 +1054,7 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   /* clean up */
   zfp_field_free(field);
   zfp_stream_close(zfp);
-  stream_close(stream);
+  zfp_close_padded_stream(stream, padded_input);
   free(shape);
   free(chunkshape);
   free(blockshape);
@@ -986,27 +1078,43 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
     for (int nmetalayer = 0; nmetalayer < context->schunk->nmetalayers; nmetalayer++) {
       if (strcmp("b2nd", context->schunk->metalayers[nmetalayer]->name) == 0) {
         meta = true;
-        uint8_t *pmeta = context->schunk->metalayers[nmetalayer]->content;
-        ndim = (int8_t) pmeta[2];
-        assert(ndim <= ZFP_MAX_DIM);
-        pmeta += (6 + ndim * 9 + ndim * 5);
-        for (int8_t i = 0; (uint8_t) i < ndim; i++) {
-          pmeta += 1;
-          swap_store(blockmeta + i, pmeta, sizeof(int32_t));
-          pmeta += sizeof(int32_t);
+        int64_t shape[B2ND_MAX_DIM];
+        int32_t chunkshape[B2ND_MAX_DIM];
+        int32_t blockmeta_aux[B2ND_MAX_DIM];
+        int deserialize_rc = b2nd_deserialize_meta_inline(
+            context->schunk->metalayers[nmetalayer]->content,
+            context->schunk->metalayers[nmetalayer]->content_len,
+            &ndim, shape, chunkshape, blockmeta_aux, NULL, NULL);
+        if (deserialize_rc < 0 || ndim <= 0 || ndim > ZFP_MAX_DIM) {
+          BLOSC_TRACE_ERROR("Invalid b2nd meta info (ndim %d)", ndim);
+          return BLOSC2_ERROR_DATA;
         }
+        for (int8_t i = 0; i < ndim; i++) {
+          if (blockmeta_aux[i] <= 0) {
+            BLOSC_TRACE_ERROR("Invalid blockshape[%d] = %d", i, blockmeta_aux[i]);
+            return BLOSC2_ERROR_DATA;
+          }
+          blockmeta[i] = blockmeta_aux[i];
+        }
+        context->schunk->ndim = ndim;
+        context->schunk->blockshape = malloc(sizeof(int64_t) * ndim);
+        BLOSC_ERROR_NULL(context->schunk->blockshape, BLOSC2_ERROR_MEMORY_ALLOC);
+        for (int i = 0; i < ndim; ++i) {
+          context->schunk->blockshape[i] = (int64_t) blockmeta[i];
+        }
+        break;
       }
     }
     if (!meta) {
-      return -1;
-    }
-    context->schunk->ndim = ndim;
-    context->schunk->blockshape = malloc(sizeof(int64_t) * ndim);
-    for (int i = 0; i < ndim; ++i) {
-      context->schunk->blockshape[i] = (int64_t) blockmeta[i];
+      BLOSC_TRACE_ERROR("b2nd metalayer not found");
+      return BLOSC2_ERROR_DATA;
     }
   }
   ndim = context->schunk->ndim;
+  if (ndim <= 0 || ndim > ZFP_MAX_DIM) {
+    BLOSC_TRACE_ERROR("ndim %d is out of range for ZFP", ndim);
+    return BLOSC2_ERROR_DATA;
+  }
   int64_t *blockshape = context->schunk->blockshape;
 
   // Compute the coordinates of the cell
@@ -1029,9 +1137,18 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   blosc2_multidim_to_unidim(cell_ind_ndim, (int8_t) ndim, ind_strides, &cell_ind);
   blosc2_multidim_to_unidim(ncell_ndim, (int8_t) ndim, cell_strides, &ncell);
   int cell_nitems = (int) (1u << (2 * ndim));
-  if ((thread_ctx->zfp_cell_nitems > cell_nitems) ||
-      ((cell_ind + thread_ctx->zfp_cell_nitems) > cell_nitems)) {
+  // The items are consecutive in the block, so they can only be taken from a single
+  // cell when they lie in one row of it, and in one row of the block (which may be
+  // shorter than a cell row).  Else, let the caller decode the whole block.
+  if ((cell_ind_ndim[ndim - 1] + thread_ctx->zfp_cell_nitems > ZFP_MAX_DIM) ||
+      (cell_start_ndim[ndim - 1] + thread_ctx->zfp_cell_nitems > blockshape[ndim - 1]) ||
+      (thread_ctx->zfp_cell_nitems * context->typesize > destsize)) {
     return 0;
+  }
+
+  if (cbytes <= 0) {
+    BLOSC_TRACE_ERROR("ZFP getcell: invalid cbytes %d", cbytes);
+    return BLOSC2_ERROR_FAILURE;
   }
 
   // Get the ZFP stream
@@ -1039,7 +1156,6 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   zfp_stream *zfp;   /* compressed stream */
   bitstream *stream; /* bit stream to write to or read from */
   int32_t typesize = context->typesize;
-  zfp = zfp_stream_open(NULL);
 
   switch (typesize) {
     case sizeof(float):
@@ -1052,21 +1168,51 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       BLOSC_TRACE_ERROR("ZFP is not available for typesize: %d", typesize);
       return BLOSC2_ERROR_FAILURE;
   }
+  zfp = zfp_stream_open(NULL);
   uint8_t compmeta = context->compcode_meta;   // access to compressed chunk header
   double rate = (double) (compmeta * typesize * 8) /
                 100.0;     // convert from output size / input size to output bits per input value
   zfp_stream_set_rate(zfp, rate, type, ndim, zfp_false);
 
-  stream = stream_open((void *) block, cbytes);
-  zfp_stream_set_bit_stream(zfp, stream);
-  zfp_stream_rewind(zfp);
+  if (zfp->maxbits == 0) {
+    BLOSC_TRACE_ERROR("ZFP getcell: maxbits is 0");
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
 
   // Check that ncell is a valid index
-  int ncells = (int) ((cbytes * 8) / zfp->maxbits);
+  int ncells = (int) (((size_t) cbytes * 8) / zfp->maxbits);
   if (ncell >= ncells) {
     BLOSC_TRACE_ERROR("Invalid cell index");
+    zfp_stream_close(zfp);
     return -1;
   }
+
+  /* Allocate a word-aligned, zero-padded buffer to protect against
+   * unbounded 64-bit word reads past cbytes. */
+  size_t padded_len = (size_t) cbytes;
+  if (padded_len < sizeof(uint64_t)) {
+    padded_len = sizeof(uint64_t);
+  }
+  padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
+  uint8_t *padded_block = malloc(padded_len);
+  if (padded_block == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate padded buffer (%zu bytes)", padded_len);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  memcpy(padded_block, block, (size_t) cbytes);
+  memset(padded_block + cbytes, 0, padded_len - (size_t) cbytes);
+
+  stream = stream_open(padded_block, padded_len);
+  if (stream == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot open padded bitstream");
+    free(padded_block);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
+  zfp_stream_set_bit_stream(zfp, stream);
+  zfp_stream_rewind(zfp);
 
   // Position the stream at the ncell bit offset for reading
   stream_rseek(zfp->stream, (size_t) (ncell * zfp->maxbits));
@@ -1074,6 +1220,12 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
   // Get the cell
   size_t zfpsize;
   uint8_t *cell = malloc(cell_nitems * typesize);
+  if (cell == NULL) {
+    BLOSC_TRACE_ERROR("ZFP: cannot allocate cell buffer");
+    zfp_close_padded_stream(stream, padded_block);
+    zfp_stream_close(zfp);
+    return BLOSC2_ERROR_FAILURE;
+  }
   switch (ndim) {
     case 1:
       if (type == zfp_type_float) {
@@ -1109,18 +1261,22 @@ int zfp_getcell(void *thread_context, const uint8_t *block, int32_t cbytes, uint
       break;
     default:
       free(cell);
+      zfp_close_padded_stream(stream, padded_block);
+      zfp_stream_close(zfp);
       BLOSC_TRACE_ERROR("ZFP is not available for ndims: %d", ndim);
       return BLOSC2_ERROR_FAILURE;
   }
-  memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
+  // In fixed-rate mode, a cell takes maxbits bits (zfpsize counts the bits read)
+  bool decoded = (zfpsize > 0) && (zfpsize <= zfp->maxbits);
+  if (decoded) {
+    memcpy(dest, &cell[cell_ind * typesize], thread_ctx->zfp_cell_nitems * typesize);
+  }
   free(cell);
+  zfp_close_padded_stream(stream, padded_block);
   zfp_stream_close(zfp);
-  stream_close(stream);
 
-  if ((zfpsize == 0) || ((int32_t) zfpsize > (destsize * 8)) ||
-      ((int32_t) zfpsize > (cell_nitems * typesize * 8)) ||
-      ((thread_ctx->zfp_cell_nitems * typesize * 8) > (int32_t) zfpsize)) {
-    BLOSC_TRACE_ERROR("ZFP error or small destsize");
+  if (!decoded) {
+    BLOSC_TRACE_ERROR("ZFP: cannot decode the cell");
     return -1;
   }
 

@@ -22,6 +22,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 /* Have problems using posix barriers when symbol value is 200112L */
 /* Requires more investigation, but this will work for the moment */
@@ -40,6 +41,7 @@ struct blosc2_context_s {
   uint8_t header_flags;  /* Flags for header */
   uint8_t blosc2_flags;  /* Flags specific for blosc2 */
   uint8_t blosc2_flags2;  /* Secondary flags specific for blosc2 */
+  bool blosc1_format;  /* Write Blosc1 (format version 2) chunks, readable by C-Blosc 1.x */
   int32_t sourcesize;  /* Number of bytes in source buffer */
   int32_t header_overhead;  /* The number of bytes in chunk header */
   int32_t nblocks;  /* Number of total blocks in buffer */
@@ -110,6 +112,7 @@ struct blosc2_context_s {
   blosc2_pthread_mutex_t jobs_mutex;    /* guards job_seq, end_threads, active_workers */
   blosc2_pthread_cond_t jobs_ready;     /* workers sleep here between jobs */
   blosc2_pthread_cond_t jobs_done;      /* main sleeps here until job completes */
+  bool prefilter_full_write;           /* prefilter initializes every physical output byte */
   // Add new fields here to avoid breaking the ABI.
 };
 
@@ -138,10 +141,11 @@ struct thread_context {
   blosc2_context* parent_context;
   struct blosc_shared_pool* owner_pool;
   int tid;
+  bool serial;  /* decodes the blocks of a chunk in order (serial jobs, getitem) */
   uint8_t* tmp;
   uint8_t* tmp2;
   uint8_t* tmp3;
-  uint8_t* tmp4;
+  uint8_t* tmp4;  /* lazy chunks: the block read from disk; filters: bitshuffle's scratch */
   int32_t tmp_blocksize;  /* the blocksize for different temporaries */
   size_t tmp_nbytes;   /* keep track of how big the temporary buffers are */
   int32_t zfp_cell_start;  /* cell starter index for ZFP fixed-rate mode */
@@ -155,10 +159,18 @@ struct thread_context {
   void* lz4_cstream;   /* LZ4_stream_t* pre-loaded with dict; NULL when no dict active */
   void* lz4hc_cstream; /* LZ4_streamHC_t* pre-loaded with dict; NULL when no dict active */
   uint32_t my_job_seq;  /* last job_seq processed; used by BLOSC_BACKEND_PER_CONTEXT on Windows */
+  void* blosclz_state;  /* blosclz_state*, lazily allocated */
 };
 
 static inline bool ctx_uses_parallel_backend(const blosc2_context *context) {
   return context != NULL && context->thread_backend != BLOSC_BACKEND_SERIAL && context->nthreads > 1;
+}
+
+/* Drop the block mask of a decompression context, if any */
+static inline void ctx_clear_maskout(blosc2_context *context) {
+  free(context->block_maskout);
+  context->block_maskout = NULL;
+  context->block_maskout_nitems = 0;
 }
 
 #endif  /* BLOSC_CONTEXT_H */

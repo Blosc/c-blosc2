@@ -23,12 +23,16 @@
 #include "bitshuffle-avx2.h"
 #include "bitshuffle-sse2.h"
 #include "bitshuffle-generic.h"
+#include "shuffle-avx2.h"
+#include "shuffle-sse2.h"
+#include <string.h>
 #include <stdlib.h>
 
 /* Make sure AVX2 is available for the compilation target and compiler. */
 #if defined(__AVX2__)
 
 #include <immintrin.h>
+#include "bitshuffle-constant.h"
 
 /* The next is useful for debugging purposes */
 #if 0
@@ -64,7 +68,6 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
   size_t ii, kk;
   const char* in_b = (const char*) in;
   char* out_b = (char*) out;
-  int32_t* out_i32;
 
   size_t nbyte = elem_size * size;
 
@@ -73,13 +76,14 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
   __m256i ymm;
   int32_t bt;
 
-  for (ii = 0; ii + 31 < nbyte; ii += 32) {
+  ii = bshuf_emit_constant_prefix(in, out, nbyte);
+  if (ii == nbyte) return nbyte;
+  for (; ii + 31 < nbyte; ii += 32) {
     ymm = _mm256_loadu_si256((__m256i *) &in_b[ii]);
     for (kk = 0; kk < 8; kk++) {
       bt = _mm256_movemask_epi8(ymm);
       ymm = _mm256_slli_epi16(ymm, 1);
-      out_i32 = (int32_t*) &out_b[((7 - kk) * nbyte + ii) / 8];
-      *out_i32 = bt;
+      memcpy(out_b + ((7 - kk) * nbyte + ii) / 8, &bt, sizeof(bt));
     }
   }
   count = bshuf_trans_bit_byte_remainder(in, out, size, elem_size,
@@ -90,22 +94,32 @@ int64_t bshuf_trans_bit_byte_AVX(const void* in, void* out, const size_t size,
 
 /* Transpose bits within elements. */
 int64_t bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                                 const size_t elem_size) {
+                                 const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
-  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  if ((elem_size == 1 || elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    const uint8_t* bytes = (const uint8_t*)in;
+    if (elem_size != 1) {
+      /* Keep the existing 128-bit byte-transpose stage; the bit stage below
+       * uses AVX2 and writes directly to the final rows. */
+      shuffle_sse2((int32_t)elem_size, (int32_t)(size * elem_size), in, tmp_buf);
+      bytes = (const uint8_t*)tmp_buf;
+    }
+    for (size_t j = 0; j < elem_size; ++j) {
+      count = bshuf_trans_bit_byte_AVX(bytes + j * size, (uint8_t*)out + j * size, size, 1);
+      CHECK_ERR(count);
+    }
+    return size * elem_size;
+  }
+  count = bshuf_trans_byte_elem_SSE(in, out, size, elem_size, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bit_byte_AVX(out, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count = bshuf_trans_bitrow_eight(tmp_buf, out, size, elem_size);
-
-  free(tmp_buf);
 
   return count;
 }
@@ -207,6 +221,22 @@ int64_t bshuf_trans_byte_bitrow_AVX(const void* in, void* out, const size_t size
 }
 
 
+/* Transpose the 8x8 bit matrix in each 64-bit lane (as TRANS_BIT_8X8). */
+static inline __m256i trans_bit_8x8_AVX(__m256i x) {
+  __m256i t;
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 7)),
+                       _mm256_set1_epi64x(0x00AA00AA00AA00AALL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 7)));
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 14)),
+                       _mm256_set1_epi64x(0x0000CCCC0000CCCCLL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 14)));
+  t = _mm256_and_si256(_mm256_xor_si256(x, _mm256_srli_epi64(x, 28)),
+                       _mm256_set1_epi64x(0x00000000F0F0F0F0LL));
+  x = _mm256_xor_si256(x, _mm256_xor_si256(t, _mm256_slli_epi64(t, 28)));
+  return x;
+}
+
+
 /* Shuffle bits within the bytes of eight element blocks. */
 int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t size,
                                         const size_t elem_size) {
@@ -224,7 +254,25 @@ int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t 
   __m256i ymm;
   int32_t bt;
 
-  if (elem_size % 4) {
+  if (elem_size <= 2) {
+    // Each 8-byte word holds the 8 bit rows of 8 one-byte elements, or of
+    // the low or the high bytes of 8 two-byte elements: transposing its
+    // bits gives those bytes.
+    for (ii = 0; ii + 31 < nbyte; ii += 32) {
+      ymm = trans_bit_8x8_AVX(_mm256_loadu_si256((__m256i *) &in_b[ii]));
+      if (elem_size == 2) {
+        // Each 128-bit lane is [low bytes, high bytes] for ONE group of
+        // eight elements, not [low0, low1, high0, high1] across the vector.
+        // Lane-local unpacks therefore pair the corresponding bytes.
+        ymm = _mm256_unpacklo_epi8(ymm, _mm256_unpackhi_epi64(ymm, ymm));
+      }
+      _mm256_storeu_si256((__m256i *) &out_b[ii], ymm);
+    }
+    if (ii < nbyte) {
+      bshuf_shuffle_bit_eightelem_SSE(&in_b[ii], &out_b[ii],
+                                      (nbyte - ii) / elem_size, elem_size);
+    }
+  } else if (elem_size % 4) {
     return bshuf_shuffle_bit_eightelem_SSE(in, out, size, elem_size);
   } else {
     for (jj = 0; jj + 31 < 8 * elem_size; jj += 32) {
@@ -246,20 +294,25 @@ int64_t bshuf_shuffle_bit_eightelem_AVX(const void* in, void* out, const size_t 
 
 /* Untranspose bits within elements. */
 int64_t bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                                   const size_t elem_size) {
+                                   const size_t elem_size, void* tmp_buf) {
 
   int64_t count;
 
   CHECK_MULT_EIGHT(size);
 
-  void* tmp_buf = malloc(size * elem_size);
-  if (tmp_buf == NULL) return -1;
-
+  if (elem_size == 1) return bshuf_untrans_bit_byte_SSE(in, out, size);
+  if ((elem_size == 2 || elem_size == 4 || elem_size == 8 || elem_size == 16)
+      && size <= INT32_MAX / elem_size) {
+    for (size_t j = 0; j < elem_size; ++j) {
+      bshuf_untrans_bit_byte_SSE((const uint8_t*)in + j * size, (uint8_t*)tmp_buf + j * size, size);
+    }
+    unshuffle_avx2((int32_t)elem_size, (int32_t)(size * elem_size), tmp_buf, out);
+    return size * elem_size;
+  }
   count = bshuf_trans_byte_bitrow_AVX(in, tmp_buf, size, elem_size);
-  CHECK_ERR_FREE(count, tmp_buf);
+  CHECK_ERR(count);
   count =  bshuf_shuffle_bit_eightelem_AVX(tmp_buf, out, size, elem_size);
 
-  free(tmp_buf);
   return count;
 }
 
@@ -271,13 +324,13 @@ const bool is_bshuf_AVX = false;
 
 int64_t
 bshuf_trans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                         const size_t elem_size) {
+                         const size_t elem_size, void* tmp_buf) {
   abort();
 }
 
 int64_t
 bshuf_untrans_bit_elem_AVX(const void* in, void* out, const size_t size,
-                           const size_t elem_size) {
+                           const size_t elem_size, void* tmp_buf) {
   abort();
 }
 

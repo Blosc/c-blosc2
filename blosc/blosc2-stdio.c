@@ -15,6 +15,7 @@
 
 #include "blosc2/blosc2-stdio.h"
 #include "blosc2.h"
+#include "blosc-checked.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -29,48 +30,11 @@
 #if defined(_WIN32)
   #include <memoryapi.h>
   #include <io.h>
-  // See https://github.com/Blosc/python-blosc2/issues/359
-  #define fseek _fseeki64
-  #define ftell _ftelli64
 #else
+  #include <fcntl.h>
   #include <sys/mman.h>
   #include <unistd.h>
 #endif
-
-
-static bool checked_mul_int64_nonneg(int64_t a, int64_t b, int64_t* out) {
-  if (a < 0 || b < 0) {
-    return false;
-  }
-  if (a == 0 || b == 0) {
-    *out = 0;
-    return true;
-  }
-  if (a > INT64_MAX / b) {
-    return false;
-  }
-  *out = a * b;
-  return true;
-}
-
-static bool checked_add_int64_nonneg(int64_t a, int64_t b, int64_t* out) {
-  if (a < 0 || b < 0) {
-    return false;
-  }
-  if (a > INT64_MAX - b) {
-    return false;
-  }
-  *out = a + b;
-  return true;
-}
-
-static bool checked_size_t_to_int64(size_t value, int64_t* out) {
-  if (value > (size_t)INT64_MAX) {
-    return false;
-  }
-  *out = (int64_t)value;
-  return true;
-}
 
 
 /* Positioned I/O on the raw descriptor behind the FILE*: no seek state and no
@@ -135,6 +99,25 @@ static int64_t stdio_pio(FILE *file, const void *buf, size_t n_bytes, int64_t po
   return (int64_t) done;
 }
 
+/* The size of the file behind @p file, or -1.  From fstat(), not fseek(SEEK_END) + ftell(): on a stream opened for
+   reading, glibc's fseek() fills the stdio buffer with the file's last block, one more read (a server round trip on
+   network file systems) for nothing.  Both backends transfer data through the raw descriptor (stdio_pio) or the
+   mapping, so no stdio buffer holds data that fstat() could miss. */
+static int64_t stdio_file_size(FILE *file) {
+#if defined(_WIN32)
+  struct _stat64 st;
+  int rc = _fstat64(_fileno(file), &st);
+#else
+  struct stat st;
+  int rc = fstat(fileno(file), &st);
+#endif
+  if (rc != 0) {
+    BLOSC_TRACE_ERROR("Cannot get the file size (error: %s).", strerror(errno));
+    return -1;
+  }
+  return (int64_t) st.st_size;
+}
+
 
 void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
   BLOSC_UNUSED_PARAM(params);
@@ -147,6 +130,14 @@ void *blosc2_stdio_open(const char *urlpath, const char *mode, void *params) {
     BLOSC_TRACE_ERROR("Cannot open the file %s with mode %s.", urlpath, mode);
     return NULL;
   }
+#if !defined(_WIN32)
+  /* Frames keep their handles open between calls, so do not let exec'd child
+     processes inherit them */
+  int fd_flags = fcntl(fileno(file), F_GETFD);
+  if (fd_flags >= 0) {
+    fcntl(fileno(file), F_SETFD, fd_flags | FD_CLOEXEC);
+  }
+#endif
   blosc2_stdio_file *my_fp = malloc(sizeof(blosc2_stdio_file));
   if (my_fp == NULL) {
     BLOSC_TRACE_ERROR("Cannot allocate memory for stdio file wrapper.");
@@ -183,30 +174,7 @@ int64_t blosc2_stdio_size(void *stream) {
     return -1;
   }
 
-  int64_t current = ftell(my_fp->file);
-  if (current < 0) {
-    BLOSC_TRACE_ERROR("ftell failed while determining current position (error: %s).", strerror(errno));
-    return -1;
-  }
-
-  if (fseek(my_fp->file, 0, SEEK_END) != 0) {
-    BLOSC_TRACE_ERROR("fseek to file end failed while getting size (error: %s).", strerror(errno));
-    fseek(my_fp->file, current, SEEK_SET);
-    return -1;
-  }
-  int64_t size = ftell(my_fp->file);
-  if (size < 0) {
-    BLOSC_TRACE_ERROR("ftell failed while getting file size (error: %s).", strerror(errno));
-    fseek(my_fp->file, current, SEEK_SET);
-    return -1;
-  }
-
-  if (fseek(my_fp->file, current, SEEK_SET) != 0) {
-    BLOSC_TRACE_ERROR("fseek restore failed after getting file size (error: %s).", strerror(errno));
-    return -1;
-  }
-
-  return size;
+  return stdio_file_size(my_fp->file);
 }
 
 int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_t position, void *stream) {
@@ -221,7 +189,7 @@ int64_t blosc2_stdio_write(const void *ptr, int64_t size, int64_t nitems, int64_
   }
 
   int64_t n_bytes_i64;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes_i64)) {
+  if (!blosc2_checked_mul_i64_nonneg(size, nitems, &n_bytes_i64)) {
     BLOSC_TRACE_ERROR("stdio write size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
     return 0;
   }
@@ -252,7 +220,7 @@ int64_t blosc2_stdio_read(void **ptr, int64_t size, int64_t nitems, int64_t posi
   }
 
   int64_t n_bytes_i64;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes_i64)) {
+  if (!blosc2_checked_mul_i64_nonneg(size, nitems, &n_bytes_i64)) {
     BLOSC_TRACE_ERROR("stdio read size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
     return 0;
   }
@@ -451,16 +419,7 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     return NULL;
   }
 
-  /* Retrieve the size of the file */
-  if (fseek(mmap_file->file, 0, SEEK_END) != 0) {
-    BLOSC_TRACE_ERROR("Cannot seek to the end of %s (error: %s).", urlpath, strerror(errno));
-    fclose(mmap_file->file);
-    mmap_file->file = NULL;
-    free(mmap_file->urlpath);
-    mmap_file->urlpath = NULL;
-    return NULL;
-  }
-  int64_t file_size_i64 = ftell(mmap_file->file);
+  int64_t file_size_i64 = stdio_file_size(mmap_file->file);
   if (file_size_i64 < 0) {
     BLOSC_TRACE_ERROR("Cannot retrieve file size for %s.", urlpath);
     fclose(mmap_file->file);
@@ -478,14 +437,6 @@ void *blosc2_stdio_mmap_open(const char *urlpath, const char *mode, void* params
     return NULL;
   }
   mmap_file->file_size = (size_t)file_size_i64;
-  if (fseek(mmap_file->file, 0, SEEK_SET) != 0) {
-    BLOSC_TRACE_ERROR("Cannot seek to the beginning of %s (error: %s).", urlpath, strerror(errno));
-    fclose(mmap_file->file);
-    mmap_file->file = NULL;
-    free(mmap_file->urlpath);
-    mmap_file->urlpath = NULL;
-    return NULL;
-  }
 
   /* The size of the mapping must be > 0 so we are using a large enough buffer for writing
   (which will be increased later if needed) */
@@ -601,7 +552,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   int64_t n_bytes_i64;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes_i64)) {
+  if (!blosc2_checked_mul_i64_nonneg(size, nitems, &n_bytes_i64)) {
     BLOSC_TRACE_ERROR("mmap write size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
     return 0;
   }
@@ -615,7 +566,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
   }
 
   int64_t position_end_i64;
-  if (!checked_add_int64_nonneg(position, n_bytes_i64, &position_end_i64)) {
+  if (!blosc2_checked_add_i64_nonneg(position, n_bytes_i64, &position_end_i64)) {
     BLOSC_TRACE_ERROR("mmap write position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes_i64);
     return 0;
   }
@@ -634,14 +585,11 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
     size_t remap_size;
-    if (mmap_file->file_size > SIZE_MAX / 2) {
+    if (!blosc2_checked_mul_size(mmap_file->file_size, 2, &remap_size)) {
       BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near SIZE_MAX; using file_size (%zu).", mmap_file->file_size);
       remap_size = mmap_file->file_size;
     }
-    else {
-      remap_size = mmap_file->file_size * 2;
-    }
-    if (remap_size > (size_t)INT64_MAX) {
+    if (!blosc2_checked_size_to_i64(remap_size, NULL)) {
       BLOSC_TRACE_ERROR("mmap mapping size exceeds supported OS range (%zu).", remap_size);
       return 0;
     }
@@ -693,7 +641,7 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
     if (!mmap_file->is_memory_only) {
       int64_t ftruncate_size;
-      if (!checked_size_t_to_int64(new_size, &ftruncate_size)) {
+      if (!blosc2_checked_size_to_i64(new_size, &ftruncate_size)) {
         BLOSC_TRACE_ERROR("Cannot extend the file size to %zu bytes: value exceeds int64_t.", new_size);
         return 0;
       }
@@ -707,12 +655,9 @@ int64_t blosc2_stdio_mmap_write(const void *ptr, int64_t size, int64_t nitems, i
 
   if (mmap_file->mapping_size < mmap_file->file_size) {
     size_t new_mapping_size;
-    if (mmap_file->file_size > SIZE_MAX / 2) {
+    if (!blosc2_checked_mul_size(mmap_file->file_size, 2, &new_mapping_size)) {
       BLOSC_TRACE_WARNING("mmap remap growth fallback: cannot double mapping_size near SIZE_MAX; using file_size (%zu).", mmap_file->file_size);
       new_mapping_size = mmap_file->file_size;
-    }
-    else {
-      new_mapping_size = mmap_file->file_size * 2;
     }
 
 #if defined(__linux__)
@@ -769,13 +714,13 @@ int64_t blosc2_stdio_mmap_read(void **ptr, int64_t size, int64_t nitems, int64_t
   }
 
   int64_t n_bytes_i64;
-  if (!checked_mul_int64_nonneg(size, nitems, &n_bytes_i64)) {
+  if (!blosc2_checked_mul_i64_nonneg(size, nitems, &n_bytes_i64)) {
     BLOSC_TRACE_ERROR("mmap read size overflow (size=%" PRId64 ", nitems=%" PRId64 ").", size, nitems);
     *ptr = NULL;
     return 0;
   }
   int64_t position_end_i64;
-  if (!checked_add_int64_nonneg(position, n_bytes_i64, &position_end_i64)) {
+  if (!blosc2_checked_add_i64_nonneg(position, n_bytes_i64, &position_end_i64)) {
     BLOSC_TRACE_ERROR("mmap read position overflow (position=%" PRId64 ", nbytes=%" PRId64 ").", position, n_bytes_i64);
     *ptr = NULL;
     return 0;
@@ -884,7 +829,7 @@ int blosc2_stdio_mmap_destroy(void* params) {
          the physical size has not changed. External appends must stay at their
          original offsets, so preserve the entire file when it has grown. */
       int64_t file_size_i64;
-      if (!checked_size_t_to_int64(mmap_file->file_size, &file_size_i64)) {
+      if (!blosc2_checked_size_to_i64(mmap_file->file_size, &file_size_i64)) {
         BLOSC_TRACE_ERROR("Cannot truncate the memory-mapped file to %zu bytes: value exceeds int64_t.",
                           mmap_file->file_size);
         err = -1;

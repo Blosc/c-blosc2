@@ -25,6 +25,9 @@
 #if defined(BLOSC_STRICT_ALIGN)
 #include <string.h>
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#endif
 
 /*
  * Use inlined functions for supported systems.
@@ -101,6 +104,9 @@ static inline unsigned char *copy_16_bytes(unsigned char *out, const unsigned ch
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
   out += 16;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  vst1q_u8(out, vld1q_u8(from));
+  out += 16;
 #elif !defined(BLOSC_STRICT_ALIGN)
   *(uint64_t*)out = *(uint64_t*)from;
    from += 8; out += 8;
@@ -129,6 +135,12 @@ static inline unsigned char *copy_32_bytes(unsigned char *out, const unsigned ch
   chunk = _mm_loadu_si128((__m128i*)from);
   _mm_storeu_si128((__m128i*)out, chunk);
   out += 16;
+#elif defined(__aarch64__) || defined(_M_ARM64)
+  uint8x16_t v0 = vld1q_u8(from);
+  uint8x16_t v1 = vld1q_u8(from + 16);
+  vst1q_u8(out, v0);
+  vst1q_u8(out + 16, v1);
+  out += 32;
 #elif !defined(BLOSC_STRICT_ALIGN)
   *(uint64_t*)out = *(uint64_t*)from;
   from += 8; out += 8;

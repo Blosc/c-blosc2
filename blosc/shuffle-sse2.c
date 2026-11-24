@@ -44,34 +44,17 @@ shuffle2_sse2(uint8_t* const dest, const uint8_t* const src,
               const int32_t vectorizable_elements, const int32_t total_elements) {
   static const int32_t bytesoftype = 2;
   int32_t j;
-  int k;
-  uint8_t* dest_for_jth_element;
-  __m128i xmm0[2], xmm1[2];
+  const __m128i mask = _mm_set1_epi16(0x00ff);
 
   for (j = 0; j < vectorizable_elements; j += sizeof(__m128i)) {
-    /* Fetch 16 elements (32 bytes) then transpose bytes, words and double words. */
-    for (k = 0; k < 2; k++) {
-      xmm0[k] = _mm_loadu_si128((__m128i*)(src + (j * bytesoftype) + (k * sizeof(__m128i))));
-      xmm0[k] = _mm_shufflelo_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shufflehi_epi16(xmm0[k], 0xd8);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi8(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-      xmm1[k] = _mm_shuffle_epi32(xmm0[k], 0x4e);
-      xmm0[k] = _mm_unpacklo_epi16(xmm0[k], xmm1[k]);
-      xmm0[k] = _mm_shuffle_epi32(xmm0[k], 0xd8);
-    }
-    /* Transpose quad words */
-    for (k = 0; k < 1; k++) {
-      xmm1[k * 2] = _mm_unpacklo_epi64(xmm0[k], xmm0[k + 1]);
-      xmm1[k * 2 + 1] = _mm_unpackhi_epi64(xmm0[k], xmm0[k + 1]);
-    }
+    /* Fetch 16 elements (32 bytes) and pack low/high bytes into separate vectors. */
+    __m128i x0 = _mm_loadu_si128((__m128i*)(src + j * bytesoftype));
+    __m128i x1 = _mm_loadu_si128((__m128i*)(src + j * bytesoftype + sizeof(__m128i)));
+    __m128i r0 = _mm_packus_epi16(_mm_and_si128(x0, mask), _mm_and_si128(x1, mask));
+    __m128i r1 = _mm_packus_epi16(_mm_srli_epi16(x0, 8), _mm_srli_epi16(x1, 8));
     /* Store the result vectors */
-    dest_for_jth_element = dest + j;
-    for (k = 0; k < 2; k++) {
-      _mm_storeu_si128((__m128i*)(dest_for_jth_element + (k * total_elements)), xmm1[k]);
-    }
+    _mm_storeu_si128((__m128i*)(dest + j), r0);
+    _mm_storeu_si128((__m128i*)(dest + j + total_elements), r1);
   }
 }
 
@@ -82,34 +65,30 @@ shuffle4_sse2(uint8_t* const dest, const uint8_t* const src,
   static const int32_t bytesoftype = 4;
   int32_t i;
   int j;
-  uint8_t* dest_for_ith_element;
-  __m128i xmm0[4], xmm1[4];
+  const __m128i mask16 = _mm_set1_epi16(0x00ff);
+  __m128i lo[4], hi[4];
 
   for (i = 0; i < vectorizable_elements; i += sizeof(__m128i)) {
-    /* Fetch 16 elements (64 bytes) then transpose bytes and words. */
+    /* Fetch 16 elements (64 bytes) and split 16-bit halves with sign extension for packs. */
     for (j = 0; j < 4; j++) {
-      xmm0[j] = _mm_loadu_si128((__m128i*)(src + (i * bytesoftype) + (j * sizeof(__m128i))));
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0xd8);
-      xmm0[j] = _mm_shuffle_epi32(xmm0[j], 0x8d);
-      xmm0[j] = _mm_unpacklo_epi8(xmm1[j], xmm0[j]);
-      xmm1[j] = _mm_shuffle_epi32(xmm0[j], 0x04e);
-      xmm0[j] = _mm_unpacklo_epi16(xmm0[j], xmm1[j]);
+      __m128i x = _mm_loadu_si128((__m128i*)(src + (i * bytesoftype) + (j * sizeof(__m128i))));
+      lo[j] = _mm_srai_epi32(_mm_slli_epi32(x, 16), 16);
+      hi[j] = _mm_srai_epi32(x, 16);
     }
-    /* Transpose double words */
-    for (j = 0; j < 2; j++) {
-      xmm1[j * 2] = _mm_unpacklo_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-      xmm1[j * 2 + 1] = _mm_unpackhi_epi32(xmm0[j * 2], xmm0[j * 2 + 1]);
-    }
-    /* Transpose quad words */
-    for (j = 0; j < 2; j++) {
-      xmm0[j * 2] = _mm_unpacklo_epi64(xmm1[j], xmm1[j + 2]);
-      xmm0[j * 2 + 1] = _mm_unpackhi_epi64(xmm1[j], xmm1[j + 2]);
-    }
+    __m128i p01_lo = _mm_packs_epi32(lo[0], lo[1]);
+    __m128i p23_lo = _mm_packs_epi32(lo[2], lo[3]);
+    __m128i p01_hi = _mm_packs_epi32(hi[0], hi[1]);
+    __m128i p23_hi = _mm_packs_epi32(hi[2], hi[3]);
     /* Store the result vectors */
-    dest_for_ith_element = dest + i;
-    for (j = 0; j < 4; j++) {
-      _mm_storeu_si128((__m128i*)(dest_for_ith_element + (j * total_elements)), xmm0[j]);
-    }
+    uint8_t* const dest_for_ith_element = dest + i;
+    _mm_storeu_si128((__m128i*)(dest_for_ith_element + 0 * total_elements),
+                     _mm_packus_epi16(_mm_and_si128(p01_lo, mask16), _mm_and_si128(p23_lo, mask16)));
+    _mm_storeu_si128((__m128i*)(dest_for_ith_element + 1 * total_elements),
+                     _mm_packus_epi16(_mm_srli_epi16(p01_lo, 8), _mm_srli_epi16(p23_lo, 8)));
+    _mm_storeu_si128((__m128i*)(dest_for_ith_element + 2 * total_elements),
+                     _mm_packus_epi16(_mm_and_si128(p01_hi, mask16), _mm_and_si128(p23_hi, mask16)));
+    _mm_storeu_si128((__m128i*)(dest_for_ith_element + 3 * total_elements),
+                     _mm_packus_epi16(_mm_srli_epi16(p01_hi, 8), _mm_srli_epi16(p23_hi, 8)));
   }
 }
 

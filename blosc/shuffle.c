@@ -10,6 +10,7 @@
 
 #include "blosc2.h" /* needs to be included first to define macros */
 #include "shuffle.h"
+#include "../plugins/filters/bytedelta/bytedelta.h"
 
 /*  Include hardware-accelerated shuffle/unshuffle routines based on
     the target architecture. Note that a target architecture may support
@@ -47,7 +48,10 @@
 #include "shuffle-generic.h"
 #include "bitshuffle-generic.h"
 
+#include "threading.h"
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 // __builtin_cpu_supports() fixed in GCC 8: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85100
@@ -63,10 +67,12 @@
 /*  Define function pointer types for shuffle/unshuffle routines. */
 typedef void(* shuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
 typedef void(* unshuffle_func)(const int32_t, const int32_t, const uint8_t*, uint8_t*);
+typedef int(* shuffle_bytedelta_func)(const uint8_t*, uint8_t*, int32_t, int);
 // For bitshuffle, everything is done in terms of size_t and int64_t (return value)
-// and although this is not strictly necessary for Blosc, it does not hurt either
-typedef int64_t(* bitshuffle_func)(const void*, void*, const size_t, const size_t);
-typedef int64_t(* bitunshuffle_func)(const void*, void*, const size_t, const size_t);
+// and although this is not strictly necessary for Blosc, it does not hurt either.
+// The last argument is a scratch buffer of size * elem_size bytes.
+typedef int64_t(* bitshuffle_func)(const void*, void*, const size_t, const size_t, void*);
+typedef int64_t(* bitunshuffle_func)(const void*, void*, const size_t, const size_t, void*);
 
 /* An implementation of shuffle/unshuffle routines. */
 typedef struct shuffle_implementation {
@@ -89,6 +95,7 @@ typedef enum {
   BLOSC_HAVE_NEON = 4,
   BLOSC_HAVE_ALTIVEC = 8,
   BLOSC_HAVE_AVX512 = 16,
+  BLOSC_HAVE_SSSE3 = 32,
 } blosc_cpu_features;
 
 /* Detect hardware and set function pointers to the best shuffle/unshuffle
@@ -101,6 +108,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   blosc_cpu_features cpu_features = BLOSC_HAVE_NOTHING;
   if (__builtin_cpu_supports("sse2")) {
     cpu_features |= BLOSC_HAVE_SSE2;
+  }
+  if (__builtin_cpu_supports("ssse3")) {
+    cpu_features |= BLOSC_HAVE_SSSE3;
   }
   if (__builtin_cpu_supports("avx2")) {
     cpu_features |= BLOSC_HAVE_AVX2;
@@ -254,6 +264,9 @@ static blosc_cpu_features blosc_get_cpu_features(void) {
   if (sse2_available) {
     result |= BLOSC_HAVE_SSE2;
   }
+  if (sse2_available && ssse3_available) {
+    result |= BLOSC_HAVE_SSSE3;
+  }
   if (xmm_state_enabled && ymm_state_enabled && avx2_available) {
     result |= BLOSC_HAVE_AVX2;
   }
@@ -328,20 +341,19 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 #endif  /* defined(SHUFFLE_SSE2_ENABLED) */
 
 #if defined(SHUFFLE_NEON_ENABLED)
-  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) { // && is_bshuf_NEON if using NEON bitshuffle
+  if (cpu_features & BLOSC_HAVE_NEON && is_shuffle_neon) {
     shuffle_implementation_t impl_neon;
     impl_neon.name = "neon";
     impl_neon.shuffle = (shuffle_func)shuffle_neon;
     impl_neon.unshuffle = (unshuffle_func)unshuffle_neon;
-    //impl_neon.shuffle = (shuffle_func)shuffle_generic;
-    //impl_neon.unshuffle = (unshuffle_func)unshuffle_generic;
-    //impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_NEON;
-    //impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_NEON;
-    // The current bitshuffle optimized for NEON is not any faster
-    // (in fact, it is pretty much slower) than the scalar implementation.
-    // So, let's use the scalar one, which is pretty fast, at least on a M1 CPU.
+#if defined(BITSHUFFLE_NEON_ENABLED)
+    impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_NEON;
+    impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_NEON;
+#else
+    // The optimized bitshuffle transpose requires AArch64; ARMv7 stays scalar.
     impl_neon.bitshuffle = (bitshuffle_func)bshuf_trans_bit_elem_scal;
     impl_neon.bitunshuffle = (bitunshuffle_func)bshuf_untrans_bit_elem_scal;
+#endif
     return impl_neon;
   }
 #endif  /* defined(SHUFFLE_NEON_ENABLED) */
@@ -370,44 +382,90 @@ static shuffle_implementation_t get_shuffle_implementation(void) {
 }
 
 
-/* Flag indicating whether the implementation has been initialized.
-   Zero means it hasn't been initialized, non-zero means it has. */
-static int32_t implementation_initialized;
-
 /* The dynamically-chosen shuffle/unshuffle implementation.
-   This is only safe to use once `implementation_initialized` is set. */
+   Only use it after init_shuffle_implementation(). */
 static shuffle_implementation_t host_implementation;
+static shuffle_bytedelta_func host_shuffle_bytedelta_forward;
+static shuffle_bytedelta_func host_shuffle_bytedelta_backward;
+static int host_has_avx2;
 
-/* Initialize the shuffle implementation, if necessary. */
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((always_inline))
-#endif
-static
-#if defined(_MSC_VER)
-__forceinline
-#else
-inline
-#endif
-void init_shuffle_implementation(void) {
-  /* Initialization could (in rare cases) take place concurrently on
-     multiple threads, but it shouldn't matter because the
-     initialization should return the same result on each thread (so
-     the implementation will be the same). Since that's the case we
-     can avoid complicated synchronization here and get a small
-     performance benefit because we don't need to perform a volatile
-     load on the initialization variable each time this function is
-     called. */
-#if defined(__GNUC__) || defined(__clang__)
-  if (__builtin_expect(!implementation_initialized, 0)) {
-#else
-    if (!implementation_initialized) {
-#endif
-    /* Initialize the implementation. */
-    host_implementation = get_shuffle_implementation();
-
-    /* Set the flag indicating the implementation has been initialized. */
-    implementation_initialized = 1;
+static void set_host_implementation(void) {
+  host_implementation = get_shuffle_implementation();
+#if defined(SHUFFLE_AVX512_ENABLED) || defined(SHUFFLE_AVX2_ENABLED) || defined(SHUFFLE_SSE2_ENABLED)
+  blosc_cpu_features cpu_features = blosc_get_cpu_features();
+  host_has_avx2 = (cpu_features & BLOSC_HAVE_AVX2) != 0;
+#if defined(SHUFFLE_BYTEDELTA_AVX2_ENABLED)
+  if (cpu_features & BLOSC_HAVE_AVX2) {
+    host_shuffle_bytedelta_forward = shuffle_bytedelta_avx2_forward;
+    host_shuffle_bytedelta_backward = shuffle_bytedelta_avx2_backward;
   }
+#endif
+#if defined(SHUFFLE_BYTEDELTA_SSSE3_ENABLED)
+  /* SSSE3 needs only the legacy XMM state, not AVX/XSAVE or YMM support. */
+  if (host_shuffle_bytedelta_forward == NULL && (cpu_features & BLOSC_HAVE_SSSE3)) {
+    host_shuffle_bytedelta_forward = shuffle_bytedelta_ssse3_forward;
+    host_shuffle_bytedelta_backward = shuffle_bytedelta_ssse3_backward;
+  }
+#endif
+#elif defined(SHUFFLE_BYTEDELTA_NEON_ENABLED) && (defined(__aarch64__) || defined(_M_ARM64))
+  host_shuffle_bytedelta_forward = shuffle_bytedelta_neon_forward;
+  host_shuffle_bytedelta_backward = shuffle_bytedelta_neon_backward;
+#endif
+}
+
+/* The worker threads of a job can make their first shuffle call at the same
+   time: the once primitive makes them wait until host_implementation is
+   complete (a plain flag could be seen set before the struct was filled). */
+#if defined(_WIN32)
+static INIT_ONCE implementation_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK set_host_implementation_once(PINIT_ONCE once, PVOID param, PVOID* context) {
+  (void)once;
+  (void)param;
+  (void)context;
+  set_host_implementation();
+  return TRUE;
+}
+
+static void init_shuffle_implementation(void) {
+  InitOnceExecuteOnce(&implementation_once, set_host_implementation_once, NULL, NULL);
+}
+#else
+static pthread_once_t implementation_once = PTHREAD_ONCE_INIT;
+
+static void init_shuffle_implementation(void) {
+  pthread_once(&implementation_once, set_host_implementation);
+}
+#endif
+
+/* Generic entry points never contain SSSE3 instructions. The once initializer
+ * publishes the pair of ISA-specific function pointers to all native workers. */
+int shuffle_bytedelta_available(void) {
+  init_shuffle_implementation();
+  return host_shuffle_bytedelta_forward != NULL;
+}
+
+int blosc_cpu_has_avx2(void) {
+  init_shuffle_implementation();
+  return host_has_avx2;
+}
+
+int shuffle_bytedelta_forward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+  init_shuffle_implementation();
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output ||
+      host_shuffle_bytedelta_forward == NULL) {
+    return 0;
+  }
+  return host_shuffle_bytedelta_forward(input, output, length, typesize);
+}
+
+int shuffle_bytedelta_backward(const uint8_t *input, uint8_t *output, int32_t length, int typesize) {
+  init_shuffle_implementation();
+  if ((typesize != 2 && typesize != 4 && typesize != 8) || length < 0 || input == output ||
+      host_shuffle_bytedelta_backward == NULL) {
+    return 0;
+  }
+  return host_shuffle_bytedelta_backward(input, output, length, typesize);
 }
 
 /* Shuffle a block by dynamically dispatching to the appropriate
@@ -420,6 +478,14 @@ blosc2_shuffle(const int32_t typesize, const int32_t blocksize,
 
   if (typesize < 1 || typesize > 256 || blocksize < 0) {
     return BLOSC2_ERROR_INVALID_PARAM;
+  }
+
+  /* Shuffling single bytes is the identity; the generic routine would copy them one by one. */
+  if (typesize == 1) {
+    if (dest != src) {
+      memcpy(dest, src, (size_t)blocksize);
+    }
+    return blocksize;
   }
 
   /* The implementation is initialized.
@@ -441,6 +507,14 @@ blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
     return BLOSC2_ERROR_INVALID_PARAM;
   }
 
+  /* Unshuffling single bytes is the identity (see blosc2_shuffle). */
+  if (typesize == 1) {
+    if (dest != src) {
+      memcpy(dest, src, (size_t)blocksize);
+    }
+    return blocksize;
+  }
+
   /* The implementation is initialized.
      Dispatch to it's unshuffle routine. */
   (host_implementation.unshuffle)(typesize, blocksize, src, dest);
@@ -448,11 +522,28 @@ blosc2_unshuffle(const int32_t typesize, const int32_t blocksize,
   return blocksize;
 }
 
+/*  Run a bit(un)shuffle routine on `size` elements with the scratch buffer
+    `tmp`, or with a temporary one when the caller has none. */
+static int64_t run_bitshuffle(bitshuffle_func routine, const void* src, void* dest,
+                              const size_t size, const size_t typesize, void* tmp) {
+  if (size == 0) {
+    return 0;  /* fewer than 8 elements: only leftovers */
+  }
+  void* scratch = (tmp != NULL) ? tmp : malloc(size * typesize);
+  if (scratch == NULL) {
+    return BLOSC2_ERROR_MEMORY_ALLOC;
+  }
+  int64_t ret = routine(src, dest, size, typesize, scratch);
+  if (scratch != tmp) {
+    free(scratch);
+  }
+  return ret;
+}
+
 /*  Bit-shuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
-int32_t
-blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
-                  const void* src, void* dest) {
+int32_t bitshuffle(const int32_t typesize, const int32_t blocksize,
+                   const void* src, void* dest, void* tmp) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
   size_t size = blocksize / typesize;
@@ -463,7 +554,7 @@ blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
 
   /* bitshuffle only supports a number of elements that is a multiple of 8. */
   size -= size % 8;
-  int ret = (int) (host_implementation.bitshuffle)(src, dest, size, typesize);
+  int ret = (int) run_bitshuffle(host_implementation.bitshuffle, src, dest, size, typesize, tmp);
   if (ret < 0) {
     // Some error in bitshuffle (should not happen)
     BLOSC_TRACE_ERROR("the impossible happened: the bitshuffle filter failed!");
@@ -477,10 +568,17 @@ blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
   return blocksize;
 }
 
+/* Stub public API that redirects to internal implementation. */
+int32_t
+blosc2_bitshuffle(const int32_t typesize, const int32_t blocksize,
+                  const void* src, void* dest) {
+  return bitshuffle(typesize, blocksize, src, dest, NULL);
+}
+
 /*  Bit-unshuffle a block by dynamically dispatching to the appropriate
     hardware-accelerated routine at run-time. */
 int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
-                     const void* src, void* dest,
+                     const void* src, void* dest, void* tmp,
                      const uint8_t format_version) {
   /* Initialize the shuffle implementation if necessary. */
   init_shuffle_implementation();
@@ -491,13 +589,17 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
     if ((size % 8) == 0) {
       /* The number of elems is a multiple of 8 which is supported by
          bitshuffle. */
-      int ret = (int) (host_implementation.bitunshuffle)
-          ((const void *) src, (void *) dest, blocksize / typesize, typesize);
+      int ret = (int) run_bitshuffle(host_implementation.bitunshuffle,
+                                     src, dest, size, typesize, tmp);
       if (ret < 0) {
         // Some error in bitshuffle (should not happen)
         BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
         return ret;
       }
+      /* Copy the leftovers (the bytes that do not make up a whole element), as
+         Blosc1 does when it writes them after the shuffled part. */
+      size_t offset = size * typesize;
+      memcpy((uint8_t *) dest + offset, (const uint8_t *) src + offset, blocksize - offset);
     }
     else {
       memcpy(dest, src, blocksize);
@@ -506,7 +608,7 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
   else {
     /* bitshuffle only supports a number of bytes that is a multiple of 8. */
     size -= size % 8;
-    int ret = (int) (host_implementation.bitunshuffle)(src, dest, size, typesize);
+    int ret = (int) run_bitshuffle(host_implementation.bitunshuffle, src, dest, size, typesize, tmp);
     if (ret < 0) {
       BLOSC_TRACE_ERROR("the impossible happened: the bitunshuffle filter failed!");
       return ret;
@@ -524,5 +626,5 @@ int32_t bitunshuffle(const int32_t typesize, const int32_t blocksize,
 int32_t
 blosc2_bitunshuffle(const int32_t typesize, const int32_t blocksize,
                     const void * src, void* dest) {
-  return bitunshuffle(typesize, blocksize, src, dest, BLOSC2_VERSION_FORMAT);
+  return bitunshuffle(typesize, blocksize, src, dest, NULL, BLOSC2_VERSION_FORMAT);
 }

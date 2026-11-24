@@ -7,7 +7,7 @@
 # See LICENSE.txt for details about copyright and rights to use.
 
 # sources
-file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c)
+file(GLOB SOURCES test_*.c b2nd/test_*.c fuzz/generate_inputs_corpus.c fuzz/gen_b2nd_corpus.c fuzz/gen_plugins_corpus.c fuzz/gen_schunk_corpus.c)
 list(APPEND SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_vl_block_overflow.c)
 list(REMOVE_DUPLICATES SOURCES)
 
@@ -61,6 +61,13 @@ foreach(source ${SOURCES})
     elseif(target STREQUAL test_shuffle_roundtrip_avx2)
         message("Skipping ${target} on non-AVX2 builds")
         continue()
+    endif()
+
+    if(COMPILER_SUPPORT_AVX512)
+        # Define a symbol so tests for the AVX512 bitshuffle will be compiled in (they check the CPU at run time).
+        set_property(
+                SOURCE ${source}
+                APPEND PROPERTY COMPILE_DEFINITIONS SHUFFLE_AVX512_ENABLED)
     endif()
 
     if(COMPILER_SUPPORT_NEON)
@@ -139,3 +146,59 @@ foreach(source ${SOURCES})
             COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR} $<TARGET_FILE:${target}>)
     endif()
 endforeach()
+
+# The broken dynamic plugins that test_plugin_info loads the way c-blosc2 loads plugins like grok:
+# libblosc2_<name>.so (also on macOS) or blosc2_<name>.dll, found by the loader
+if(TARGET test_plugin_info)
+    foreach(kind none null missing)
+        set(plugin blosc2_plugin_info_${kind})
+        add_library(${plugin} SHARED plugin_info_lib.c)
+        string(TOUPPER ${kind} variant)
+        target_compile_definitions(${plugin} PRIVATE PLUGIN_INFO_${variant})
+        if(WIN32)
+            set_target_properties(${plugin} PROPERTIES PREFIX "")
+        else()
+            set_target_properties(${plugin} PROPERTIES PREFIX "lib" SUFFIX ".so")
+        endif()
+        add_dependencies(test_plugin_info ${plugin})
+    endforeach()
+    if(NOT WIN32)
+        set(path_var LD_LIBRARY_PATH)
+        if(APPLE)
+            set(path_var DYLD_LIBRARY_PATH)
+        endif()
+        set(plugin_path "$<TARGET_FILE_DIR:blosc2_plugin_info_none>")
+        if(NOT "$ENV{${path_var}}" STREQUAL "")
+            string(APPEND plugin_path ":$ENV{${path_var}}")
+        endif()
+        set_tests_properties(test_plugin_info PROPERTIES ENVIRONMENT "${path_var}=${plugin_path}")
+    endif()
+endif()
+
+# The dynamic plugins that test_plugin_threads loads, as c-blosc2 loads grok & co.:
+# libblosc2_<name>.so (also on macOS) or blosc2_<name>.dll, found by the loader
+if(TARGET test_plugin_threads)
+    foreach(kind codec filter)
+        set(plugin blosc2_plugin_threads_${kind})
+        add_library(${plugin} SHARED plugin_threads_lib.c)
+        if(kind STREQUAL codec)
+            target_compile_definitions(${plugin} PRIVATE PLUGIN_THREADS_CODEC)
+        endif()
+        if(WIN32)
+            set_target_properties(${plugin} PROPERTIES PREFIX "")
+        else()
+            set_target_properties(${plugin} PROPERTIES PREFIX "lib" SUFFIX ".so")
+        endif()
+        add_dependencies(test_plugin_threads ${plugin})
+    endforeach()
+    if(APPLE)
+        set_tests_properties(test_plugin_threads PROPERTIES ENVIRONMENT
+            "DYLD_LIBRARY_PATH=$<TARGET_FILE_DIR:blosc2_plugin_threads_codec>")
+    elseif(NOT WIN32)
+        set(plugin_path "$<TARGET_FILE_DIR:blosc2_plugin_threads_codec>")
+        if(NOT "$ENV{LD_LIBRARY_PATH}" STREQUAL "")
+            string(APPEND plugin_path ":$ENV{LD_LIBRARY_PATH}")
+        endif()
+        set_tests_properties(test_plugin_threads PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=${plugin_path}")
+    endif()
+endif()

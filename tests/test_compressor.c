@@ -199,6 +199,99 @@ static char *test_delta(void) {
 }
 
 
+static char *check_delta_pipeline(const uint8_t *filters, int nfilters,
+                                  int16_t cnthreads, int16_t dnthreads) {
+  blosc2_cparams cparams = BLOSC2_CPARAMS_DEFAULTS;
+  cparams.typesize = (int32_t)typesize;
+  cparams.clevel = clevel;
+  cparams.nthreads = cnthreads;
+  for (int i = 0; i < BLOSC2_MAX_FILTERS; i++) {
+    cparams.filters[i] = (i < nfilters) ? filters[i] : BLOSC_NOFILTER;
+  }
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.nthreads = dnthreads;
+
+  memcpy(src, srccpy, size);
+  memset(dest2, 0, size);
+
+  blosc2_context *cctx = blosc2_create_cctx(cparams);
+  blosc2_context *dctx = blosc2_create_dctx(dparams);
+  mu_assert("ERROR: could not create contexts for delta pipeline test",
+            cctx != NULL && dctx != NULL);
+
+  cbytes = blosc2_compress_ctx(cctx, src, (int32_t)size, dest,
+                               (int32_t)size + BLOSC2_MAX_OVERHEAD);
+  nbytes = blosc2_decompress_ctx(dctx, dest, cbytes, dest2, (int32_t)size);
+
+  blosc2_free_ctx(cctx);
+  blosc2_free_ctx(dctx);
+
+  mu_assert("ERROR: delta pipeline compression failed", cbytes > 0);
+  mu_assert("ERROR: delta pipeline modified source buffer",
+            memcmp(src, srccpy, size) == 0);
+  mu_assert("ERROR: delta pipeline decompression size mismatch",
+            nbytes == (int)size);
+  mu_assert("ERROR: delta pipeline roundtrip mismatch",
+            memcmp(dest2, srccpy, size) == 0);
+  return 0;
+}
+
+
+/* Check pipelines with multiple delta filters */
+static char *test_multiple_delta(void) {
+  const int16_t thread_counts[] = {1, 4};
+  uint8_t filters[BLOSC2_MAX_FILTERS];
+  char *result;
+
+  for (int nfilters = 1; nfilters <= BLOSC2_MAX_FILTERS; nfilters++) {
+    for (int i = 0; i < nfilters; i++) {
+      filters[i] = BLOSC_DELTA;
+    }
+    for (size_t ci = 0; ci < sizeof(thread_counts) / sizeof(thread_counts[0]); ci++) {
+      for (size_t di = 0; di < sizeof(thread_counts) / sizeof(thread_counts[0]); di++) {
+        result = check_delta_pipeline(filters, nfilters,
+                                      thread_counts[ci], thread_counts[di]);
+        if (result != 0) {
+          return result;
+        }
+      }
+    }
+  }
+
+  const uint8_t delta_then_shuffle[] = {
+    BLOSC_DELTA, BLOSC_DELTA, BLOSC_SHUFFLE
+  };
+  const uint8_t shuffle_then_multiple_delta[] = {
+    BLOSC_SHUFFLE, BLOSC_SHUFFLE, BLOSC_SHUFFLE, BLOSC_DELTA, BLOSC_DELTA
+  };
+  const uint8_t delta_shuffle_delta[] = {
+    BLOSC_DELTA, BLOSC_SHUFFLE, BLOSC_DELTA
+  };
+  for (size_t ci = 0; ci < sizeof(thread_counts) / sizeof(thread_counts[0]); ci++) {
+    for (size_t di = 0; di < sizeof(thread_counts) / sizeof(thread_counts[0]); di++) {
+      result = check_delta_pipeline(delta_then_shuffle, 3,
+                                    thread_counts[ci], thread_counts[di]);
+      if (result != 0) {
+        return result;
+      }
+      result = check_delta_pipeline(shuffle_then_multiple_delta, 5,
+                                    thread_counts[ci], thread_counts[di]);
+      if (result != 0) {
+        return result;
+      }
+      result = check_delta_pipeline(delta_shuffle_delta, 3,
+                                    thread_counts[ci], thread_counts[di]);
+      if (result != 0) {
+        return result;
+      }
+    }
+  }
+
+  return 0;
+}
+
+
 /* Check typesize */
 static char *test_typesize(void) {
   int cbytes2;
@@ -282,6 +375,7 @@ static char *all_tests(void) {
   mu_run_test(test_shuffle);
   mu_run_test(test_bitshuffle);
   mu_run_test(test_delta);
+  mu_run_test(test_multiple_delta);
   mu_run_test(test_typesize);
   mu_run_test(test_small_blocksize);
   mu_run_test(test_small_buffer);
