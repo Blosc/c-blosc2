@@ -835,8 +835,14 @@ BLOSCLZ_ALWAYS_INLINE uint8_t* emit_literals(uint8_t* op, const uint8_t* op_limi
 
 /* Hash entries are stored as position + base.  Entries below base belong to
  * a previous pass and read as position 0, exactly like a zeroed table.  With
- * no state, base is always 0 and the table is memset as usual. */
-#define HTAB_GET(entry, base) (tagged ? ((entry) >= (base) ? (entry) - (base) : 0) : (entry))
+ * no state, base is always 0 and the table is memset as usual.
+ * Compute the masked difference branchlessly so compilers (notably GCC 14)
+ * do not emit a mispredicting branch on every hash lookup. */
+BLOSCLZ_ALWAYS_INLINE uint32_t blosclz_htab_get_tagged(uint32_t entry, uint32_t base) {
+  uint32_t valid = 0U - (uint32_t)(entry >= base);
+  return (entry - base) & valid;
+}
+#define HTAB_GET(entry, base) (tagged ? blosclz_htab_get_tagged((entry), (base)) : (entry))
 
 // Get a guess for the compressed size of a buffer window
 BLOSCLZ_ALWAYS_INLINE double get_cratio(uint8_t* ibase, int maxlen, int minlen, int ipshift, uint32_t htab[],
@@ -1322,14 +1328,17 @@ BLOSCLZ_ALWAYS_INLINE void blosclz_copy_short_match(uint8_t *op, const uint8_t *
     {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0},
   };
 
+  /* Compute the repeat-table row branchlessly (row 0 is identity for dist >= 16)
+   * so GCC does not emit a mispredicting branch on dist < 16. */
+  size_t row = (size_t)dist & ((size_t)0 - (size_t)(dist < 16));
 #if defined(__aarch64__) || defined(_M_ARM64)
-  uint8x16_t index = vld1q_u8(repeat[dist < 16 ? dist : 0]);
+  uint8x16_t index = vld1q_u8(repeat[row]);
   vst1q_u8(op, vqtbl1q_u8(vld1q_u8(ref), index));
   if (len > 16) {
     vst1q_u8(op + 16, vqtbl1q_u8(vld1q_u8(ref + 16), index));
   }
 #else
-  __m128i index = _mm_loadu_si128((const __m128i *)repeat[dist < 16 ? dist : 0]);
+  __m128i index = _mm_loadu_si128((const __m128i *)repeat[row]);
   _mm_storeu_si128((__m128i *)op, _mm_shuffle_epi8(_mm_loadu_si128((const __m128i *)ref), index));
   if (len > 16) {
     _mm_storeu_si128((__m128i *)(op + 16), _mm_shuffle_epi8(_mm_loadu_si128((const __m128i *)(ref + 16)), index));
@@ -1954,7 +1963,7 @@ static inline int blosclz_decompress_impl(const void* input, int length, void* o
       int32_t len = (int32_t)(ctrl >> 5U) - 1 ;
       int32_t ofs = (int32_t)(ctrl & 31U) << 8U;
       uint8_t code;
-      const uint8_t* ref = op - ofs;
+      const uint8_t* ref;
 
       if (len == 7 - 1) {
 #ifdef BLOSCLZ_WIDE_DECODE
@@ -1994,19 +2003,18 @@ static inline int blosclz_decompress_impl(const void* input, int length, void* o
       }
       code = *ip++;
       len += 3;
-      ref -= code;
+      ofs += code;
 
-      /* match from 16-bit distance */
-      if (BLOSCLZ_UNLIKELY(code == 255)) {
-        if (ofs == (31U << 8U)) {
-          if (ip + 1 >= ip_limit) {
-            return 0;
-          }
-          ofs = (*ip++) << 8U;
-          ofs += *ip++;
-          ref = op - ofs - MAX_DISTANCE;
+      /* match from 16-bit distance: ofs == (31 << 8) && code == 255 iff ofs + code == MAX_DISTANCE */
+      if (BLOSCLZ_UNLIKELY(ofs == MAX_DISTANCE)) {
+        if (ip + 1 >= ip_limit) {
+          return 0;
         }
+        ofs = (*ip++) << 8U;
+        ofs += *ip++;
+        ofs += MAX_DISTANCE;
       }
+      ref = op - ofs;
 
       if (BLOSCLZ_UNLIKELY(len > op_limit - op)) {
         return 0;
