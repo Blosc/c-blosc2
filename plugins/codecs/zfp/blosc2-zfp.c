@@ -81,15 +81,20 @@ static int zfp_check_output_size(int deserialize_rc, int8_t ndim,
 }
 
 /* Allocate a word-aligned, zero-padded input buffer sized to zfp_stream_maximum_size()
- * and open a bitstream on it to guard against zfp's unbounded 64-bit word reads. */
+ * and open a bitstream on it to guard against zfp's unbounded word reads. */
 static int zfp_open_padded_stream(const uint8_t *input, int32_t input_len,
                                   zfp_stream *zfp, const zfp_field *field,
                                   bitstream **stream_out, uint8_t **padded_buf_out) {
   *stream_out = NULL;
   *padded_buf_out = NULL;
 
-  /* zfp's bitstream reader fetches whole 64-bit words with no bounds
-   * checking (see stream_read_word() in zfp's bitstream.inl: "buffer
+  if (input_len < 0) {
+    BLOSC_TRACE_ERROR("ZFP: invalid negative input length %d", input_len);
+    return BLOSC2_ERROR_FAILURE;
+  }
+
+  /* zfp's bitstream reader fetches whole stream words (up to 64 bits) with no
+   * bounds checking (see stream_read_word() in zfp's bitstream.inl: "buffer
    * overruns are not caught"), so the decoder can touch bytes past the
    * validated input_len whenever the consumed bit count is not a whole
    * number of words (fixed-rate), or is data-dependent (fixed-accuracy /
@@ -107,8 +112,11 @@ static int zfp_open_padded_stream(const uint8_t *input, int32_t input_len,
   if (padded_len < (size_t) input_len) {
     padded_len = (size_t) input_len;
   }
-  /* round up to whole words; input_len >= 8 past the check above, so the
-   * addition cannot overflow */
+  if (padded_len > SIZE_MAX - (sizeof(uint64_t) - 1)) {
+    BLOSC_TRACE_ERROR("ZFP: padded input buffer size overflow");
+    return BLOSC2_ERROR_FAILURE;
+  }
+  /* round up to whole 64-bit words */
   padded_len = (padded_len + sizeof(uint64_t) - 1) & ~(sizeof(uint64_t) - 1);
   uint8_t *padded_input = malloc(padded_len);
   if (padded_input == NULL) {
@@ -377,10 +385,10 @@ int zfp_acc_decompress(const uint8_t *input, int32_t input_len, uint8_t *output,
 
   size_t blocks = zfp_field_blocks(field);
   size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
-  if (min_bytes < sizeof(uint64_t)) {
-    min_bytes = sizeof(uint64_t);
+  if (min_bytes < 1) {
+    min_bytes = 1;
   }
-  if (input_len < (int32_t) min_bytes) {
+  if (input_len < 0 || (size_t) input_len < min_bytes) {
     BLOSC_TRACE_ERROR("ZFP acc: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
@@ -703,10 +711,10 @@ int zfp_prec_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
 
   size_t blocks = zfp_field_blocks(field);
   size_t min_bytes = (blocks + CHAR_BIT - 1) / CHAR_BIT;
-  if (min_bytes < sizeof(uint64_t)) {
-    min_bytes = sizeof(uint64_t);
+  if (min_bytes < 1) {
+    min_bytes = 1;
   }
-  if (input_len < (int32_t) min_bytes) {
+  if (input_len < 0 || (size_t) input_len < min_bytes) {
     BLOSC_TRACE_ERROR("ZFP prec: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, min_bytes);
     zfp_field_free(field);
@@ -1018,10 +1026,10 @@ int zfp_rate_decompress(const uint8_t *input, int32_t input_len, uint8_t *output
   }
   size_t required_bits = blocks * (size_t) bits;
   size_t required_bytes = (required_bits + CHAR_BIT - 1) / CHAR_BIT;
-  if (required_bytes < sizeof(uint64_t)) {
-    required_bytes = sizeof(uint64_t);
+  if (required_bytes < 1) {
+    required_bytes = 1;
   }
-  if (input_len < (int32_t) required_bytes) {
+  if (input_len < 0 || (size_t) input_len < required_bytes) {
     BLOSC_TRACE_ERROR("ZFP rate: input too small (%d bytes) for the required "
                       "bitstream size (%zu bytes)", input_len, required_bytes);
     zfp_field_free(field);

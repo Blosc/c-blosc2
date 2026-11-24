@@ -228,6 +228,65 @@ static int test_getitem_word_alignment(void) {
   return 0;
 }
 
+/* Test decompressing small streams shorter than 8 bytes (e.g. produced when
+ * ZFP is compiled with ZFP_BIT_STREAM_WORD_SIZE=8) with exact malloc buffers. */
+static int test_subword_small_streams(void) {
+  int64_t shape[1] = { 4 };
+  int32_t chunkshape[1] = { 4 };
+  int32_t blockshape[1] = { 4 };
+  blosc2_schunk *schunk = make_schunk(1, shape, chunkshape, blockshape);
+  if (schunk == NULL) {
+    printf("  test_subword_small_streams: could not create schunk -- FAIL\n");
+    return -1;
+  }
+
+  blosc2_dparams dparams = BLOSC2_DPARAMS_DEFAULTS;
+  dparams.schunk = schunk;
+  float output[4];
+
+  /* 1 cell at rate meta=16 -> 20 bits -> ceil(20 / 8) = 3 bytes */
+  int32_t rate_len = 3;
+  uint8_t *rate_in = malloc((size_t) rate_len);
+  if (rate_in == NULL) {
+    blosc2_schunk_free(schunk);
+    return -1;
+  }
+  memset(rate_in, 0, (size_t) rate_len);
+  int rc = zfp_rate_decompress(rate_in, rate_len, (uint8_t *) output, (int32_t) sizeof(output), 16, &dparams, NULL);
+  free(rate_in);
+  if (rc <= 0) {
+    blosc2_schunk_free(schunk);
+    printf("  test_subword_small_streams: zfp_rate_decompress(3 bytes) failed (%d) -- FAIL\n", rc);
+    return -1;
+  }
+
+  /* 1 cell in prec and acc modes -> min_bytes = 1 byte (e.g. all-zero constant cell) */
+  int32_t min_len = 1;
+  uint8_t *min_in = malloc((size_t) min_len);
+  if (min_in == NULL) {
+    blosc2_schunk_free(schunk);
+    return -1;
+  }
+  memset(min_in, 0, (size_t) min_len);
+  rc = zfp_prec_decompress(min_in, min_len, (uint8_t *) output, (int32_t) sizeof(output), 20, &dparams, NULL);
+  if (rc <= 0) {
+    free(min_in);
+    blosc2_schunk_free(schunk);
+    printf("  test_subword_small_streams: zfp_prec_decompress(1 byte) failed (%d) -- FAIL\n", rc);
+    return -1;
+  }
+  rc = zfp_acc_decompress(min_in, min_len, (uint8_t *) output, (int32_t) sizeof(output), 4, &dparams, NULL);
+  free(min_in);
+  blosc2_schunk_free(schunk);
+  if (rc <= 0) {
+    printf("  test_subword_small_streams: zfp_acc_decompress(1 byte) failed (%d) -- FAIL\n", rc);
+    return -1;
+  }
+
+  printf("  test_subword_small_streams -- OK\n");
+  return 0;
+}
+
 int main(void) {
   int result = 0;
   blosc2_init();
@@ -237,6 +296,7 @@ int main(void) {
   result |= test_prec_word_alignment();
   result |= test_acc_word_alignment();
   result |= test_getitem_word_alignment();
+  result |= test_subword_small_streams();
 
   if (result == 0) {
     printf("All ZFP word-alignment checks passed.\n");
