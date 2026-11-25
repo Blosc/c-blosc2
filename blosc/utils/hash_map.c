@@ -233,12 +233,14 @@ int hash_map_new(hash_map** phm, size_t value_size, cb_free_value free_value) {
 void hash_map_free_pairs(hash_map* hm) {
     assert(hm != NULL);
 
-    if (hm->free_value == NULL) {
-        s_map_free_pairs_no_cb(hm);
-    } else {
-        s_map_free_pairs_with_cb(hm);
+    if (hm->length > 0) {
+        if (hm->free_value == NULL) {
+            s_map_free_pairs_no_cb(hm);
+        } else {
+            s_map_free_pairs_with_cb(hm);
+        }
+        hm->length = 0;
     }
-    hm->length = 0;
 }
 
 void hash_map_free_struct(hash_map* hm) {
