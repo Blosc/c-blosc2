@@ -3,7 +3,10 @@
  * License: BSD 3-Clause (see LICENSE.txt)
  */
 #include "b2nd.h"
+#include "config.h"
+#ifdef HAVE_PLUGINS
 #include "blosc2/filters-registry.h"
+#endif
 #include <float.h>
 #include <limits.h>
 #include <math.h>
@@ -82,8 +85,10 @@ static int check_case(const geometry *g, int size, bool swap, int backend, int t
   cp.clevel = backend == 0 ? 0 : 1;
   memset(cp.filters, 0, sizeof(cp.filters));
   cp.filters[0] = BLOSC_SHUFFLE;
+#ifdef HAVE_PLUGINS
   cp.filters[1] = BLOSC_FILTER_BYTEDELTA;
   cp.filters_meta[1] = (uint8_t)size;
+#endif
   blosc2_storage storage = {
       .cparams = &cp, .contiguous = backend == 1 || backend == 2,
       .urlpath = backend >= 2 ? (char *)path : NULL};
