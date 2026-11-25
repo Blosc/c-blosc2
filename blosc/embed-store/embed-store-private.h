@@ -11,7 +11,7 @@ Blosc - Blocked Shuffling and Compression Library
 #ifndef BLOSC_EMBED_STORE_PRIVATE_H
 #define BLOSC_EMBED_STORE_PRIVATE_H
 
-#include <blosc2/embed-store.h>
+#include <stores.h>
 #include <utils/hash_map.h>
 
 typedef enum {
@@ -34,14 +34,14 @@ typedef struct {
         b2_es_value_local f_local;
         b2_es_value_remote f_remote;
     };
-    b2_es_value_tag tag;
+    blosc2_store_value_tag tag;
 }b2_es_value;
 
 struct blosc2_embed_store {
     blosc2_schunk *schunk;
     int64_t current_offset;
     hash_map hm;
-    b2_es_open_mode open_mode;
+    blosc2_store_open_mode mode;
 };
 
 struct blosc2_embed_store_iter {

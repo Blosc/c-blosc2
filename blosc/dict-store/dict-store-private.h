@@ -1,17 +1,16 @@
 /*********************************************************************
 Blosc - Blocked Shuffling and Compression Library
 
-Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
-https://blosc.org
-License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-See LICENSE.txt for details about copyright and rights to use.
+  See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 #ifndef BLOSC_DICT_STORE_PRIVATE_H
 #define BLOSC_DICT_STORE_PRIVATE_H
 
-#include <blosc2/dict-store.h>
 #include <embed-store/embed-store-private.h>
 #include <utils/hash_map.h>
 
@@ -19,23 +18,36 @@ See LICENSE.txt for details about copyright and rights to use.
 #define BLOSC2_DICT_STORE_LOAD_FACTOR 0.75f
 #define BLOSC2_DICT_STORE_RESIZE_FACTOR 2
 
-typedef union {
+typedef struct {
+    union {
+        struct {
+            int64_t offset;
+            size_t length;
+        }f_zip;
 
-    struct {
-        int64_t offset;
-        size_t length;
-    }f_zip;
+        struct {
+            uint8_t* localpath; // (note): Localpath is used to store de filesystem path of the file associated in the key
+            size_t localpath_length; // (note): Storing this, the amount of strlen made is less
+        }f_dir;
 
-    struct {
-        uint8_t* localpath; // (note): Localpath is used to store de filesystem path of the file associated in the key
-        size_t localpath_length; // (note): Storing this, the amount of strlen made is less
-    }f_dir;
+        struct {
+            blosc2_schunk* schunk;
+        }f_mem;
 
-    struct {
-        blosc2_schunk* schunk;
-    }f_mem;
-
+        struct {
+            uint8_t* urlbase;
+            uint8_t* path;
+        }remote;
+    };
+    bool has_remote; // If has_remote is true, then retrieve remote
 }b2_ds_value;
+
+typedef enum {
+    B2_DS_MEMORY_SPARSE = 0, /**< In memory, one schunk pointer per key (the caller keeps ownership). */
+    B2_DS_B2Z = 1,               /**< A .b2z archive (ZIP container). */
+    B2_DS_B2D = 2,               /**< A .b2d directory holding one file per key. */
+    B2_DS_MEMORY_CONTIGUOUS, /**< In memory, all entries packed into a single buffer (see blosc2_dict_store_from_buffer()). */
+}b2_ds_storage_type;
 
 struct blosc2_dict_store {
     hash_map map;
@@ -48,7 +60,7 @@ struct blosc2_dict_store {
     blosc2_embed_store* estore;
     int64_t threshold;
 
-    b2_ds_open_mode open_mode;
+    blosc2_store_open_mode mode;
     b2_ds_storage_type storage_type;
 };
 
@@ -57,7 +69,7 @@ typedef struct {
     size_t urlpath_length;
     const uint8_t* tmpdir;
     size_t tmpdir_length;
-    b2_ds_open_mode open_mode;
+    blosc2_store_open_mode open_mode;
     b2_ds_storage_type storage_type;
 }b2_ds_default;
 

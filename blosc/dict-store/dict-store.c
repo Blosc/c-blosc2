@@ -8,7 +8,6 @@ License: BSD 3-Clause (see LICENSE.txt)
 See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <blosc2/dict-store.h>
 #include "dict-store-private.h"
 #include <embed-store/embed-store-private.h>
 #include <utils/filesystem.h>
@@ -26,18 +25,19 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <b2nd.h>
 
 typedef blosc2_dict_store dict_store;
-typedef b2_ds_value value; // Recall that this is an union in C
 
 /* == Static functions (and some constants) == */
 
-static const uint8_t* b2z_extension = (const uint8_t*)"b2z";
-//static const size_t b2z_extension_len = 3;
-static const uint8_t* b2d_extension = (const uint8_t*)"b2d";
+static const uint8_t b2e_name[] = "embed.b2e"; // Used to identify the EmbedStore in the filesystem
+static size_t b2e_name_length = sizeof(b2e_name) - 1;
+static const uint8_t b2z_extension[] = "b2z";
+//static const size_t b2z_extension_len = sizeof(b2z_extension) - 1;
+static const uint8_t b2d_extension[] = "b2d";
 //static const size_t b2d_extension_len = 3;
-static const uint8_t* schunk_extension = (const uint8_t*)"cframe";
-static const size_t schunk_extension_len = 6;
-static const uint8_t* b2nd_extension = (const uint8_t*)"b2nd";
-static const size_t b2nd_extension_len = 3;
+static const uint8_t schunk_extension[] = "b2f";
+static const size_t schunk_extension_len = sizeof(schunk_extension) - 1;
+static const uint8_t b2nd_extension[] = "b2nd";
+static const size_t b2nd_extension_len = sizeof(b2nd_extension) - 1;
 
 // Enum used to specify if a value was inserted in the EmbedStore successfully
 enum {
@@ -64,7 +64,7 @@ static int s_dict_store_alloc(dict_store** dstore, cb_free_value free_value) {
     return rc;
 }
 
-static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpath, b2_ds_storage_type storage_type, b2_ds_open_mode open_mode, cb_free_value cb) {
+static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpath, b2_ds_storage_type storage_type, blosc2_store_open_mode mode, cb_free_value cb) {
     *dstore = NULL;
     dict_store *pds = NULL;
     int error_code = s_dict_store_alloc(&pds, cb);
@@ -79,14 +79,14 @@ static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpat
         return error_code;
     }
     pds->urlpath_length = strlen((const char*)pds->urlpath);
-    pds->open_mode = open_mode;
+    pds->mode = mode;
     pds->storage_type = storage_type;
     *dstore = pds;
     return error_code;
 }
 
-static void s_b2_es_item_set_local(b2_es_item* item, blosc2_schunk* schunk) {
-    item->tag = B2_ES_VALUE_LOCAL;
+static void s_blosc2_store_value_set_local(blosc2_store_value* item, blosc2_schunk* schunk) {
+    item->tag = BLOSC2_STORE_VALUE_SCHUNK;
     item->schunk = schunk;
 }
 
@@ -231,9 +231,8 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
             free((void*)concat);
         } else if (S_ISREG(st.st_mode)) {
             // Get filename
-            value v = {0};
+            b2_ds_value v = {0};
             const uint8_t* first_bar = (const uint8_t*) strchr((const char*)concat, '/');
-            //uint8_t* localpath = NULL;
             error_code = blosc2_string_duplicate(first_bar + 1, (uint8_t**)&(v.f_dir.localpath));
             free((void*)concat);
             if (error_code != 0) {
@@ -318,39 +317,55 @@ static int s_open_rdonly_b2z(dict_store **ds, const uint8_t* urlpath) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
 
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDONLY, NULL);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, BLOSC2_STORE_OPEN_MODE_RDONLY, NULL);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
     }
 
+    bool embed_found = false;
     while (ziputils_reader_iter_next(iter)) {
         uint8_t *filename = NULL;
-        uint8_t* filename_without_extension = NULL;
         size_t filename_size = 0;
-        value val = {0};
+        b2_ds_value val = {0};
 
+        // NOTE: Filename in malloc-ed
         error_code = ziputils_reader_iter_get_filename(iter, &filename, &filename_size);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not obtain filename from b2z");
             break;
         }
 
+        val.f_zip.offset = (int64_t)ziputils_reader_iter_get_offset(iter);
+        val.f_zip.length = ziputils_reader_iter_get_length(iter);
+
+        // Detect the EmbedStore
+        if (!embed_found && strcmp((const char*)filename, (const char*)b2e_name) == 0) {
+            embed_found = true;
+            // Now, open EmbedStore
+            blosc2_embed_store* estore = NULL;
+            error_code = blosc2_embed_store_open_offset(&estore, urlpath, BLOSC2_STORE_OPEN_MODE_RDONLY, val.f_zip.offset);
+            if (error_code < 0) {
+                BLOSC_TRACE_ERROR("The EmbedStore was detected, but it couldn't be opened by blosc2_embed_store_open_offset");
+                free(filename);
+                break;
+            }
+            pds->estore = estore;
+            free(filename);
+            continue;
+        }
+
         // Filename comes with extension, we need an extensionless version
-        error_code = blosc2_string_remove_extension(filename, &filename_without_extension);
-        free((void*)filename);
+        error_code = blosc2_string_remove_extension_inplace(filename);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not allocate memory to remoev extension");
             break;
         }
 
-        val.f_zip.offset = (int64_t)ziputils_reader_iter_get_offset(iter);
-        val.f_zip.length = ziputils_reader_iter_get_length(iter);
-
         bool needs_free = false;
-        error_code = hash_map_put(&pds->map, filename_without_extension, &val, &needs_free);
+        error_code = hash_map_put(&pds->map, filename, &val, &needs_free);
         if (needs_free) {
-            free((void*)filename_without_extension);
+            free(filename);
         }
         if (error_code < 0) {
             BLOSC_TRACE_ERROR("Could not put element in hash_map");
@@ -377,7 +392,7 @@ static int s_open_rdonly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
     dict_store *pds = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDONLY, s_b2_ds_value_free_dir);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, BLOSC2_STORE_OPEN_MODE_RDONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -422,7 +437,7 @@ static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
     uint8_t* tmpdir = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
 
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_WRONLY, s_b2_ds_value_free_dir);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, BLOSC2_STORE_OPEN_MODE_WRONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -448,7 +463,7 @@ static int s_open_wronly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
     dict_store *pds = NULL;
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_WRONLY, s_b2_ds_value_free_dir);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, BLOSC2_STORE_OPEN_MODE_WRONLY, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         rmdir((const char*)urlpath);
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
@@ -494,7 +509,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     zip_archive_iter *iter = NULL;
 
     int error_code = BLOSC2_ERROR_SUCCESS;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, B2_DS_RDWR, s_b2_ds_value_free_dir);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, BLOSC2_STORE_OPEN_MODE_RDWR, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -529,7 +544,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     uint8_t full_path[PATH_MAX];
     const size_t full_path_length = PATH_MAX;
     while (ziputils_reader_iter_next(iter)) {
-        value val = {0};
+        b2_ds_value val = {0};
         uint8_t* key_with_extension = NULL;
         uint8_t* key = NULL;
 
@@ -618,7 +633,7 @@ static int s_open_rdwr_b2d(dict_store **ds, const uint8_t* urlpath) {
     }
     int error_code = BLOSC2_ERROR_SUCCESS;
     dict_store *pds = NULL;
-    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, B2_DS_RDWR, s_b2_ds_value_free_dir);
+    error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2D, BLOSC2_STORE_OPEN_MODE_RDWR, s_b2_ds_value_free_dir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store");
         return error_code;
@@ -660,10 +675,10 @@ static int s_open_rdwr(dict_store **ds, const uint8_t* urlpath, int storage_type
 }
 
 // (note): s_get_mem_sparse is implemented directly in the switch statement in blosc2_dict_store_get
-static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_es_item* item) {
+static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, blosc2_store_value* item) {
     assert(ds != NULL && value != NULL && item != NULL);
     assert(ds->storage_type == B2_DS_MEMORY_CONTIGUOUS);
-    assert(ds->open_mode == B2_DS_RDONLY);
+    assert(ds->mode == BLOSC2_STORE_OPEN_MODE_RDONLY);
 
     int64_t offset = value->f_zip.offset;
     size_t length = value->f_zip.length;
@@ -672,28 +687,28 @@ static int s_get_mem_contiguous(const dict_store *ds, b2_ds_value* value, b2_es_
     if (schunk == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
-    s_b2_es_item_set_local(item, schunk);
+    s_blosc2_store_value_set_local(item, schunk);
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_es_item* item) {
+static int s_get_b2x(dict_store *ds, b2_ds_value* value, blosc2_store_value* item) {
     assert(ds != NULL && value != NULL && value != NULL && item != NULL);
-    assert(ds->open_mode == B2_DS_RDONLY || ds->open_mode == B2_DS_RDWR);
+    assert(ds->mode == BLOSC2_STORE_OPEN_MODE_RDONLY || ds->mode == BLOSC2_STORE_OPEN_MODE_RDWR);
     assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
 
     bool free_path = false;
     int64_t offset = 0;
     uint8_t* path = NULL;
 
-    switch (ds->open_mode) {
-    case B2_DS_RDONLY:
+    switch (ds->mode) {
+    case BLOSC2_STORE_OPEN_MODE_RDONLY:
         if (ds->storage_type == B2_DS_B2Z) {
             offset = value->f_zip.offset;
             path = ds->urlpath;
             break;
         }
         /* Intentional fallthrough */
-    case B2_DS_RDWR:{
+    case BLOSC2_STORE_OPEN_MODE_RDWR:{
         uint8_t* prefix;
         size_t prefix_length;
         if (ds->storage_type == B2_DS_B2Z) {
@@ -728,20 +743,20 @@ static int s_get_b2x(dict_store *ds, b2_ds_value* value, b2_es_item* item) {
         BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %ld", (const char*)path, offset);
         error_code = BLOSC2_ERROR_FILE_OPEN;
     } else {
-        s_b2_es_item_set_local(item, schunk);
+        s_blosc2_store_value_set_local(item, schunk);
     }
     if (free_path) free((void*)path);
     return error_code;
 }
 
-static int s_get_from_value(dict_store* ds, b2_ds_value* value, b2_es_item* item) {
+static int s_get_from_value(dict_store* ds, b2_ds_value* value, blosc2_store_value* item) {
     assert(ds != NULL && value != NULL && item != NULL);
-    assert(ds->open_mode != B2_DS_WRONLY);
+    assert(ds->mode != BLOSC2_STORE_OPEN_MODE_WRONLY);
 
     int rc = BLOSC2_ERROR_SUCCESS;
     switch (ds->storage_type) {
     case B2_DS_MEMORY_SPARSE:
-        s_b2_es_item_set_local(item, value->f_mem.schunk);
+        s_blosc2_store_value_set_local(item, value->f_mem.schunk);
         break;
     case B2_DS_MEMORY_CONTIGUOUS:
         rc = s_get_mem_contiguous(ds, value, item);
@@ -760,7 +775,7 @@ static int s_get_from_value(dict_store* ds, b2_ds_value* value, b2_es_item* item
 
 static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* free_key) {
     assert(ds != NULL || key != NULL || schunk != NULL || free_key != NULL);
-    assert(ds->open_mode != B2_DS_RDONLY);
+    assert(ds->mode != BLOSC2_STORE_OPEN_MODE_RDONLY);
     assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
     // Also, key is malloc-ed
 
@@ -930,14 +945,14 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
 
     int error_code = BLOSC2_ERROR_SUCCESS;
 
-    switch (ds->open_mode) {
-        case B2_DS_RDONLY: {
+    switch (ds->mode) {
+        case BLOSC2_STORE_OPEN_MODE_RDONLY: {
             BLOSC_TRACE_ERROR("Cannot write to the filesystem in RDONLY mode");
             error_code = BLOSC2_ERROR_FILE_WRITE;
             break;
         }
-        case B2_DS_WRONLY:
-        case B2_DS_RDWR: {
+        case BLOSC2_STORE_OPEN_MODE_WRONLY:
+        case BLOSC2_STORE_OPEN_MODE_RDWR: {
             hash_map_iter iter = {0};
             hash_map_iter* piter = &iter;
             hash_map_iter_init(piter, &ds->map);
@@ -989,7 +1004,7 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
 
 static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
     assert(ds != NULL && key != NULL);
-    assert(ds->open_mode != B2_DS_RDONLY);
+    assert(ds->mode != BLOSC2_STORE_OPEN_MODE_RDONLY);
     assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
 
     b2_ds_value* value = hash_map_get(&ds->map, key);
@@ -1034,13 +1049,48 @@ static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
     return error_code;
 }
 
+static int s_persist_embed_store( blosc2_embed_store* estore, const uint8_t* urlpath, size_t urlpath_length ) {
+    assert(estore != NULL);
+    assert(urlpath != NULL);
+
+    int rc = blosc2_embed_store_close(estore);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not close EmbedStore");
+        return rc;
+    }
+    size_t concat_size = urlpath_length + b2e_name_length + 2;
+    uint8_t* concat = malloc(concat_size);
+    if (concat == NULL) {
+        BLOSC_TRACE_ERROR("Could not allocate memory to concat paths");
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    snprintf((char*)concat, concat_size, "%s/%s", (const char*)urlpath, (const char*)b2e_name);
+
+    int64_t fileframe_size = blosc2_embed_store_to_file(estore, concat);
+    if (fileframe_size < 0) {
+        BLOSC_TRACE_ERROR("There was an error while persisting the EmbedStore to %s", (const char*)concat);
+        rc = (int)fileframe_size;
+    }
+    free(concat);
+
+    return rc;
+}
+
 static int s_close_b2z( dict_store *ds ) {
+    assert(ds != NULL);
     int error_code = BLOSC2_ERROR_SUCCESS;
-    switch (ds->open_mode) {
-        case B2_DS_RDONLY: return BLOSC2_ERROR_SUCCESS;
-        case B2_DS_WRONLY:
-        case B2_DS_RDWR: {
+    switch (ds->mode) {
+        case BLOSC2_STORE_OPEN_MODE_RDONLY: return BLOSC2_ERROR_SUCCESS;
+        case BLOSC2_STORE_OPEN_MODE_WRONLY:
+        case BLOSC2_STORE_OPEN_MODE_RDWR: {
             // Compress temporal directory
+            if (ds->estore != NULL) {
+                error_code = s_persist_embed_store(ds->estore, ds->tmpdir, ds->tmpdir_length);
+                if (error_code < 0) {
+                    BLOSC_TRACE_ERROR("Could not persist EmbedStore when closing B2Z");
+                    break;
+                }
+            }
             if (s_inode_exists(ds->urlpath) == BLOSC2_ERROR_SUCCESS) {
                 if (blosc2_remove_urlpath((const char*)ds->urlpath) != 0) {
                     BLOSC_TRACE_ERROR("Could not remove file at %s", (const char*)ds->urlpath);
@@ -1058,31 +1108,63 @@ static int s_close_b2z( dict_store *ds ) {
         default: return BLOSC2_ERROR_INVALID_PARAM;
     }
     if (error_code != 0) {
-        BLOSC_TRACE_ERROR("Could not close b2z");
+        BLOSC_TRACE_ERROR("Could not close B2Z");
     }
     return error_code;
 }
 
-static int s_try_set_schunk_in_embed(blosc2_embed_store* estore, int64_t threshold, const uint8_t* key, blosc2_schunk* schunk) {
+static int s_close_b2d(dict_store* ds) {
+    assert(ds != NULL);
+    int rc = BLOSC2_ERROR_SUCCESS;
+    if ((ds->mode == BLOSC2_STORE_OPEN_MODE_WRONLY || ds->mode == BLOSC2_STORE_OPEN_MODE_RDWR) && ds->estore != NULL) {
+        rc = s_persist_embed_store(ds->estore, ds->urlpath, ds->urlpath_length);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not persist EmbedStore while closing B2D");
+        }
+    }
+    return rc;
+}
+
+static int s_try_set_value_in_embed(blosc2_embed_store* estore, int64_t threshold, const uint8_t* key, blosc2_store_value* value) {
     assert(estore != NULL);
-    assert(schunk != NULL);
+    assert(value != NULL);
     // Threshold may be <= 0. In that case, we are wasting time
 
-    int64_t nbytes = schunk->nbytes;
-    if (nbytes < threshold) {
-        int rc = blosc2_embed_store_set(estore, key, schunk);
-        if (rc < 0) {
-            BLOSC_TRACE_ERROR("There was an error while inserting SChunk to DictStore's inner EmbedStore with key %s", (const char*)key);
-            return rc;
+    switch (value->tag) {
+    case BLOSC2_STORE_VALUE_SCHUNK:{
+        blosc2_schunk* schunk = value->schunk;
+        int64_t nbytes = schunk->nbytes;
+        if (nbytes < threshold) {
+            break;
+
         }
-        return EMBED_INSERTED;
+        return EMBED_NOT_INSERTED;
     }
-    return EMBED_NOT_INSERTED;
+    case BLOSC2_STORE_VALUE_REMOTE:{
+        size_t urlbase_length = strlen((const char*)value->remote.urlbase);
+        size_t path_length = strlen((const char*)value->remote.path);
+        size_t total_length = urlbase_length + path_length;
+        if (total_length < (size_t)threshold) {
+            break;
+        }
+        return EMBED_NOT_INSERTED;
+    }
+    default:
+        BLOSC_TRACE_ERROR("An unexpected tag was found on value");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    int rc = blosc2_embed_store_set(estore, key, value);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("There was an error while inserting SChunk to DictStore's inner EmbedStore with key %s", (const char*)key);
+        return rc;
+    }
+    return EMBED_INSERTED;
 }
 
 /* == END Static functions (and some constants) == */
 
-int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, blosc2_embed_store* estore, int64_t threshold ) {
+int blosc2_dict_store_new(blosc2_dict_store** dstore, const uint8_t* urlpath, blosc2_embed_store* estore, int64_t threshold) {
     if (dstore == NULL) {
         BLOSC_TRACE_ERROR("blosc2_dict_store pointer cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -1090,7 +1172,7 @@ int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, b
     *dstore = NULL;
 
     b2_ds_storage_type storage_type = B2_DS_MEMORY_SPARSE;
-    b2_ds_open_mode open_mode = B2_DS_RDWR;
+    blosc2_store_open_mode open_mode = BLOSC2_STORE_OPEN_MODE_RDWR;
     cb_free_value cb = NULL;
 
     if (urlpath != NULL) {
@@ -1145,7 +1227,7 @@ int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, b
             return rc;
         }
         ds->storage_type = storage_type;
-        ds->open_mode = open_mode;
+        ds->mode = open_mode;
     }
 
     if (estore != NULL) {
@@ -1153,10 +1235,9 @@ int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, b
     } else if (threshold >= 0) {
         // Create new EmbedStore
         blosc2_embed_store* new_estore = NULL;
-        int rc = blosc2_embed_store_new(&new_estore, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE);
+        rc = blosc2_embed_store_new(&new_estore, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not create EmbedStore for the DicStore");
-            blosc2_dict_store_close(ds); // TODO: See that this does not fail
             blosc2_dict_store_free(ds);
             return rc;
         }
@@ -1168,8 +1249,8 @@ int blosc2_dict_store_new( blosc2_dict_store** dstore, const uint8_t* urlpath, b
     return rc;
 }
 
-int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_ds_open_mode open_mode) {
-    if (pds == NULL || urlpath == NULL) {
+int blosc2_dict_store_open(blosc2_dict_store** dstore, const uint8_t* urlpath, blosc2_store_open_mode open_mode) {
+    if (dstore == NULL || urlpath == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -1187,16 +1268,16 @@ int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_d
 
     int error_code = BLOSC2_ERROR_SUCCESS;
     switch (open_mode) {
-        case B2_DS_RDONLY: {
-            error_code = s_open_rdonly(pds, urlpath, storage_type);
+        case BLOSC2_STORE_OPEN_MODE_RDONLY: {
+            error_code = s_open_rdonly(dstore, urlpath, storage_type);
             break;
         }
-        case B2_DS_WRONLY: {
-            error_code = s_open_wronly(pds, urlpath, storage_type);
+        case BLOSC2_STORE_OPEN_MODE_WRONLY: {
+            error_code = s_open_wronly(dstore, urlpath, storage_type);
             break;
         }
-        case B2_DS_RDWR: {
-            error_code = s_open_rdwr(pds, urlpath, storage_type);
+        case BLOSC2_STORE_OPEN_MODE_RDWR: {
+            error_code = s_open_rdwr(dstore, urlpath, storage_type);
             break;
         }
         default: {
@@ -1211,34 +1292,39 @@ int blosc2_dict_store_open(blosc2_dict_store** pds, const uint8_t* urlpath, b2_d
     return error_code;
 }
 
-int blosc2_dict_store_close( blosc2_dict_store *ds ) {
-    if (ds == NULL) {
+int blosc2_dict_store_close(blosc2_dict_store *dstore) {
+    if (dstore == NULL) {
         BLOSC_TRACE_ERROR("blosc2_dict_store pointer must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
 
-    switch (ds->storage_type) {
+    switch (dstore->storage_type) {
+        case B2_DS_MEMORY_CONTIGUOUS:
         case B2_DS_MEMORY_SPARSE: {
             return BLOSC2_ERROR_SUCCESS;
         }
         case B2_DS_B2Z: {
-            int error_code = s_close_b2z(ds);
+            int error_code = s_close_b2z(dstore);
             if (error_code != 0) {
-                BLOSC_TRACE_ERROR("Could not close dict store");
+                BLOSC_TRACE_ERROR("Could not close B2Z DictStore");
             }
             return error_code;
         }
         case B2_DS_B2D: {
-            return BLOSC2_ERROR_SUCCESS;
+            int error_code = s_close_b2d(dstore);
+            if (error_code != 0) {
+                BLOSC_TRACE_ERROR("Could not close B2D DictStore");
+            }
+            return error_code;
         }
         default: {
-            BLOSC_TRACE_ERROR("Dict store was neither in memory, nor a b2z storage, nor a b2d storage");
+            BLOSC_TRACE_ERROR("DictStore was neither in memory, nor a B2Z storage, nor a B2D storage");
             return BLOSC2_ERROR_INVALID_PARAM;
         }
     }
 }
 
-void blosc2_dict_store_free( blosc2_dict_store* dstore ) {
+void blosc2_dict_store_free(blosc2_dict_store* dstore) {
     assert(dstore != NULL);
     hash_map_free_struct(&dstore->map);
     if (dstore->urlpath != NULL) free(dstore->urlpath);
@@ -1247,50 +1333,50 @@ void blosc2_dict_store_free( blosc2_dict_store* dstore ) {
     free(dstore);
 }
 
-size_t blosc2_dict_store_get_length( blosc2_dict_store *ds ) {
-    assert(ds != NULL);
-    size_t length = ds->map.length;
-    if (ds->estore != NULL) {
-        length += blosc2_embed_store_get_length(ds->estore);
+size_t blosc2_dict_store_get_length(blosc2_dict_store *dstore) {
+    assert(dstore != NULL);
+    size_t length = dstore->map.length;
+    if (dstore->estore != NULL) {
+        length += blosc2_embed_store_get_length(dstore->estore);
     }
     return length;
 }
 
-size_t blosc2_dict_store_get_capacity( blosc2_dict_store *ds ) {
-    assert(ds != NULL);
-    return ds->map.capacity;
+size_t blosc2_dict_store_get_capacity(blosc2_dict_store *dstore) {
+    assert(dstore != NULL);
+    return dstore->map.capacity;
 }
 
-b2_ds_open_mode blosc2_dict_store_get_open_mode( blosc2_dict_store *ds ) {
-    assert(ds != NULL);
-    return ds->open_mode;
+blosc2_store_open_mode blosc2_dict_store_get_open_mode(blosc2_dict_store *dstore) {
+    assert(dstore != NULL);
+    return dstore->mode;
 }
 
-int blosc2_dict_store_get_storage_type( blosc2_dict_store *ds ) {
-    assert(ds != NULL);
-    return ds->storage_type;
+int blosc2_dict_store_get_storage_type(blosc2_dict_store *dstore) {
+    assert(dstore != NULL);
+    return dstore->storage_type;
 }
 
-bool blosc2_dict_store_contains_key( blosc2_dict_store *ds, const uint8_t* key ) {
-    if (ds == NULL || key == NULL) return false;
+bool blosc2_dict_store_contains_key(blosc2_dict_store *dstore, const uint8_t* key) {
+    if (dstore == NULL || key == NULL) return false;
 
     /* Keep the same key handling as get()/set()/remove(): canonical keys are
        searched as-is, non-canonical ones are normalized first. */
     if (blosc2_key_is_canonical(key)) {
-        return hash_map_contains_key(&ds->map, key);
+        return hash_map_contains_key(&dstore->map, key);
     }
 
     uint8_t* normalized_key = NULL;
     if (blosc2_key_normalize_copy(key, &normalized_key) != BLOSC2_ERROR_SUCCESS) {
         return false;
     }
-    bool contains = hash_map_contains_key(&ds->map, normalized_key);
+    bool contains = hash_map_contains_key(&dstore->map, normalized_key);
     free(normalized_key);
     return contains;
 }
 
-int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_urlpath ) {
-    if (ds == NULL || destination_urlpath == NULL) {
+int blosc2_dict_store_to_b2z(blosc2_dict_store *dstore, const uint8_t* destination_urlpath) {
+    if (dstore == NULL || destination_urlpath == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -1304,9 +1390,9 @@ int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_
     }
 
     int error_code = BLOSC2_ERROR_SUCCESS;
-    switch (ds->storage_type) {
+    switch (dstore->storage_type) {
         case B2_DS_MEMORY_SPARSE: {
-            error_code = s_to_b2z_from_mem(ds, destination_urlpath);
+            error_code = s_to_b2z_from_mem(dstore, destination_urlpath);
             break;
         }
         case B2_DS_B2Z: {
@@ -1314,7 +1400,7 @@ int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_
             return BLOSC2_ERROR_FAILURE;
         }
         case B2_DS_B2D: {
-            error_code = s_to_b2z_from_b2d(ds, destination_urlpath);
+            error_code = s_to_b2z_from_b2d(dstore, destination_urlpath);
             break;
         }
         default:
@@ -1328,8 +1414,8 @@ int blosc2_dict_store_to_b2z( blosc2_dict_store *ds, const uint8_t* destination_
     return error_code;
 }
 
-int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* destination_urlpath ) {
-    if (ds == NULL || destination_urlpath == NULL) {
+int blosc2_dict_store_to_b2d(blosc2_dict_store *dstore, const uint8_t* destination_urlpath) {
+    if (dstore == NULL || destination_urlpath == NULL) {
         BLOSC_TRACE_ERROR("Every parameter must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -1342,13 +1428,13 @@ int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* destination_
         return BLOSC2_ERROR_FILE_WRITE;
     }
     int error_code = BLOSC2_ERROR_SUCCESS;
-    switch (ds->storage_type) {
+    switch (dstore->storage_type) {
         case B2_DS_MEMORY_SPARSE: {
-            error_code = s_to_b2d_from_memory(ds, destination_urlpath);
+            error_code = s_to_b2d_from_memory(dstore, destination_urlpath);
             break;
         }
         case B2_DS_B2Z: {
-            error_code = s_to_b2d_from_b2z(ds, destination_urlpath);
+            error_code = s_to_b2d_from_b2z(dstore, destination_urlpath);
             break;
         }
         case B2_DS_B2D: {
@@ -1367,12 +1453,12 @@ int blosc2_dict_store_to_b2d( blosc2_dict_store *ds, const uint8_t* destination_
     return error_code;
 }
 
-int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* psize ) {
-    if (ds == NULL || pbuffer == NULL) {
+int blosc2_dict_store_to_buffer(blosc2_dict_store *dstore, void** pbuffer, size_t* psize) {
+    if (dstore == NULL || pbuffer == NULL) {
         BLOSC_TRACE_ERROR("ds cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (ds->storage_type == B2_DS_B2D || ds->storage_type == B2_DS_B2Z) {
+    if (dstore->storage_type == B2_DS_B2D || dstore->storage_type == B2_DS_B2Z) {
         BLOSC_TRACE_ERROR("This function is only supported for B2_DS_MEMORY storage type");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1390,7 +1476,7 @@ int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* 
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
 
-    int error_code = s_zip_write_all_pairs(ds, za);
+    int error_code = s_zip_write_all_pairs(dstore, za);
 
     if (error_code == BLOSC2_ERROR_SUCCESS) {
         if (!ziputils_writer_finalize_heap(za, pbuffer, psize)) {
@@ -1404,8 +1490,8 @@ int blosc2_dict_store_to_buffer( blosc2_dict_store *ds, void** pbuffer, size_t* 
     return error_code;
 }
 
-int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t size) {
-    if (pds == NULL || buffer == NULL) {
+int blosc2_dict_store_from_buffer(blosc2_dict_store** dstore, void* buffer, size_t size) {
+    if (dstore == NULL || buffer == NULL) {
         BLOSC_TRACE_ERROR("Cannot pass NULL arguments to this function");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -1413,7 +1499,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
         BLOSC_TRACE_ERROR("Size must be greater than 0");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
-    *pds = NULL;
+    *dstore = NULL;
     bool free_dict_store = true;
 
     zip_archive *za = ziputils_archive_new();
@@ -1441,12 +1527,12 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
         goto cleanup;
     }
     ds->storage_type = B2_DS_MEMORY_CONTIGUOUS;
-    ds->open_mode = B2_DS_RDONLY;
+    ds->mode = BLOSC2_STORE_OPEN_MODE_RDONLY;
 
     while (ziputils_reader_iter_next(iter)) {
         uint8_t* filename = NULL; // Filename is malloc-ed
         size_t filename_length = 0;
-        value val = {0};
+        b2_ds_value val = {0};
 
         error_code = ziputils_reader_iter_get_filename(iter, &filename, &filename_length);
         if (error_code != 0) {
@@ -1485,7 +1571,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** pds, void* buffer, size_t 
 
     ds->urlpath = buffer;
     free_dict_store = false;
-    *pds = ds;
+    *dstore = ds;
 
 cleanup:
     ziputils_reader_iter_free(iter);
@@ -1496,20 +1582,20 @@ cleanup:
     return error_code;
 }
 
-int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_es_item* item ) {
-    if (ds == NULL || key == NULL || item == NULL) {
+int blosc2_dict_store_get(blosc2_dict_store* dstore, const uint8_t* key, blosc2_store_value* item) {
+    if (dstore == NULL || key == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (ds->open_mode == B2_DS_WRONLY) {
+    if (dstore->mode == BLOSC2_STORE_OPEN_MODE_WRONLY) {
         BLOSC_TRACE_ERROR("Cannot access items in WRONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
     int error_code = BLOSC2_ERROR_SUCCESS;
     // EmbedStore
-    if (ds->estore != NULL) {
-        error_code = blosc2_embed_store_get(ds->estore, key, item);
+    if (dstore->estore != NULL) {
+        error_code = blosc2_embed_store_get(dstore->estore, key, item);
         if (error_code == BLOSC2_ERROR_SUCCESS) {
             return BLOSC2_ERROR_SUCCESS;
         }
@@ -1530,29 +1616,29 @@ int blosc2_dict_store_get( blosc2_dict_store* ds, const uint8_t* key, b2_es_item
             BLOSC_TRACE_ERROR("Could not normalize key");
             return error_code;
         }
-        value = hash_map_get(&ds->map, processed_key);
+        value = hash_map_get(&dstore->map, processed_key);
         free(processed_key);
     } else {
-        value = hash_map_get(&ds->map, key);
+        value = hash_map_get(&dstore->map, key);
     }
 
     if (value == NULL) {
         return BLOSC2_ERROR_NOT_FOUND;
     }
 
-    error_code = s_get_from_value(ds, value, item);
+    error_code = s_get_from_value(dstore, value, item);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not retrieve schunk with key: %s", (const char*)key);
     }
     return error_code;
 }
 
-int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_schunk* container ) {
-    if (container == NULL || ds == NULL || key == NULL) {
+int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_store_value* value ) {
+    if (value == NULL || ds == NULL || key == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (ds->open_mode == B2_DS_RDONLY) {
+    if (ds->mode == BLOSC2_STORE_OPEN_MODE_RDONLY) {
         BLOSC_TRACE_ERROR("Cannot call set when open_mode is RDONLY");
         return BLOSC2_ERROR_FAILURE;
     }
@@ -1560,7 +1646,7 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
     // EmbedStore
     int error_code = BLOSC2_ERROR_SUCCESS;
     if (ds->estore != NULL) {
-        error_code = s_try_set_schunk_in_embed(ds->estore, ds->threshold, key, container);
+        error_code = s_try_set_value_in_embed(ds->estore, ds->threshold, key, value);
         if (error_code < 0) {
             BLOSC_TRACE_ERROR("The element was suitable for insertion, but it couldn't be inserted");
             return error_code;
@@ -1569,6 +1655,9 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
             return BLOSC2_ERROR_SUCCESS;
         }
         // EMBED_NOT_INSERTED
+    } else if (value->tag == BLOSC2_STORE_VALUE_REMOTE) {
+        BLOSC_TRACE_ERROR("Cannot estore remote value if no EmbedStore was created for this DictStore");
+        return BLOSC2_ERROR_INVALID_PARAM;
     }
     // EmbedStore END
 
@@ -1592,11 +1681,12 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
     }
     bool free_processed = true;
 
+    blosc2_schunk* container = value->schunk;
     // Try insert it in the DictStore
     switch (ds->storage_type) {
         case B2_DS_MEMORY_SPARSE: {
-            value v = {0};
-            v.f_mem.schunk = container;
+            b2_ds_value v = {0};
+            v.f_mem.schunk = value->schunk;
             error_code = hash_map_put(&ds->map, processed_key, &v, &free_processed);
             break;
         }
@@ -1615,50 +1705,19 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sch
     return error_code;
 }
 
-int blosc2_dict_store_set_remote(blosc2_dict_store* dstore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path) {
-    if (dstore == NULL || key == NULL || urlbase == NULL || path == NULL) {
-        BLOSC_TRACE_ERROR("Arguments must be different from NULL");
+int64_t blosc2_dict_store_get_threshold(blosc2_dict_store* dstore) {
+    assert(dstore != NULL);
+    return dstore->threshold;
+}
+
+int blosc2_dict_store_set_threshold(blosc2_dict_store* dstore, int64_t threshold) {
+    if (dstore == NULL) {
+        BLOSC_TRACE_ERROR("dstore cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (dstore->open_mode == B2_DS_RDONLY) {
-        BLOSC_TRACE_ERROR("Cannot call set when open_mode is RDONLY");
-        return BLOSC2_ERROR_FAILURE;
-    }
-    if (key[0] == '\0') {
-        BLOSC_TRACE_ERROR("key cannot be equal to the empty string");
-        return BLOSC2_ERROR_INVALID_PARAM;
-    }
-    if (dstore->estore == NULL) {
-        BLOSC_TRACE_ERROR("Cannot set remote values when the DictStore does not contain any EmbedStore");
-        return BLOSC2_ERROR_INVALID_PARAM;
-    }
-
-    // EmbedStore
-    int error_code = blosc2_embed_store_set_remote(dstore->estore, key, urlbase, path);
-    if (error_code < 0) {
-        BLOSC_TRACE_ERROR("Could not set item with key '%s'", (const char*)key);
-    }
-    // EmbedStore END
-
-    // TODO: Take into account both urlbase and path and the threshold
-    //error_code = BLOSC2_ERROR_SUCCESS;
-    //// The stripped key is a malloc(ed) string that belongs to the map
-    //uint8_t* processed_key = NULL;
-    //if (!blosc2_key_is_canonical(key)) {
-    //    error_code = blosc2_key_normalize_copy(key, &processed_key);
-    //    if (error_code != 0) {
-    //        return error_code;
-    //    }
-    //} else {
-    //    error_code = blosc2_string_duplicate(key, &processed_key);
-    //    if (error_code != 0) {
-    //        return error_code;
-    //    }
-    //}
-    //bool free_processed = true;
-//
-    //if (free_processed) free(processed_key);
-    return error_code;
+    // Threshold can be <= 0, in that case, it is assumed that the user does not want to use the EmbedStore anymore.
+    dstore->threshold = threshold;
+    return BLOSC2_ERROR_SUCCESS;
 }
 
 int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
@@ -1666,7 +1725,7 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (ds->open_mode == B2_DS_RDONLY) {
+    if (ds->mode == BLOSC2_STORE_OPEN_MODE_RDONLY) {
         BLOSC_TRACE_ERROR("Cannot remove elements in RDONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1759,12 +1818,12 @@ const uint8_t* blosc2_dict_store_iter_get_key( blosc2_dict_store_iter *iter ) {
     return hash_map_iter_get_key(&iter->map_iter);
 }
 
-int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_es_item* item ) {
+int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, blosc2_store_value* item ) {
     if (iter == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (iter->dstore->open_mode == B2_DS_WRONLY) {
+    if (iter->dstore->mode == BLOSC2_STORE_OPEN_MODE_WRONLY) {
         BLOSC_TRACE_ERROR("Cannot retrieve container from iterator in WRONLY mode");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1780,9 +1839,4 @@ int blosc2_dict_store_iter_get_container( blosc2_dict_store_iter *iter, b2_es_it
         BLOSC_TRACE_ERROR("Could not retrieve item");
     }
     return rc;
-}
-
-bool blosc2_dict_store_iter_container_is_from_embed_store( blosc2_dict_store_iter* iter ) {
-    assert(iter != NULL);
-    return iter->state == B2_DS_ITER_EMBED;
 }

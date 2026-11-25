@@ -13,7 +13,7 @@ Blosc - Blocked Shuffling and Compression Library
 
 #include <stdint.h>
 #include <stddef.h>
-#include <blosc2/embed-store.h>
+#include <stores.h>
 
 /*
 The following functions cannot deserialize an arbitrary hash_map. This was done specifically to support the EmbedStore

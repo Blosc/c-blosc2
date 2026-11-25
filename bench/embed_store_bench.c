@@ -61,7 +61,7 @@ Blosc - Blocked Shuffling and Compression Library
 #include <inttypes.h>
 
 #include <blosc2.h>
-#include <blosc2/embed-store.h>
+#include <stores.h>
 #include <utils/msgpack.h>
 
 #define DEFAULT_NKEYS 1000
@@ -135,7 +135,7 @@ static blosc2_schunk* s_make_value_schunk(size_t elem_size) {
 /* Inserts `nkeys` values in the store. Used as untimed setup by several benchmarks. */
 static int s_populate(blosc2_embed_store* es, size_t nkeys, char** keys, blosc2_schunk* value) {
   for (size_t i = 0; i < nkeys; i++) {
-    if (blosc2_embed_store_set(es, (const uint8_t*)keys[i], value) != 0) {
+    if (blosc2_embed_store_set(es, (const uint8_t*)keys[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = value}) != 0) {
       printf("Error setting key '%s'\n", keys[i]);
       return -1;
     }
@@ -161,7 +161,7 @@ static int s_create_persisted_store(const char* path, size_t nkeys, char** keys,
   };
 
   blosc2_embed_store* es = NULL;
-  if (blosc2_embed_store_new(&es, &storage, 256) != 0 || es == NULL) {
+  if (blosc2_embed_store_new(&es, &storage, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE) != 0 || es == NULL) {
     return -1;
   }
   if (s_populate(es, nkeys, keys, value) != 0) {
@@ -180,7 +180,7 @@ static int s_create_persisted_store(const char* path, size_t nkeys, char** keys,
 /* set: insertion of `nkeys` values. */
 static int s_bench_set(size_t nkeys, size_t elem_size, char** keys, blosc2_schunk* value) {
   blosc2_embed_store* es = NULL;
-  if (blosc2_embed_store_new(&es, NULL, 256) != 0 || es == NULL) {
+  if (blosc2_embed_store_new(&es, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE) != 0 || es == NULL) {
     printf("Error creating the embed store\n");
     return -1;
   }
@@ -202,7 +202,7 @@ static int s_bench_set(size_t nkeys, size_t elem_size, char** keys, blosc2_schun
 /* get: retrieval of `nkeys` values. */
 static int s_bench_get(size_t nkeys, size_t elem_size, char** keys, blosc2_schunk* value) {
   blosc2_embed_store* es = NULL;
-  if (blosc2_embed_store_new(&es, NULL, 256) != 0 || es == NULL) {
+  if (blosc2_embed_store_new(&es, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE) != 0 || es == NULL) {
     printf("Error creating the embed store\n");
     return -1;
   }
@@ -216,7 +216,7 @@ static int s_bench_get(size_t nkeys, size_t elem_size, char** keys, blosc2_schun
 
   blosc_set_timestamp(&t0);
   for (size_t i = 0; i < nkeys; i++) {
-    b2_es_item got = {0};
+    blosc2_store_value got = {0};
     if (blosc2_embed_store_get(es, (const uint8_t*)keys[i], &got) != 0) {
       printf("Error getting key '%s'\n", keys[i]);
       blosc2_embed_store_free(es);
@@ -235,7 +235,7 @@ static int s_bench_get(size_t nkeys, size_t elem_size, char** keys, blosc2_schun
 /* remove: deletion of `nkeys` keys. */
 static int s_bench_remove(size_t nkeys, char** keys, blosc2_schunk* value) {
   blosc2_embed_store* es = NULL;
-  if (blosc2_embed_store_new(&es, NULL, 256) != 0 || es == NULL) {
+  if (blosc2_embed_store_new(&es, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE) != 0 || es == NULL) {
     printf("Error creating the embed store\n");
     return -1;
   }
@@ -266,7 +266,7 @@ static int s_bench_remove(size_t nkeys, char** keys, blosc2_schunk* value) {
 /* serialize: serialization of the whole index to a msgpack buffer. */
 static int s_bench_serialize(size_t nkeys, int reps, char** keys, blosc2_schunk* value) {
   blosc2_embed_store* es = NULL;
-  if (blosc2_embed_store_new(&es, NULL, 256) != 0 || es == NULL) {
+  if (blosc2_embed_store_new(&es, NULL, BLOSC2_EMBED_STORE_DEFAULT_CHUNKSIZE, BLOSC2_EMBED_STORE_DEFAULT_BLOCKSIZE) != 0 || es == NULL) {
     printf("Error creating the embed store\n");
     return -1;
   }
@@ -309,7 +309,7 @@ static int s_bench_open(size_t nkeys, int reps, char** keys, blosc2_schunk* valu
   blosc_set_timestamp(&t0);
   for (int r = 0; r < reps; r++) {
     blosc2_embed_store* opened = NULL;
-    if (blosc2_embed_store_open(&opened, (const uint8_t*)URLPATH, B2_ES_RDONLY) != 0 || opened == NULL) {
+    if (blosc2_embed_store_open(&opened, (const uint8_t*)URLPATH, BLOSC2_STORE_OPEN_MODE_RDONLY) != 0 || opened == NULL) {
       printf("Error opening the embed store\n");
       blosc2_remove_urlpath(URLPATH);
       return -1;

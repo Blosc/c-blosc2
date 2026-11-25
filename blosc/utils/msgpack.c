@@ -341,9 +341,9 @@ static int s_msgpack_serializer_serialize_embed_store_map(msgpack_serializer* se
         }
         b2_es_value* pvalue = iter.value;
         int rc = BLOSC2_ERROR_SUCCESS;
-        if (pvalue->tag == B2_ES_VALUE_LOCAL) {
+        if (pvalue->tag == BLOSC2_STORE_VALUE_SCHUNK) {
             rc = s_msgpack_serializer_serialize_embed_store_local_value(serial, *pvalue);
-        } else if (pvalue->tag == B2_ES_VALUE_REMOTE) {
+        } else if (pvalue->tag == BLOSC2_STORE_VALUE_REMOTE) {
             rc = s_msgpack_serializer_serialize_embed_store_remote_value(serial, *pvalue);
         } else {
             BLOSC_TRACE_ERROR("The value obtained does not have the right tag");
@@ -549,7 +549,7 @@ static int s_try_deserialize_local_value(const uint8_t* packed, size_t* pindex, 
         BLOSC_TRACE_ERROR("Could not deserialize length");
         return rc;
     }
-    pvalue->tag = B2_ES_VALUE_LOCAL;
+    pvalue->tag = BLOSC2_STORE_VALUE_SCHUNK;
 
     *pindex = current_index;
     return BLOSC2_ERROR_SUCCESS;
@@ -569,7 +569,7 @@ static int s_try_deserialize_remote_value(const uint8_t* packed, size_t* pindex,
         free(pvalue->f_remote.urlbase);
         return rc;
     }
-    pvalue->tag = B2_ES_VALUE_REMOTE;
+    pvalue->tag = BLOSC2_STORE_VALUE_REMOTE;
 
     *pindex = current_index;
     return BLOSC2_ERROR_SUCCESS;
@@ -739,11 +739,11 @@ static int s_v1_try_deserialize_embed_map_value(const uint8_t* packed, size_t* p
     }
 
     if (seen == (HAS_OFFSET | HAS_LENGTH)) {
-        pvalue->tag = B2_ES_VALUE_LOCAL;
+        pvalue->tag = BLOSC2_STORE_VALUE_SCHUNK;
         pvalue->f_local.offset = offset;
         pvalue->f_local.length = length;
     } else if (seen == (HAS_URLBASE | HAS_PATH)) {
-        pvalue->tag = B2_ES_VALUE_REMOTE;
+        pvalue->tag = BLOSC2_STORE_VALUE_REMOTE;
         pvalue->f_remote.urlbase = urlbase;
         pvalue->f_remote.path = path;
     } else {

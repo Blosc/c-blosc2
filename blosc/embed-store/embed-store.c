@@ -8,7 +8,6 @@ Blosc - Blocked Shuffling and Compression Library
   See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
-#include <blosc2/embed-store.h>
 #include "embed-store-private.h"
 #include "string_manipulation.h"
 #include <utils/msgpack.h>
@@ -28,7 +27,7 @@ static const char s_invalid_key_chars[] = ":\0\n\r\t"; // TODO: Check if '.' and
 static const size_t s_invalid_key_chars_size = sizeof(s_invalid_key_chars) - 1;
 
 static value s_value_create_local(size_t offset, size_t length) {
-    return (value){.tag = B2_ES_VALUE_LOCAL, .f_local = { .offset = offset, .length = length }};
+    return (value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .f_local = { .offset = offset, .length = length }};
 }
 
 static b2_es_value_local s_value_get_local(value* pvalue) {
@@ -56,7 +55,7 @@ static blosc2_schunk* s_embed_create_schunk_with_default_storage(const uint8_t* 
 // NOTE: This callback is used by the hash map to free the values when needed
 static void hm_value_free_cb(void* pvalue) {
     value* val = (value*)pvalue;
-    if (val->tag == B2_ES_VALUE_REMOTE) {
+    if (val->tag == BLOSC2_STORE_VALUE_REMOTE) {
         free(val->f_remote.urlbase);
         free(val->f_remote.path);
     }
@@ -142,21 +141,21 @@ static int s_embed_load_local_schunk(blosc2_schunk* origin, b2_es_value_local lo
     return rc;
 }
 
-static int s_embed_load_value(embed_store* es, b2_es_value* value, b2_es_item* item) {
+static int s_embed_load_value(embed_store* es, b2_es_value* value, blosc2_store_value* item) {
     int rc = BLOSC2_ERROR_SUCCESS;
     switch (value->tag) {
-    case B2_ES_VALUE_LOCAL:
+    case BLOSC2_STORE_VALUE_SCHUNK:
         blosc2_schunk* schunk = NULL;
         rc = s_embed_load_local_schunk(es->schunk, s_value_get_local(value), &schunk);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not load local SChunk");
             return rc;
         }
-        item->tag = B2_ES_VALUE_LOCAL;
+        item->tag = BLOSC2_STORE_VALUE_SCHUNK;
         item->schunk = schunk;
         break;
-    case B2_ES_VALUE_REMOTE:
-        item->tag = B2_ES_VALUE_REMOTE;
+    case BLOSC2_STORE_VALUE_REMOTE:
+        item->tag = BLOSC2_STORE_VALUE_REMOTE;
         item->remote.urlbase = value->f_remote.urlbase;
         item->remote.path = value->f_remote.path;
         break;
@@ -310,7 +309,7 @@ cleanup:
 
 static int s_embed_save_remote(embed_store* estore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path) {
     b2_es_value val = {0};
-    val.tag = B2_ES_VALUE_REMOTE;
+    val.tag = BLOSC2_STORE_VALUE_REMOTE;
     int rc = blosc2_string_duplicate(urlbase, &val.f_remote.urlbase);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to duplicate urlbase");
@@ -333,8 +332,8 @@ static int s_embed_save_remote(embed_store* estore, const uint8_t* key, const ui
 }
 
 static int s_embed_check_set_op(embed_store* estore, const uint8_t* key) {
-    if (estore->open_mode == B2_ES_RDONLY) {
-        BLOSC_TRACE_ERROR("Cannot call set with open_mode equal to B2_ES_RDONLY");
+    if (estore->mode == BLOSC2_STORE_OPEN_MODE_RDONLY) {
+        BLOSC_TRACE_ERROR("Cannot call set with open_mode equal to BLOSC2_STORE_OPEN_MODE_RDONLY");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
@@ -466,7 +465,7 @@ static int s_embed_serialize_version(blosc2_schunk* schunk, b2_es_version versio
     return rc;
 }
 
-static int s_embed_init_new_store(blosc2_schunk* schunk, b2_es_open_mode open_mode, blosc2_embed_store** estore) {
+static int s_embed_init_new_store(blosc2_schunk* schunk, blosc2_store_open_mode open_mode, blosc2_embed_store** estore) {
     embed_store* es = NULL;
     int rc = s_embed_alloc(&es, schunk);
     if (rc < 0) {
@@ -479,7 +478,7 @@ static int s_embed_init_new_store(blosc2_schunk* schunk, b2_es_open_mode open_mo
         blosc2_embed_store_free(es);
         return rc;
     }
-    es->open_mode = open_mode;
+    es->mode = open_mode;
     *estore = es;
     return rc;
 }
@@ -565,7 +564,7 @@ int blosc2_embed_store_new(blosc2_embed_store** estore, blosc2_storage* storage,
     schunk->chunksize = chunksize;
     schunk->blocksize = blocksize;
 
-    int rc = s_embed_init_new_store(schunk, B2_ES_RDWR, estore);
+    int rc = s_embed_init_new_store(schunk, BLOSC2_STORE_OPEN_MODE_RDWR, estore);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not create new EmbedStore");
     }
@@ -579,18 +578,23 @@ void blosc2_embed_store_free(blosc2_embed_store* estore) {
     free(estore);
 }
 
-int blosc2_embed_store_open_udio(blosc2_embed_store** estore, const uint8_t* urlpath, b2_es_open_mode open_mode, blosc2_io* io) {
+int blosc2_embed_store_open_offset_udio(blosc2_embed_store** estore, const uint8_t* urlpath, blosc2_store_open_mode open_mode, int64_t offset, blosc2_io* io) {
     if (estore == NULL || urlpath == NULL || io == NULL) {
         BLOSC_TRACE_ERROR("Every argument must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
+    if (offset < 0) {
+        BLOSC_TRACE_ERROR("Offset should be >= 0");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
     *estore = NULL;
     blosc2_schunk* schunk = NULL;
     embed_store* es = NULL;
     int rc = BLOSC2_ERROR_SUCCESS;
-    if (open_mode == B2_ES_RDONLY || open_mode == B2_ES_RDWR) {
+    if (open_mode == BLOSC2_STORE_OPEN_MODE_RDONLY || open_mode == BLOSC2_STORE_OPEN_MODE_RDWR) {
         // Load schunk
-        schunk = blosc2_schunk_open_udio((const char*)urlpath, io);
+        schunk = blosc2_schunk_open_offset_udio((const char*)urlpath, offset, io);
         if (schunk == NULL) {
             BLOSC_TRACE_ERROR("Embed store could not open schunk at '%s'", (const char*)urlpath);
             return BLOSC2_ERROR_FILE_OPEN;
@@ -599,9 +603,9 @@ int blosc2_embed_store_open_udio(blosc2_embed_store** estore, const uint8_t* url
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not create EmbedStore from SChunk");
         } else {
-            es->open_mode = open_mode;
+            es->mode = open_mode;
         }
-    } else if (open_mode == B2_ES_WRONLY) {
+    } else if (open_mode == BLOSC2_STORE_OPEN_MODE_WRONLY) {
         rc = s_exists_inode((const char*)urlpath);
         if (rc == BLOSC2_ERROR_SUCCESS) {
             BLOSC_TRACE_ERROR("Cannot overwrite EmbedStore located at '%s'", (const char*)urlpath);
@@ -632,9 +636,18 @@ int blosc2_embed_store_open_udio(blosc2_embed_store** estore, const uint8_t* url
     return rc;
 }
 
-int blosc2_embed_store_open(blosc2_embed_store** estore, const uint8_t* urlpath, b2_es_open_mode open_mode) {
+int blosc2_embed_store_open_offset(blosc2_embed_store** estore, const uint8_t* urlpath, blosc2_store_open_mode open_mode, int64_t offset) {
     blosc2_io io = blosc2_get_blosc2_io_defaults();
-    return blosc2_embed_store_open_udio(estore, urlpath, open_mode, &io);
+    return blosc2_embed_store_open_offset_udio(estore, urlpath, open_mode, offset, &io);
+}
+
+int blosc2_embed_store_open_udio(blosc2_embed_store** estore, const uint8_t* urlpath, blosc2_store_open_mode open_mode, blosc2_io* io) {
+    return blosc2_embed_store_open_offset_udio(estore, urlpath, open_mode, 0, io);
+}
+
+int blosc2_embed_store_open(blosc2_embed_store** estore, const uint8_t* urlpath, blosc2_store_open_mode open_mode) {
+    blosc2_io io = blosc2_get_blosc2_io_defaults();
+    return blosc2_embed_store_open_offset_udio(estore, urlpath, open_mode, 0, &io);
 }
 
 int blosc2_embed_store_close(blosc2_embed_store* estore) {
@@ -672,6 +685,31 @@ int blosc2_embed_store_close(blosc2_embed_store* estore) {
     return rc;
 }
 
+int64_t blosc2_embed_store_to_file(blosc2_embed_store* estore, const uint8_t* urlpath) {
+    if (estore == NULL || urlpath == NULL) {
+        BLOSC_TRACE_ERROR("Arguments must be different from NULL");
+        return BLOSC2_ERROR_NULL_POINTER;
+    }
+
+    int rc = s_exists_inode((const char*)urlpath);
+    if (rc == BLOSC2_ERROR_SUCCESS) {
+        BLOSC_TRACE_ERROR("File was found at %s, remove it first!", (const char*)urlpath);
+        return BLOSC2_ERROR_FAILURE;
+    }
+    if (rc != BLOSC2_ERROR_NOT_FOUND) {
+        BLOSC_TRACE_ERROR("There was an error while calling stat");
+        return rc;
+    }
+    // BLOSC2_ERROR_NOT_FOUND
+
+    blosc2_schunk* schunk = estore->schunk;
+    int64_t fileframe_size = blosc2_schunk_to_file(schunk, (const char*)urlpath);
+    if (fileframe_size < 0) {
+        BLOSC_TRACE_ERROR("Could not write EmbedStore to file %s", (const char*)urlpath);
+    }
+    return fileframe_size;
+}
+
 bool blosc2_embed_store_contains_key(blosc2_embed_store* estore, const uint8_t* key) {
     if (estore == NULL || key == NULL) {
         BLOSC_TRACE_ERROR("Neither es nor key can be equal to NULL");
@@ -684,7 +722,7 @@ bool blosc2_embed_store_contains_key(blosc2_embed_store* estore, const uint8_t* 
     return hash_map_contains_key(&estore->hm, key);
 }
 
-int blosc2_embed_store_get(blosc2_embed_store* estore, const uint8_t* key, b2_es_item* item) {
+int blosc2_embed_store_get(blosc2_embed_store* estore, const uint8_t* key, blosc2_store_value* item) {
     if (estore == NULL || key == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("Neither es, nor key, nor pschunk can be equal to NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -709,8 +747,8 @@ int blosc2_embed_store_get(blosc2_embed_store* estore, const uint8_t* key, b2_es
     return rc;
 }
 
-int blosc2_embed_store_set(blosc2_embed_store* estore, const uint8_t* key, blosc2_schunk* schunk) {
-    if (estore == NULL || key == NULL || schunk == NULL) {
+int blosc2_embed_store_set(blosc2_embed_store* estore, const uint8_t* key, blosc2_store_value* value) {
+    if (estore == NULL || key == NULL || value == NULL) {
         BLOSC_TRACE_ERROR("Neither es, nor key, nor schunk can be equal to NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -720,27 +758,17 @@ int blosc2_embed_store_set(blosc2_embed_store* estore, const uint8_t* key, blosc
         return rc;
     }
 
-    // NOTE: Embed store does not accept the reassignment of existing keys
-    rc = s_embed_save_schunk(estore, key, schunk);
-    if (rc != 0) {
-        BLOSC_TRACE_ERROR("Could not store schunk");
+    switch (value->tag) {
+    case BLOSC2_STORE_VALUE_SCHUNK:
+        blosc2_schunk* schunk = value->schunk;
+        rc = s_embed_save_schunk(estore, key, schunk);
+        break;
+    case BLOSC2_STORE_VALUE_REMOTE:
+        rc = s_embed_save_remote(estore, key, value->remote.urlbase, value->remote.path);
+        break;
     }
-    return rc;
-}
-
-int blosc2_embed_store_set_remote(blosc2_embed_store* estore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path) {
-    if (estore == NULL || key == NULL || urlbase == NULL || path == NULL) {
-        BLOSC_TRACE_ERROR("All arguments must be different from NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
-    int rc = s_embed_check_set_op(estore, key);
     if (rc < 0) {
-        BLOSC_TRACE_ERROR("Cannot call blosc2_embed_store_set_remote");
-        return rc;
-    }
-    rc = s_embed_save_remote(estore, key, urlbase, path);
-    if (rc < 0) {
-        BLOSC_TRACE_ERROR("Could not insert remote in EmbedStore");
+        BLOSC_TRACE_ERROR("Could not insert value in EmbedStore");
     }
     return rc;
 }
@@ -750,7 +778,7 @@ int blosc2_embed_store_remove(blosc2_embed_store* estore, const uint8_t* key) {
         BLOSC_TRACE_ERROR("Neither es nor key can be euqual to NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (estore->open_mode == B2_ES_RDONLY) {
+    if (estore->mode == BLOSC2_STORE_OPEN_MODE_RDONLY) {
         BLOSC_TRACE_ERROR("Cannot remove element when open_mode is RDONLY");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -764,7 +792,7 @@ int blosc2_embed_store_remove(blosc2_embed_store* estore, const uint8_t* key) {
     bool removed = hash_map_remove_take(&estore->hm, key, &val);
     if (removed) {
         // Then the element was found
-        if (val.tag == B2_ES_VALUE_REMOTE) {
+        if (val.tag == BLOSC2_STORE_VALUE_REMOTE) {
             free(val.f_remote.urlbase);
             free(val.f_remote.path);
         }
@@ -776,8 +804,8 @@ size_t blosc2_embed_store_get_length(blosc2_embed_store* estore) {
     return estore->hm.length;
 }
 
-b2_es_open_mode blosc2_embed_store_get_open_mode(blosc2_embed_store* estore) {
-    return estore->open_mode;
+blosc2_store_open_mode blosc2_embed_store_get_open_mode(blosc2_embed_store* estore) {
+    return estore->mode;
 }
 
 int blosc2_embed_store_get_version(blosc2_embed_store* estore) {
@@ -830,7 +858,7 @@ int blosc2_embed_store_from_schunk(blosc2_embed_store** estore, blosc2_schunk* s
         BLOSC_TRACE_ERROR("Could not create EmbedStore from SChunk");
         if (copy) blosc2_schunk_free(embed_schunk);
     } else {
-        es->open_mode = B2_ES_RDWR;
+        es->mode = BLOSC2_STORE_OPEN_MODE_RDWR;
         *estore = es;
     }
     return rc;
@@ -937,12 +965,12 @@ const uint8_t* blosc2_embed_store_iter_get_key(blosc2_embed_store_iter* iter) {
     return iter->map_iter.key->key;
 }
 
-int blosc2_embed_store_iter_get_container(blosc2_embed_store_iter* iter, b2_es_item* item) {
+int blosc2_embed_store_iter_get_container(blosc2_embed_store_iter* iter, blosc2_store_value* item) {
     if (iter == NULL || item == NULL) {
         BLOSC_TRACE_ERROR("Neither iter nor pschunk can be equal to NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    *item = (b2_es_item){0};
+    *item = (blosc2_store_value){0};
     value* val = iter->map_iter.value;
     return s_embed_load_value(iter->es, val, item);
 }

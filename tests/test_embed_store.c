@@ -12,7 +12,7 @@ Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
 
 #include "test_common.h"
 #include <blosc2.h>
-#include <blosc2/embed-store.h>
+#include <stores.h>
 #include "../blosc/embed-store/embed-store-private.h"
 #include <utils/msgpack.h>
 
@@ -115,7 +115,7 @@ static char* test_embed_store_new() {
     mu_assert("ERROR: Creation should have failed", rc == BLOSC2_ERROR_INVALID_PARAM);
     rc = blosc2_embed_store_new(&es, NULL, s_default_chunksize, s_default_blocksize);
     mu_assert("ERROR: Creation should have succeed", rc == 0);
-    mu_assert("ERROR: Wrong open mode detected, it should be B2_ES_RDWR", blosc2_embed_store_get_open_mode(es) == B2_ES_RDWR);
+    mu_assert("ERROR: Wrong open mode detected, it should be BLOSC2_STORE_OPEN_MODE_RDWR", blosc2_embed_store_get_open_mode(es) == BLOSC2_STORE_OPEN_MODE_RDWR);
     blosc2_embed_store_free(es);
     es = NULL;
     rc = blosc2_embed_store_new(&es, &b2_storage, s_default_chunksize, s_default_blocksize);
@@ -126,7 +126,7 @@ static char* test_embed_store_new() {
 
 static char* test_embed_store_open_v1() {
     // TODO
-    int rc = blosc2_embed_store_open(&es, embed_store_v1, B2_ES_RDONLY);
+    int rc = blosc2_embed_store_open(&es, embed_store_v1, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Could not open embed store", rc == 0);
     mu_assert("ERROR: embed store was no allocated", es != NULL);
     mu_assert("ERROR: Length was not the expected", blosc2_embed_store_get_length(es) == s_V1_length);
@@ -173,11 +173,11 @@ static char* test_embed_store_open_v2() {
     int rc = s_create_persisted_v2_store(packed_file_v2);
     mu_assert("ERROR: Could not create the persisted v2 embed store", rc == 0);
 
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, B2_ES_RDONLY);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Could not open the v2 embed store", rc == 0);
     mu_assert("ERROR: The opened v2 embed store was not allocated", es != NULL);
-    mu_assert("ERROR: Wrong open mode detected, it should be B2_ES_RDONLY",
-              blosc2_embed_store_get_open_mode(es) == B2_ES_RDONLY);
+    mu_assert("ERROR: Wrong open mode detected, it should be BLOSC2_STORE_OPEN_MODE_RDONLY",
+              blosc2_embed_store_get_open_mode(es) == BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Opened v2 embed store's length is not the expected",
               blosc2_embed_store_get_length(es) == KEYS_LENGTH);
 
@@ -185,10 +185,10 @@ static char* test_embed_store_open_v2() {
     for (size_t i = 0; i < KEYS_LENGTH; i+=1) {
         mu_assert("ERROR: A stored key is not present in the opened v2 embed store",
                   blosc2_embed_store_contains_key(es, keys[i]));
-        b2_es_item item;
+        blosc2_store_value item;
         rc = blosc2_embed_store_get(es, keys[i], &item);
         mu_assert("ERROR: Could not get a value from the opened v2 embed store", rc == 0);
-        mu_assert("ERROR: item tag should be local", item.tag == B2_ES_VALUE_LOCAL);
+        mu_assert("ERROR: item tag should be local", item.tag == BLOSC2_STORE_VALUE_SCHUNK);
         mu_assert("ERROR: The retrieved schunk is NULL", item.schunk != NULL);
         rc = blosc2_schunk_free(item.schunk);
         mu_assert("ERROR: Could not free the retrieved schunk", rc == 0);
@@ -208,7 +208,7 @@ static char* test_embed_store_open_v2() {
     mu_assert("ERROR: The number of iterated keys is not the expected", iterated == KEYS_LENGTH);
 
     // A store opened as read-only must reject writes
-    rc = blosc2_embed_store_set(es, "/new_key", schunks[0]);
+    rc = blosc2_embed_store_set(es, (const uint8_t*)"/new_key", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = schunks[0]});
     mu_assert("ERROR: set must fail on a read-only embed store", rc != 0);
 
     rc = blosc2_embed_store_close(es);
@@ -222,13 +222,13 @@ static char* test_embed_store_open_v2_readwrite() {
     int rc = s_create_persisted_v2_store(packed_file_v2);
     mu_assert("ERROR: Could not create the persisted v2 embed store", rc == 0);
 
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, B2_ES_RDWR);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, BLOSC2_STORE_OPEN_MODE_RDWR);
     mu_assert("ERROR: Could not open the v2 embed store in RDWR mode", rc == 0);
-    mu_assert("ERROR: Wrong open mode detected, it should be B2_ES_RDWR",
-              blosc2_embed_store_get_open_mode(es) == B2_ES_RDWR);
+    mu_assert("ERROR: Wrong open mode detected, it should be BLOSC2_STORE_OPEN_MODE_RDWR",
+              blosc2_embed_store_get_open_mode(es) == BLOSC2_STORE_OPEN_MODE_RDWR);
 
     // Writes must be accepted when the store is opened as RDWR
-    rc = blosc2_embed_store_set(es, "/new_key", schunks[0]);
+    rc = blosc2_embed_store_set(es, (const uint8_t*)"/new_key", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = schunks[0]});
     mu_assert("ERROR: Could not set a new key in a RDWR-open embed store", rc == 0);
     mu_assert("ERROR: Length was not increased after setting a new key",
               blosc2_embed_store_get_length(es) == KEYS_LENGTH + 1);
@@ -239,16 +239,16 @@ static char* test_embed_store_open_v2_readwrite() {
     es = NULL;
 
     // Reopen in read-only mode and check that the change was persisted
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, B2_ES_RDONLY);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Could not reopen the v2 embed store", rc == 0);
     mu_assert("ERROR: The new key was not persisted", blosc2_embed_store_contains_key(es, "/new_key"));
     mu_assert("ERROR: The reopened v2 embed store's length is not the expected",
               blosc2_embed_store_get_length(es) == KEYS_LENGTH + 1);
 
-    b2_es_item item;
+    blosc2_store_value item;
     rc = blosc2_embed_store_get(es, "/new_key", &item);
     mu_assert("ERROR: Could not get the newly added key's value", rc == 0);
-    mu_assert("ERROR: Item tag should be LOCAL", item.tag == B2_ES_VALUE_LOCAL);
+    mu_assert("ERROR: Item tag should be LOCAL", item.tag == BLOSC2_STORE_VALUE_SCHUNK);
     mu_assert("ERROR: The newly added key's schunk is NULL", item.schunk != NULL);
     blosc2_schunk_free(item.schunk);
 
@@ -264,28 +264,28 @@ static char* test_embed_store_open_v2_readwrite() {
 static char* test_embed_store_open_errors() {
     es = NULL;
 
-    int rc = blosc2_embed_store_open(NULL, (const uint8_t*)packed_file_v2, B2_ES_RDONLY);
+    int rc = blosc2_embed_store_open(NULL, (const uint8_t*)packed_file_v2, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: open with a NULL store pointer should fail with BLOSC2_ERROR_NULL_POINTER",
               rc == BLOSC2_ERROR_NULL_POINTER);
 
-    rc = blosc2_embed_store_open(&es, NULL, B2_ES_RDONLY);
+    rc = blosc2_embed_store_open(&es, NULL, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: open with a NULL urlpath should fail with BLOSC2_ERROR_NULL_POINTER",
               rc == BLOSC2_ERROR_NULL_POINTER);
     mu_assert("ERROR: The store pointer should remain NULL after a failed open", es == NULL);
 
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)"whatever.b2e", (b2_es_open_mode)99);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)"whatever.b2e", (blosc2_store_open_mode)99);
     mu_assert("ERROR: open with an invalid open mode should fail with BLOSC2_ERROR_INVALID_PARAM",
               rc == BLOSC2_ERROR_INVALID_PARAM);
     mu_assert("ERROR: The store pointer should remain NULL after a failed open", es == NULL);
 
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)"this_file_does_not_exist.b2e", B2_ES_RDONLY);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)"this_file_does_not_exist.b2e", BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: open with a non-existent file should fail", rc < 0);
     mu_assert("ERROR: The store pointer should remain NULL after a failed open", es == NULL);
 
     return NULL;
 }
 
-// B2_ES_WRONLY creates a fresh store on a non-existent path. The store must be usable
+// BLOSC2_STORE_OPEN_MODE_WRONLY creates a fresh store on a non-existent path. The store must be usable
 // (set/close) and, crucially, reopenable afterwards, which requires the version metalayer to
 // be written at creation time.
 static char* test_embed_store_open_wronly() {
@@ -294,13 +294,13 @@ static char* test_embed_store_open_wronly() {
 
     // A fresh store can be created in WRONLY mode, and it is a writing mode
     es = NULL;
-    int rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, B2_ES_WRONLY);
+    int rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, BLOSC2_STORE_OPEN_MODE_WRONLY);
     mu_assert("ERROR: Could not create a WRONLY embed store", rc == 0);
     mu_assert("ERROR: The WRONLY embed store was not allocated", es != NULL);
-    mu_assert("ERROR: Wrong open mode detected, it should be B2_ES_WRONLY",
-              blosc2_embed_store_get_open_mode(es) == B2_ES_WRONLY);
+    mu_assert("ERROR: Wrong open mode detected, it should be BLOSC2_STORE_OPEN_MODE_WRONLY",
+              blosc2_embed_store_get_open_mode(es) == BLOSC2_STORE_OPEN_MODE_WRONLY);
 
-    rc = blosc2_embed_store_set(es, keys[0], schunks[0]);
+    rc = blosc2_embed_store_set(es, keys[0], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = schunks[0]});
     mu_assert("ERROR: set must be accepted on a WRONLY embed store", rc == 0);
     mu_assert("ERROR: The WRONLY embed store's length is not the expected",
               blosc2_embed_store_get_length(es) == 1);
@@ -310,7 +310,7 @@ static char* test_embed_store_open_wronly() {
     es = NULL;
 
     // Reopening must succeed: this pins down that the version metalayer was written
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, B2_ES_RDONLY);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Could not reopen the WRONLY-created embed store", rc == 0);
     mu_assert("ERROR: The reopened embed store was not allocated", es != NULL);
     mu_assert("ERROR: The persisted key is missing after reopening",
@@ -321,7 +321,7 @@ static char* test_embed_store_open_wronly() {
     es = NULL;
 
     // A second WRONLY open on the now existing file must be rejected
-    rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, B2_ES_WRONLY);
+    rc = blosc2_embed_store_open(&es, (const uint8_t*)wronly_file, BLOSC2_STORE_OPEN_MODE_WRONLY);
     mu_assert("ERROR: WRONLY open must reject an existing file", rc != 0);
     mu_assert("ERROR: The store pointer should remain NULL after a failed WRONLY open", es == NULL);
 
@@ -331,7 +331,7 @@ static char* test_embed_store_open_wronly() {
 
 static int s_set_elements(blosc2_embed_store* es) {
     for (size_t i = 0; i < KEYS_LENGTH; i+=1) {
-        int rc = blosc2_embed_store_set(es, keys[i], schunks[i]);
+        int rc = blosc2_embed_store_set(es, keys[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = schunks[i]});
         if (rc != 0) {
             return rc;
         }
@@ -353,7 +353,7 @@ static char* test_embed_store_set() {
     while (blosc2_embed_store_iter_next(iter)) {
         const uint8_t* key = blosc2_embed_store_iter_get_key(iter);
         mu_assert("ERROR: A NULL key was found while iterating", key != NULL);
-        b2_es_item item;
+        blosc2_store_value item;
         rc = blosc2_embed_store_iter_get_container(iter, &item);
         blosc2_schunk* schunk = item.schunk;
         mu_assert("ERROR: Could not obtain container from iterator", rc == 0);
@@ -376,10 +376,10 @@ static char* test_embed_store_get() {
     mu_assert("ERROR: EmbedStore's length was not setted properly", blosc2_embed_store_get_length(es) == KEYS_LENGTH);
 
     for (size_t i = 0; i < KEYS_LENGTH; i+=1) {
-        b2_es_item item;
+        blosc2_store_value item;
         rc = blosc2_embed_store_get(es, keys[i], &item);
         mu_assert("ERROR: Could not get element", rc == 0);
-        mu_assert("ERROR: Item's tag should be local", item.tag == B2_ES_VALUE_LOCAL);
+        mu_assert("ERROR: Item's tag should be local", item.tag == BLOSC2_STORE_VALUE_SCHUNK);
         mu_assert("ERROR: Schunk pointer unexpectedly equals to NULL", item.schunk != NULL);
         rc = blosc2_schunk_free(item.schunk);
         mu_assert("ERROR: Could not free schunk", rc == 0);
@@ -436,15 +436,15 @@ static void s_print_embed_store(blosc2_embed_store* estore) {
 
     while (blosc2_embed_store_iter_next(iter)) {
         const uint8_t* key = blosc2_embed_store_iter_get_key(iter);
-        b2_es_item item = {0};
+        blosc2_store_value item = {0};
         blosc2_embed_store_iter_get_container(iter, &item);
         printf("Key: '%s'\n", (const char*)key);
-        if (item.tag == B2_ES_VALUE_LOCAL) {
+        if (item.tag == BLOSC2_STORE_VALUE_SCHUNK) {
             printf("Local value\n");
             if (item.schunk != NULL) {
                 blosc2_schunk_free(item.schunk);
             }
-        } else if (item.tag == B2_ES_VALUE_REMOTE) {
+        } else if (item.tag == BLOSC2_STORE_VALUE_REMOTE) {
             printf("urlbase: '%s'\n", (const char*)item.remote.urlbase);
             printf("path: '%s'\n", (const char*)item.remote.path);
         } else {
@@ -497,12 +497,12 @@ static char* test_serialize_matches_fixture() {
         b2_es_value* obtained = (b2_es_value*)hash_map_get(&roundtrip->hm, key);
         mu_assert("ERROR: A key from the fixture is missing in the re-serialized buffer", obtained != NULL);
         mu_assert("ERROR: Diverging tags found, they should be equal", expected->tag == obtained->tag);
-        if (expected->tag == B2_ES_VALUE_LOCAL) {
+        if (expected->tag == BLOSC2_STORE_VALUE_SCHUNK) {
             mu_assert("ERROR: The serialized offset does not match the fixture",
                               obtained->f_local.offset == expected->f_local.offset);
             mu_assert("ERROR: The serialized length does not match the fixture",
                       obtained->f_local.length == expected->f_local.length);
-        } else if (expected->tag == B2_ES_VALUE_REMOTE) {
+        } else if (expected->tag == BLOSC2_STORE_VALUE_REMOTE) {
             mu_assert("ERROR: urlbase strings does not match", strcmp((const char*)obtained->f_remote.urlbase, (const char*)expected->f_remote.urlbase) == 0);
             mu_assert("ERROR: path strings does not match", strcmp((const char*)obtained->f_remote.path, (const char*)expected->f_remote.path) == 0);
         } else {
@@ -664,10 +664,10 @@ static char* test_embed_store_from_schunk_v2() {
     for (size_t i = 0; i < KEYS_LENGTH; i+=1) {
         mu_assert("ERROR: A stored key is missing from the EmbedStore built from a schunk",
                   blosc2_embed_store_contains_key(es, keys[i]));
-        b2_es_item item;
+        blosc2_store_value item;
         rc = blosc2_embed_store_get(es, keys[i], &item);
         mu_assert("ERROR: Could not get a value from the EmbedStore built from a schunk", rc == 0);
-        mu_assert("ERROR: Item's tag should be local", item.tag == B2_ES_VALUE_LOCAL);
+        mu_assert("ERROR: Item's tag should be local", item.tag == BLOSC2_STORE_VALUE_SCHUNK);
         mu_assert("ERROR: The value retrieved from the EmbedStore built from a schunk is NULL", item.schunk != NULL);
         rc = blosc2_schunk_free(item.schunk);
         mu_assert("ERROR: Could not free the value retrieved from the EmbedStore built from a schunk", rc == 0);
@@ -763,7 +763,7 @@ static char* test_mmap(void) {
         mmap_file->needs_free = true;
         io.params = mmap_file;
         mmap_file->mode = "r";
-        int rc = blosc2_embed_store_open_udio(&estore, (const uint8_t*)"test_embed_store_v1.b2e", B2_ES_RDONLY, &io);
+        int rc = blosc2_embed_store_open_udio(&estore, (const uint8_t*)"test_embed_store_v1.b2e", BLOSC2_STORE_OPEN_MODE_RDONLY, &io);
         mu_assert("ERROR: Could not create new EmbedStore with mmap options", rc == 0);
     }
     int rc = BLOSC2_ERROR_SUCCESS;
@@ -773,14 +773,14 @@ static char* test_mmap(void) {
     while (blosc2_embed_store_iter_next(iter)) {
         const uint8_t* key = blosc2_embed_store_iter_get_key(iter);
         mu_assert("ERROR: NULL key retrieved", key != NULL);
-        b2_es_item item = {0};
+        blosc2_store_value item = {0};
         rc = blosc2_embed_store_iter_get_container(iter, &item);
         mu_assert("ERROR: Could not retrieve container", rc == 0);
-        if (item.tag == B2_ES_VALUE_LOCAL) {
+        if (item.tag == BLOSC2_STORE_VALUE_SCHUNK) {
             blosc2_schunk* schunk = item.schunk;
             mu_assert("ERROR: Could not obtain schunk", schunk != NULL);
             blosc2_schunk_free(schunk);
-        } else if (item.tag == B2_ES_VALUE_REMOTE) {
+        } else if (item.tag == BLOSC2_STORE_VALUE_REMOTE) {
             mu_assert("ERROR: urlbase shouldn't be NULL", item.remote.urlbase != NULL);
             mu_assert("ERROR: path shouldn't be NULL", item.remote.path != NULL);
         } else {
