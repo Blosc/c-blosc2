@@ -13,6 +13,7 @@ short).
    :members:
 .. doxygenfunction:: blosc2_schunk_new
 .. doxygenfunction:: blosc2_schunk_free
+.. doxygenfunction:: blosc2_schunk_flush
 
 .. doxygenfunction:: blosc2_schunk_open
 .. doxygenfunction:: blosc2_schunk_open_offset

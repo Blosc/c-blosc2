@@ -1,24 +1,24 @@
-# Announcing C-Blosc2 3.8.0
+# Announcing C-Blosc2 3.9.0
 A fast, compressed, and persistent binary data store library for C.
 
 ## What is new?
 
-C-Blosc2 3.8.0 delivers major SIMD optimizations in BloscLZ 2.7.0 and fused
-SHUFFLE+BYTEDELTA across x86-64 and ARM64, lower thread-pool overhead, and
-important security and portability fixes.
+C-Blosc2 3.9.0 delivers a critical Zstandard 1.6.0 security update, new
+explicit flush APIs with frame close error propagation, BloscLZ branchless
+optimizations, and several important bug fixes.
 
-- BloscLZ 2.7.0 speeds up both compression and decompression on x86-64
-  (SSE2/SSSE3/AVX2) and ARM64 (NEON) with improved match finding, run
-  detection, and vectorized literal/match copying.
-- Fused SHUFFLE+BYTEDELTA gains an AVX2 path, faster x86-64 and NEON backward
-  decoders, a zero-high-planes fast path, and fixes missing NEON symbols on
-  ARM64 Linux (#883).
-- Reduced shared thread-pool overhead by running worker 0 on the calling
-  thread, spawning `nthreads - 1` workers, and reusing thread-local scratch
-  buffers.
-- Fixed a heap buffer overflow in the ZFP compressors when compressed output
-  exceeds `output_len` (#887, #888), added `PREFER_EXTERNAL_ZFP` (#886), and
-  fixed portability issues on older macOS / unoptimized GCC builds (#884, #885).
+- Updated bundled/fetched Zstandard to 1.6.0, fixing CVE-2026-124851 and other
+  memory-safety issues (legacy format support is now disabled by default).
+- Added `blosc2_schunk_flush()` and `b2nd_flush()` and propagated frame close
+  errors from `blosc2_schunk_free()` / `b2nd_free()` so delayed I/O errors on
+  `fsync()`/`close()` (such as NFS `EDQUOT` or `ENOSPC`) are caught reliably
+  (#848).
+- Made BloscLZ tagged hash-table lookups and short-match row selection
+  branchless for faster GCC compression and decompression, and fixed a
+  declaration-after-label portability issue for pre-C23 compilers.
+- Fixed super-chunk copy truncation for `typesize > 255` (#890), double-free of
+  `vlmetalayers` in `b2nd` views (#876), and ZFP compressed blocks smaller than
+  8 bytes when `ZFP_BIT_STREAM_WORD_SIZE < 64` (#893).
 
 For more info, see the release notes in:
 

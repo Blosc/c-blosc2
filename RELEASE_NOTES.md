@@ -1,13 +1,32 @@
 Release notes for C-Blosc2
 ==========================
 
-Changes from 3.8.0 to 3.8.1
+Changes from 3.8.0 to 3.9.0
 ===========================
 
 * **Zstd 1.6.0** (security). Update the bundled/fetched Zstandard to 1.6.0, which
   fixes CVE-2026-124851 (streaming decompression of malformed data could expose
   uninitialized memory) along with several other memory-safety fixes. Upgrading
   is highly recommended. Zstd now disables legacy format support by default.
+* **Explicit flush APIs and frame close error propagation**. Add
+  `blosc2_schunk_flush()` and `b2nd_flush()` to synchronize pending writes to
+  disk and close cached writable handles so delayed I/O errors (such as NFS
+  quota exceeded `EDQUOT` or `ENOSPC` reported on `fsync()`/`close()`) can be
+  caught explicitly before freeing, and propagate frame close errors from
+  `blosc2_schunk_free()` / `b2nd_free()` (#848).
+* **BloscLZ micro-optimizations and C99/C11 portability**. Make tagged
+  hash-table lookups (`blosclz_htab_get_tagged()`) and short-match repeat-table
+  row selection (`blosclz_copy_short_match()`) branchless for faster GCC
+  compression and decompression, simplify the far-distance check in
+  `blosclz_decompress_impl()`, and fix a declaration-after-label in
+  `blosc/blosclz.c` for pre-C23 compilers.
+* **Bug fixes**.
+  - Preserve `schunk->typesize > 255` when copying super-chunks instead of
+    truncating it to `uint8_t` (#890).
+  - Deep-copy variable-length metalayers (`vlmetalayers`) when creating `b2nd`
+    views to prevent double-free errors (#876).
+  - Allow ZFP compressed blocks smaller than 8 bytes when
+    `ZFP_BIT_STREAM_WORD_SIZE < 64` (#893).
 
 Changes from 3.7.0 to 3.8.0
 ===========================
