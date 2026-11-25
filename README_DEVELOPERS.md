@@ -8,6 +8,10 @@ containing the core `miniexpr` library and headers (`miniexpr_kernel.h`,
 `miniexpr_grid.h`, `miniexpr_reduce.h`).
 Constructors and the optional `sum_linspace` benchmark use the core library
 directly and do not need JSON support.
+The 1.0 cleanup baseline is miniexpr
+`744646d2bb38dbf4b1311d5560d8f59215482a8d` (`next`).
+Install `miniexpr_types.h` alongside the kernel/grid/reduction headers; new
+constructor code does not depend on the callback-bearing compatibility API.
 
 For sibling checkouts, run from the repository root:
 
