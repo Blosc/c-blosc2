@@ -4,13 +4,16 @@
 
 `BLOSC2_MINIEXPR_ROOT` enables SIMD acceleration for `b2nd_linspace()` and
 `b2nd_arange()`. Point it to a built miniexpr source tree or installation
-containing both `miniexpr` and `miniexpr_artifact`.
+containing the core `miniexpr` library and headers (`miniexpr_kernel.h`,
+`miniexpr_grid.h`, `miniexpr_reduce.h`).
+Constructors and the optional `sum_linspace` benchmark use the core library
+directly and do not need JSON support.
 
 For sibling checkouts, run from the repository root:
 
 ```sh
 cmake -S ../miniexpr -B ../miniexpr/build -DCMAKE_BUILD_TYPE=Release
-cmake --build ../miniexpr/build --target miniexpr miniexpr_artifact -j8
+cmake --build ../miniexpr/build --target miniexpr -j8
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTS=ON -DBUILD_BENCHMARKS=ON \
   -DBLOSC2_MINIEXPR_ROOT=../miniexpr

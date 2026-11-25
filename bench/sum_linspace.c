@@ -6,8 +6,8 @@
  *   a = blosc2.linspace(0, 1, 10**9)   # float64, materialized/compressed
  *   a.sum()
  *
- * Build (miniexpr must already be built, including its artifact library):
- *   cmake --build ../miniexpr/build --target miniexpr miniexpr_artifact -j8
+ * Build (miniexpr must already be built):
+ *   cmake --build ../miniexpr/build --target miniexpr -j8
  *   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
  *     -DBLOSC2_MINIEXPR_ROOT=../miniexpr
  *   cmake --build build --target sum_linspace -j8
@@ -38,7 +38,8 @@
 #include "blosc2.h"
 #include "b2nd.h"
 #include "blosc2/filters-registry.h"
-#include "miniexpr_artifact.h"
+#include "miniexpr.h"
+#include "miniexpr_reduce.h"
 
 #define LEAF ME_PAIRWISE_SUM_LEAF_ITEMS
 #ifndef B2ND_RAMP_BACKEND
@@ -86,7 +87,7 @@ static int reduce_block(blosc2_prefilter_params *p) {
   if (rc != valid_bytes ||
       me_pairwise_sum_leaves(ME_FLOAT64, p->output, count * LEAF,
                             s->leaves + offset,
-                            (s->leaf_capacity - offset) * sizeof(double)) != ME_ARTIFACT_SUCCESS) {
+                            (s->leaf_capacity - offset) * sizeof(double)) != ME_PAIRWISE_SUM_SUCCESS) {
     s->errors[p->tid] = -1;
     return -1;
   }
@@ -98,7 +99,7 @@ static int reduce_block(blosc2_prefilter_params *p) {
 
 static int sum_array(blosc2_schunk *sc, bench_state *s, double *buffer, double *result) {
   me_pairwise_sum_state sum;
-  if (me_pairwise_sum_init(&sum, ME_FLOAT64) != ME_ARTIFACT_SUCCESS) return -1;
+  if (me_pairwise_sum_init(&sum, ME_FLOAT64) != ME_PAIRWISE_SUM_SUCCESS) return -1;
   for (int64_t i = 0; i < sc->nchunks; ++i) {
     uint8_t *chunk = NULL;
     bool needs_free = false;
@@ -121,8 +122,8 @@ static int sum_array(blosc2_schunk *sc, bench_state *s, double *buffer, double *
     for (int t = 0; t < s->nthreads; ++t) if (s->errors[t]) return -1;
     size_t n = valid;
     size_t full = n / LEAF;
-    if (me_pairwise_sum_append(&sum, s->leaves, full) != ME_ARTIFACT_SUCCESS ||
-        me_pairwise_sum_update(&sum, s->tail, n % LEAF) != ME_ARTIFACT_SUCCESS) {
+    if (me_pairwise_sum_append(&sum, s->leaves, full) != ME_PAIRWISE_SUM_SUCCESS ||
+        me_pairwise_sum_update(&sum, s->tail, n % LEAF) != ME_PAIRWISE_SUM_SUCCESS) {
       return -1;
     }
   }

@@ -102,6 +102,10 @@ static int check_case(const geometry *g, int size, bool swap, int backend, int t
     bool endpoint = mode == 0;
     int rc = mode < 2 ? b2nd_linspace(ctx, &a, start, stop, endpoint)
                       : b2nd_arange(ctx, &a, start, stop, step);
+    if (rc != 0) {
+      fprintf(stderr, "constructor failed: ndim=%d n=%lld size=%d swap=%d backend=%d mode=%d rc=%d\n",
+              g->ndim, (long long)n, size, swap, backend, mode, rc);
+    }
     CHECK(rc == 0 && a != NULL);
     CHECK(a->nitems == n && strcmp(a->dtype, dtype) == 0);
     blosc2_cparams *actual;

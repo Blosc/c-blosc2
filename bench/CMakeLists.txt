@@ -32,11 +32,9 @@ if(BENCH_MINIEXPR_ROOT OR BLOSC2_MINIEXPR_ROOT)
     endif()
     get_filename_component(_bench_miniexpr_root "${_bench_miniexpr_root}"
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
-    find_path(BENCH_MINIEXPR_INCLUDE_DIR miniexpr_artifact.h
+    find_path(BENCH_MINIEXPR_INCLUDE_DIR miniexpr_reduce.h
         HINTS "${_bench_miniexpr_root}/src" "${_bench_miniexpr_root}/include" REQUIRED)
     find_library(BENCH_MINIEXPR_LIBRARY NAMES miniexpr
-        HINTS "${_bench_miniexpr_root}/build" "${_bench_miniexpr_root}/lib" REQUIRED)
-    find_library(BENCH_MINIEXPR_ARTIFACT_LIBRARY NAMES miniexpr_artifact
         HINTS "${_bench_miniexpr_root}/build" "${_bench_miniexpr_root}/lib" REQUIRED)
     find_package(Threads REQUIRED)
     add_executable(sum_linspace sum_linspace.c)
@@ -47,7 +45,7 @@ if(BENCH_MINIEXPR_ROOT OR BLOSC2_MINIEXPR_ROOT)
     endif()
     target_include_directories(sum_linspace PRIVATE "${BENCH_MINIEXPR_INCLUDE_DIR}")
     target_link_libraries(sum_linspace Blosc2::blosc2
-        "${BENCH_MINIEXPR_ARTIFACT_LIBRARY}" "${BENCH_MINIEXPR_LIBRARY}"
+        "${BENCH_MINIEXPR_LIBRARY}"
         Threads::Threads ${CMAKE_DL_LIBS})
 endif()
 

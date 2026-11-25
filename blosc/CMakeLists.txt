@@ -367,18 +367,16 @@ set(BLOSC2_MINIEXPR_ROOT "" CACHE PATH
 if(BLOSC2_MINIEXPR_ROOT)
     get_filename_component(_miniexpr_root "${BLOSC2_MINIEXPR_ROOT}"
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
-    find_path(BLOSC2_MINIEXPR_INCLUDE_DIR miniexpr_artifact.h
+    find_path(BLOSC2_MINIEXPR_INCLUDE_DIR miniexpr_kernel.h
         HINTS "${_miniexpr_root}/src" "${_miniexpr_root}/include" REQUIRED)
     find_library(BLOSC2_MINIEXPR_LIBRARY NAMES miniexpr
-        HINTS "${_miniexpr_root}/build" "${_miniexpr_root}/lib" REQUIRED)
-    find_library(BLOSC2_MINIEXPR_ARTIFACT_LIBRARY NAMES miniexpr_artifact
         HINTS "${_miniexpr_root}/build" "${_miniexpr_root}/lib" REQUIRED)
     foreach(_target blosc2_shared blosc2_static blosc_testing)
         if(TARGET ${_target})
             target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
             target_include_directories(${_target} PRIVATE "${BLOSC2_MINIEXPR_INCLUDE_DIR}")
             target_link_libraries(${_target} PRIVATE
-                "${BLOSC2_MINIEXPR_ARTIFACT_LIBRARY}" "${BLOSC2_MINIEXPR_LIBRARY}"
+                "${BLOSC2_MINIEXPR_LIBRARY}"
                 ${CMAKE_DL_LIBS})
         endif()
     endforeach()

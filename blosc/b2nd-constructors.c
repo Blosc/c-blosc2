@@ -8,13 +8,12 @@
 #include "blosc-checked.h"
 
 #include <math.h>
-#include <locale.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #ifdef BLOSC2_HAVE_MINIEXPR
-#include "miniexpr_artifact.h"
+#include "miniexpr_kernel.h"
+#include "miniexpr_grid.h"
 #endif
 
 typedef struct {
@@ -24,7 +23,8 @@ typedef struct {
   int itemsize;
   int64_t nchunk;
 #ifdef BLOSC2_HAVE_MINIEXPR
-  me_artifact *kernel;
+  me_kernel *kernel;
+  me_grid *grid;
 #endif
 } ramp_state;
 
@@ -60,12 +60,12 @@ static int ramp_span(ramp_state *s, uint8_t *output, int64_t origin, int64_t cou
   b2nd_array_t *a = s->array;
 #ifdef BLOSC2_HAVE_MINIEXPR
   if (s->kernel != NULL) {
-    me_artifact_eval_descriptor d = {
-        .struct_size = sizeof(d), .version = ME_ARTIFACT_EVAL_DESCRIPTOR_VERSION,
-        .nitems = (size_t)count, .output_capacity = (size_t)count * s->itemsize,
+    me_block d = {
+        .struct_size = sizeof(d), .nitems = (size_t)count,
         .ndim = 1, .logical_shape = &a->nitems,
-        .block_origin = &origin, .block_extent = &count};
-    if (me_artifact_eval_ex(s->kernel, NULL, 0, output, &d, NULL) != ME_ARTIFACT_SUCCESS) {
+        .origin = &origin, .extent = &count};
+    me_mut_buffer result = {output, (size_t)count * s->itemsize};
+    if (me_eval_block(s->kernel, NULL, 0, result, &d, NULL, NULL) != ME_SUCCESS) {
       return BLOSC2_ERROR_FAILURE;
     }
   }
@@ -109,6 +109,40 @@ static int ramp_span(ramp_state *s, uint8_t *output, int64_t origin, int64_t cou
 static int ramp_prefilter(blosc2_prefilter_params *p) {
   ramp_state *s = p->user_data;
   b2nd_array_t *a = s->array;
+#ifdef BLOSC2_HAVE_MINIEXPR
+  if (s->grid != NULL) {
+    me_grid_block_info info = ME_GRID_BLOCK_INFO_INITIALIZER;
+    if (me_grid_describe_block(s->grid, s->nchunk, p->nblock, &info, NULL) != ME_SUCCESS ||
+        me_grid_eval_block(s->grid, s->kernel, s->nchunk, p->nblock, NULL, 0,
+            (me_mut_buffer){p->output, (size_t)p->output_size}, NULL, NULL) != ME_SUCCESS) {
+      return BLOSC2_ERROR_FAILURE;
+    }
+    if (!info.valid_nitems) return 0;
+    bool first = true, last = true;
+    int64_t last_lane = 0, stride = 1;
+    for (int d = a->ndim - 1; d >= 0; --d) {
+      first &= info.origin[d] == 0;
+      last &= info.origin[d] + info.extent[d] == a->shape[d];
+      last_lane += (info.extent[d] - 1) * stride;
+      stride *= a->blockshape[d];
+    }
+    if (first) store_value(s, p->output, s->start);
+    if (last && s->endpoint && a->nitems > 1) {
+      store_value(s, p->output + last_lane * s->itemsize, s->stop);
+    }
+    if (s->swap) {
+      for (size_t i = 0; i < info.padded_nitems; i++) {
+        uint8_t *value = p->output + i * s->itemsize;
+        for (int j = 0; j < s->itemsize / 2; j++) {
+          uint8_t tmp = value[j];
+          value[j] = value[s->itemsize - 1 - j];
+          value[s->itemsize - 1 - j] = tmp;
+        }
+      }
+    }
+    return 0;
+  }
+#endif
   int ndim = a->ndim;
   int64_t chunk = s->nchunk, block = p->nblock;
   int64_t base[B2ND_MAX_DIM], valid[B2ND_MAX_DIM];
@@ -151,35 +185,30 @@ static int ramp_prefilter(blosc2_prefilter_params *p) {
 }
 
 #ifdef BLOSC2_HAVE_MINIEXPR
-/* snprintf follows LC_NUMERIC, but Menudet source always uses a decimal dot.
- * Never change the process locale from inside the library. */
-static void ramp_literal(double value, char out[128]) {
-  snprintf(out, 128, "%.17g", value);
-  const char *decimal = localeconv()->decimal_point;
-  char *point = decimal[0] ? strstr(out, decimal) : NULL;
-  if (point != NULL && strcmp(decimal, ".") != 0) {
-    size_t len = strlen(decimal);
-    *point = '.';
-    memmove(point + 1, point + len, strlen(point + len) + 1);
-  }
-  if (strpbrk(out, ".eE") == NULL) strcat(out, ".0");
-}
-
 static int ramp_compile(ramp_state *s) {
   if (s->interpolate) return 0;
-  char start[128], step[128], json[2048];
-  ramp_literal(s->start, start);
-  ramp_literal(s->step, step);
-  snprintf(json, sizeof(json),
-      "{\"schema_version\":\"0.1\",\"language\":{\"name\":\"menudet\",\"version\":\"0.1\"},"
-      "\"requires\":[\"numeric\",\"nd-context\"],"
-      "\"source\":\"def ramp():\\n    return %s + _flat_idx * %s\\n\","
-      "\"entry_point\":\"ramp\",\"inputs\":[],\"constants\":[],"
-      "\"output\":{\"dtype\":\"float%d\",\"contract\":\"elementwise\"},"
-      "\"context\":{\"ndim\":1},\"semantics\":{\"fp\":\"strict\","
-      "\"numeric\":\"numpy-2.5\",\"casting\":\"unsafe\"}}", start, step, s->itemsize * 8);
-  return me_artifact_load(json, strlen(json), ME_JIT_OFF, &s->kernel, NULL) == ME_ARTIFACT_SUCCESS
-             ? 0 : BLOSC2_ERROR_FAILURE;
+  /* Binary captures preserve exact values without source/JSON formatting.
+   * Their copies belong to the prepared kernel; s remains caller-owned. */
+  me_capture captures[] = {
+      {{"start", ME_FLOAT64, 0}, &s->start, ME_CAPTURE_TYPED},
+      {{"step", ME_FLOAT64, 0}, &s->step, ME_CAPTURE_TYPED}};
+  me_signature signature = ME_SIGNATURE_INITIALIZER;
+  signature.captures = captures;
+  signature.ncaptures = 2;
+  signature.output_dtype = s->itemsize == 4 ? ME_FLOAT32 : ME_FLOAT64;
+  signature.cardinality = ME_ELEMENTWISE;
+  signature.context_ndim = s->array->ndim ? s->array->ndim : 1;
+  const char *source = "def ramp(start, step):\n    return start + _flat_idx * step\n";
+  if (me_prepare_menudet("0.1", source, &signature, NULL, &s->kernel, NULL) != ME_SUCCESS) {
+    return BLOSC2_ERROR_FAILURE;
+  }
+  if (s->array->ndim) {
+    me_grid_spec grid = {
+        .struct_size = sizeof(grid), .ndim = s->array->ndim, .shape = s->array->shape,
+        .chunkshape = s->array->chunkshape, .blockshape = s->array->blockshape};
+    if (me_grid_create(&grid, &s->grid, NULL) != ME_SUCCESS) return BLOSC2_ERROR_FAILURE;
+  }
+  return 0;
 }
 #endif
 
@@ -266,7 +295,8 @@ success:
 cleanup:
   if (compressor != NULL) blosc2_free_ctx(compressor);
 #ifdef BLOSC2_HAVE_MINIEXPR
-  me_artifact_free(s.kernel);
+  me_kernel_free(s.kernel);
+  me_grid_free(s.grid);
 #endif
   free(dummy);
   free(chunk);
