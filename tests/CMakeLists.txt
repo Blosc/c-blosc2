@@ -147,6 +147,12 @@ foreach(source ${SOURCES})
     endif()
 endforeach()
 
+# test_embed_store opens fixture files that live next to the sources, so it must run
+# from the source directory rather than the build directory.
+if(TARGET test_embed_store)
+    set_tests_properties(test_embed_store PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
 # The broken dynamic plugins that test_plugin_info loads the way c-blosc2 loads plugins like grok:
 # libblosc2_<name>.so (also on macOS) or blosc2_<name>.dll, found by the loader
 if(TARGET test_plugin_info)
