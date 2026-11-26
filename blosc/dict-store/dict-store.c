@@ -1028,6 +1028,11 @@ static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
     assert(ds->storage_type == B2_DS_B2Z || ds->storage_type == B2_DS_B2D);
 
     b2_ds_value* value = hash_map_get(&ds->map, key);
+    if (value == NULL) {
+        // The key was not found, so there is nothing to remove
+        return BLOSC2_ERROR_SUCCESS;
+    }
+
     uint8_t* prefix;
     size_t prefix_length;
     if (ds->storage_type == B2_DS_B2Z) {
@@ -1066,6 +1071,13 @@ static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
     }
 
     free((void*)full_path);
+    if (error_code == BLOSC2_ERROR_SUCCESS) {
+        // Only drop the in-memory entry once the file is gone, so that a failed
+        // removal leaves both the index and the filesystem consistent. This also
+        // frees the value (and its localpath) through the hash_map's free_value
+        // callback.
+        hash_map_remove(&ds->map, key);
+    }
     return error_code;
 }
 
@@ -1347,7 +1359,7 @@ int blosc2_dict_store_close(blosc2_dict_store *dstore) {
 void blosc2_dict_store_free(blosc2_dict_store* dstore) {
     assert(dstore != NULL);
     hash_map_free_struct(&dstore->map);
-    if (dstore->urlpath != NULL) free(dstore->urlpath);
+    if (dstore->urlpath != NULL && dstore->storage_type != B2_DS_MEMORY_CONTIGUOUS) free(dstore->urlpath);
     if (dstore->tmpdir != NULL) free(dstore->tmpdir);
     if (dstore->estore != NULL) blosc2_embed_store_free(dstore->estore); // Remember that dstore->estore could be NULL
     free(dstore);
@@ -1382,6 +1394,11 @@ bool blosc2_dict_store_contains_key(blosc2_dict_store *dstore, const uint8_t* ke
 
     /* Keep the same key handling as get()/set()/remove(): canonical keys are
        searched as-is, non-canonical ones are normalized first. */
+
+    if (dstore->estore != NULL && blosc2_embed_store_contains_key(dstore->estore, key)) {
+        return true;
+    }
+
     if (key_is_canonical(key)) {
         return hash_map_contains_key(&dstore->map, key);
     }
@@ -1529,6 +1546,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** dstore, void* buffer, size
     }
     if (!ziputils_reader_init_heap(za, buffer, size)) {
         BLOSC_TRACE_ERROR("Could not init zip_archive reader from buffer");
+        ziputils_archive_free(za);
         return BLOSC2_ERROR_FAILURE;
     }
     // Iterate though zip_archive

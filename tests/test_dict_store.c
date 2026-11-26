@@ -17,8 +17,6 @@
 int tests_run = 0;
 
 #define SCHUNKS_SIZE 40
-//#define END_TEST printf("(%d) TEST SUCCESS\n", tests_run)
-#define END_TEST
 
 #define RUN_TEST(func) \
     do { \
@@ -157,6 +155,76 @@ static void s_teardown(void) {
     keep_file = false;
 }
 
+/* Insert every global paths[i] -> b2_schunks[i] pair. Returns 0 or first error. */
+static int s_set_all_schunks(blosc2_dict_store* store) {
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        int rc = blosc2_dict_store_set(store, (const uint8_t*)paths[i],
+            &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
+        if (rc != 0) {
+            return rc;
+        }
+    }
+    return 0;
+}
+
+/* Get every global path[i] (checking non-NULL); free_each releases each one. */
+static int s_get_all_schunks(blosc2_dict_store* store, bool free_each) {
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        blosc2_store_value item = {0};
+        int rc = blosc2_dict_store_get(store, (const uint8_t*)paths[i], &item);
+        if (rc != 0 || item.schunk == NULL) {
+            return rc != 0 ? rc : BLOSC2_ERROR_FAILURE;
+        }
+        if (free_each) {
+            blosc2_schunk_free(item.schunk);
+        }
+    }
+    return 0;
+}
+
+/* Iterate, checking every key is non-NULL and present; writes the count. */
+static int s_count_iterated(blosc2_dict_store* store, size_t* count) {
+    blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(store);
+    if (iter == NULL) {
+        return BLOSC2_ERROR_FAILURE;
+    }
+    size_t n = 0;
+    while (blosc2_dict_store_iter_next(iter)) {
+        const uint8_t* key = blosc2_dict_store_iter_get_key(iter);
+        if (key == NULL || !blosc2_dict_store_contains_key(store, key)) {
+            blosc2_dict_store_iter_free(iter);
+            return BLOSC2_ERROR_FAILURE;
+        }
+        n += 1;
+    }
+    blosc2_dict_store_iter_free(iter);
+    *count = n;
+    return 0;
+}
+
+/* Iterate, getting and releasing every container. Returns 0 or first error. */
+static int s_get_all_containers_from_iter(blosc2_dict_store* store) {
+    blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(store);
+    if (iter == NULL) {
+        return BLOSC2_ERROR_FAILURE;
+    }
+    int rc = 0;
+    while (blosc2_dict_store_iter_next(iter)) {
+        blosc2_store_value item = {0};
+        rc = blosc2_dict_store_iter_get_container(iter, &item);
+        if (rc != 0) {
+            break;
+        }
+        if (item.schunk == NULL) {
+            rc = BLOSC2_ERROR_FAILURE;
+            break;
+        }
+        blosc2_schunk_free(item.schunk);
+    }
+    blosc2_dict_store_iter_free(iter);
+    return rc;
+}
+
 static int s_generate_b2z(const uint8_t* destination_urlpath) {
     int error_code = BLOSC2_ERROR_SUCCESS;
     blosc2_dict_store *store = NULL;
@@ -221,7 +289,7 @@ static char* test_dict_store_new_memory(void) {
     mu_assert("ERROR: A new in-memory dict_store must be empty",
         blosc2_dict_store_get_length(ds) == 0);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -237,27 +305,19 @@ static char* test_dict_store_set_memory(void) {
     mu_assert("ERROR: Expected an error when the container is NULL",
         blosc2_dict_store_set(ds, (const uint8_t*)"/some/path", NULL) != 0);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
 
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(ds);
-    mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
+    size_t iters = 0;
+    mu_assert("ERROR: Could not iterate the dict_store",
+        s_count_iterated(ds, &iters) == 0);
+    mu_assert("ERROR: The iterator did not yield all the inserted keys",
+        iters == SCHUNKS_SIZE);
 
-    bool next = blosc2_dict_store_iter_next(iter);
-    while (next) {
-        const uint8_t* key = blosc2_dict_store_iter_get_key(iter);
-        mu_assert("ERROR: The iterator returned a NULL key", key != NULL);
 
-        next = blosc2_dict_store_iter_next(iter);
-    }
-    blosc2_dict_store_iter_free(iter);
-
-    END_TEST;
     return EXIT_SUCCESS;
 }
 
@@ -270,16 +330,16 @@ static char* test_dict_store_get_memory(void) {
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
-    for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
 
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
+    /* For the sparse in-memory storage the returned pointer is borrowed, so it
+       must be the very same schunk that was inserted. */
     blosc2_store_value item = {0};
-    for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
         const uint8_t* key_to_get = (const uint8_t*)paths[i];
         mu_assert("ERROR: Could not get a schunk from the dict_store",
             blosc2_dict_store_get(ds, key_to_get, &item) == 0);
@@ -290,7 +350,7 @@ static char* test_dict_store_get_memory(void) {
     mu_assert("ERROR: The dict_store length changed after get operations",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -303,15 +363,13 @@ static char* test_dict_store_remove_memory(void) {
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
-    for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
 
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
         const uint8_t* key_to_remove = (const uint8_t*)paths[i];
         blosc2_dict_store_remove(ds, key_to_remove);
         size_t length = blosc2_dict_store_get_length(ds);
@@ -323,7 +381,7 @@ static char* test_dict_store_remove_memory(void) {
     mu_assert("ERROR: The dict_store must be empty after removing all the keys",
         blosc2_dict_store_get_length(ds) == 0);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -335,15 +393,10 @@ static char* test_dict_store_to_b2z_memory(void) {
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
-    for (int i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-
-        blosc2_store_value item = {0};
-        mu_assert("ERROR: Could not get a schunk from the dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
-        mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
+    mu_assert("ERROR: Could not get a schunk from the dict_store",
+        s_get_all_schunks(ds, false) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -355,7 +408,7 @@ static char* test_dict_store_to_b2z_memory(void) {
         blosc2_dict_store_to_b2z(ds, archive_path) == 0);
     mu_assert("ERROR: The b2z archive was not created", s_exists_inode(archive_path));
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -369,7 +422,7 @@ static char* test_dict_store_new_b2z(void) {
     mu_assert("ERROR: Could not close the b2z dict_store",
         blosc2_dict_store_close(ds) == 0);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -381,10 +434,8 @@ static char* test_dict_store_set_b2z(void) {
     mu_assert("ERROR: ds is NULL after a successful new",
         ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -394,7 +445,7 @@ static char* test_dict_store_set_b2z(void) {
     /* Keep the archive for test_dict_store_open_b2z */
     keep_file = true;
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -410,13 +461,8 @@ static char* test_dict_store_open_b2z(void) {
     mu_assert("ERROR: Unexpected dict_store length after opening the archive",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_store_value item = {0};
-        mu_assert("ERROR: Could not get a schunk from the b2z dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
-        mu_assert("ERROR: The returned container is NULL", item.schunk != NULL);
-        blosc2_schunk_free(item.schunk);
-    }
+    mu_assert("ERROR: Could not get the schunks from the b2z dict_store",
+        s_get_all_schunks(ds, true) == 0);
 
     mu_assert("ERROR: set() must fail when the dict_store was opened in RDONLY mode",
         blosc2_dict_store_set(ds, wrong_archive_path, &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[0]}) != 0);
@@ -439,6 +485,7 @@ static char* test_dict_store_open_b2z(void) {
     mu_assert("ERROR: A newly opened WRONLY dict_store must be empty",
         blosc2_dict_store_get_length(ds) == 0);
 
+    /* The length must grow monotonically with each new key. */
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
         mu_assert("ERROR: Could not set a schunk in a WRONLY dict_store",
             blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
@@ -468,16 +515,8 @@ static char* test_dict_store_open_b2z(void) {
     mu_assert("ERROR: Unexpected dict_store length after opening the archive",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
-    mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
-    while (blosc2_dict_store_iter_next(iter)) {
-        item = (blosc2_store_value){0};
-        mu_assert("ERROR: Could not get the container from the iterator",
-            blosc2_dict_store_iter_get_container(iter, &item) == 0);
-        mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
-        blosc2_schunk_free(item.schunk);
-    }
-    blosc2_dict_store_iter_free(iter);
+    mu_assert("ERROR: Could not iterate the b2z dict_store",
+        s_get_all_containers_from_iter(ds) == 0);
 
     for (size_t i = SCHUNKS_SIZE; i > 0; i-=1) {
         mu_assert("ERROR: Could not overwrite a schunk in a RDWR dict_store",
@@ -489,7 +528,7 @@ static char* test_dict_store_open_b2z(void) {
     mu_assert("ERROR: Could not close the RDWR dict_store",
         blosc2_dict_store_close(ds) == 0);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -503,25 +542,19 @@ static char* test_dict_store_new_b2d(void) {
         blosc2_dict_store_new(&ds, dir_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the b2d dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the b2d dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        blosc2_store_value item = {0};
-        mu_assert("ERROR: Could not get a schunk from the b2d dict_store",
-            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == 0);
-        blosc2_schunk_free(item.schunk);
-    }
+    mu_assert("ERROR: Could not get the schunks from the b2d dict_store",
+        s_get_all_schunks(ds, true) == 0);
 
     mu_assert("ERROR: Could not close the b2d dict_store",
         blosc2_dict_store_close(ds) == 0);
     remove_dir_recursive(dir_path);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -538,16 +571,8 @@ static char* test_dict_store_open_b2d(void) {
     mu_assert("ERROR: set() must fail when the dict_store was opened in RDONLY mode",
         blosc2_dict_store_set(ds, (const uint8_t*)paths[0], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[0]}) != 0);
 
-    blosc2_dict_store_iter *iter = blosc2_dict_store_iter_new(ds);
-    mu_assert("ERROR: Could not create a dict_store iterator", iter != NULL);
-    while (blosc2_dict_store_iter_next(iter)) {
-        blosc2_store_value item = {0};
-        mu_assert("ERROR: Could not get the container from the iterator",
-            blosc2_dict_store_iter_get_container(iter, &item) == 0);
-        mu_assert("ERROR: The iterator returned a NULL container", item.schunk != NULL);
-        blosc2_schunk_free(item.schunk);
-    }
-    blosc2_dict_store_iter_free(iter);
+    mu_assert("ERROR: Could not iterate the b2d dict_store",
+        s_get_all_containers_from_iter(ds) == 0);
 
     mu_assert("ERROR: Could not close the b2d dict_store",
         blosc2_dict_store_close(ds) == 0);
@@ -568,7 +593,7 @@ static char* test_dict_store_open_b2d(void) {
         blosc2_dict_store_close(ds) == 0);
     remove_dir_recursive(dir_path);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -580,10 +605,8 @@ static char* test_dict_store_to_b2z(void) {
         blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -602,10 +625,8 @@ static char* test_dict_store_to_b2z(void) {
         blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -627,10 +648,8 @@ static char* test_dict_store_to_b2z(void) {
         blosc2_dict_store_new(&ds, dir_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the b2d dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the b2d dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -644,7 +663,7 @@ static char* test_dict_store_to_b2z(void) {
     remove_dir_recursive(dir_path);
     remove((const char*)archive_path);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -656,10 +675,8 @@ static char* test_dict_store_to_b2d(void) {
         blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -684,10 +701,8 @@ static char* test_dict_store_to_b2d(void) {
         blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
     mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
-            blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]}) == 0);
-    }
+    mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
+        s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
         blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
 
@@ -703,7 +718,7 @@ static char* test_dict_store_to_b2d(void) {
     remove((const char*)archive_path);
     remove_dir_recursive(dir_path);
 
-    END_TEST;
+
     return EXIT_SUCCESS;
 }
 
@@ -726,6 +741,8 @@ static char* test_dict_store_embed_basic(void) {
     rc = blosc2_dict_store_set(ds, (const uint8_t*)"/key", &remote_value);
     mu_assert("ERROR: The item should have been inserted", rc == 0);
     mu_assert("ERROR: The DictStore's length should be 1", blosc2_dict_store_get_length(ds) == 1);
+
+    /* Every insertion is checked one by one: the length must grow with each key. */
     for (size_t i = 0; i < SCHUNKS_SIZE; i+= 1) {
         rc = blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
         mu_assert("ERROR: Could not insert SChunk into DictStore", rc == 0);
@@ -739,6 +756,7 @@ static char* test_dict_store_embed_basic(void) {
     mu_assert("ERROR: urlbase is wrong", strcmp(urlbase, (const char*)item.remote.urlbase) == 0);
     mu_assert("ERROR: path is wrong", strcmp(path, (const char*)item.remote.path) == 0);
 
+    /* The iterator mixes the inner EmbedStore entries with the DictStore ones. */
     blosc2_dict_store_iter* iter = blosc2_dict_store_iter_new(ds);
     size_t iters = 0;
     while (blosc2_dict_store_iter_next(iter)) {
@@ -794,10 +812,7 @@ static char* test_dict_store_embed_b2z(void) {
     rc = blosc2_dict_store_set(ds, (const uint8_t*)"/key", &remote_value);
     mu_assert("ERROR: Could not insert remote value in DictStore", rc == 0);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        rc = blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
-        mu_assert("ERROR: Could not set SChunk in DictStore", rc == 0);
-    }
+    mu_assert("ERROR: Could not set SChunk in DictStore", s_set_all_schunks(ds) == 0);
 
     mu_assert("ERROR: DictStore's length is wrong", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE + 1);
 
@@ -841,10 +856,7 @@ static char* test_dict_store_embed_b2d(void) {
     rc = blosc2_dict_store_set(ds, key, &value);
     mu_assert("ERROR: Could not insert remote value in DictStore", rc == 0);
 
-    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        rc = blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
-        mu_assert("ERROR: Could not set SChunk in DictStore", rc == 0);
-    }
+    mu_assert("ERROR: Could not set SChunk in DictStore", s_set_all_schunks(ds) == 0);
     mu_assert("ERROR: DictStore's length is wrong", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE + 1);
 
     rc = blosc2_dict_store_close(ds);
@@ -878,17 +890,447 @@ static char* test_dict_store_embed_b2d(void) {
     return NULL;
 }
 
+static char* test_dict_store_introspection_memory(void) {
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+    mu_assert("ERROR: ds is NULL after a successful new",
+        ds != NULL);
+
+    /* A brand new in-memory dict_store has no inner EmbedStore and is empty */
+    mu_assert("ERROR: A new in-memory dict_store must use B2_DS_MEMORY_SPARSE",
+        blosc2_dict_store_get_storage_type(ds) == B2_DS_MEMORY_SPARSE);
+    mu_assert("ERROR: A new in-memory dict_store must be opened in RDWR mode",
+        blosc2_dict_store_get_open_mode(ds) == BLOSC2_STORE_OPEN_MODE_RDWR);
+    mu_assert("ERROR: A new in-memory dict_store must be empty",
+        blosc2_dict_store_get_length(ds) == 0);
+    mu_assert("ERROR: The capacity must be greater than or equal to the length",
+        blosc2_dict_store_get_capacity(ds) >= blosc2_dict_store_get_length(ds));
+    mu_assert("ERROR: The initial threshold must match the one requested",
+        blosc2_dict_store_get_threshold(ds) == -1);
+
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
+    mu_assert("ERROR: Unexpected dict_store length after setting all the schunks",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE);
+    mu_assert("ERROR: The capacity must be greater than or equal to the length",
+        blosc2_dict_store_get_capacity(ds) >= SCHUNKS_SIZE);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_threshold(void) {
+    mu_assert("ERROR: set_threshold() must fail when dstore is NULL",
+        blosc2_dict_store_set_threshold(NULL, 128) == BLOSC2_ERROR_NULL_POINTER);
+
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+
+    mu_assert("ERROR: The threshold should be the one requested",
+        blosc2_dict_store_get_threshold(ds) == -1);
+    mu_assert("ERROR: Could not update the threshold",
+        blosc2_dict_store_set_threshold(ds, 0) == 0);
+    mu_assert("ERROR: The threshold was not updated",
+        blosc2_dict_store_get_threshold(ds) == 0);
+    mu_assert("ERROR: Could not update the threshold",
+        blosc2_dict_store_set_threshold(ds, 4096) == 0);
+    mu_assert("ERROR: The threshold was not updated",
+        blosc2_dict_store_get_threshold(ds) == 4096);
+    /* A negative threshold disables the use of the inner EmbedStore */
+    mu_assert("ERROR: Could not update the threshold to a negative value",
+        blosc2_dict_store_set_threshold(ds, -5) == 0);
+    mu_assert("ERROR: The threshold was not updated",
+        blosc2_dict_store_get_threshold(ds) == -5);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_contains_key_memory(void) {
+    mu_assert("ERROR: contains_key() must return false for a NULL dstore",
+        !blosc2_dict_store_contains_key(NULL, (const uint8_t*)paths[0]));
+
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+
+    mu_assert("ERROR: contains_key() must return false for a NULL key",
+        !blosc2_dict_store_contains_key(ds, NULL));
+    mu_assert("ERROR: contains_key() must return false in an empty store",
+        !blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[0]));
+
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
+
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        mu_assert("ERROR: contains_key() must find an inserted key",
+            blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+    }
+    mu_assert("ERROR: contains_key() must return false for a missing key",
+        !blosc2_dict_store_contains_key(ds, (const uint8_t*)"/missing/key"));
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_key_normalization_memory(void) {
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+
+    mu_assert("ERROR: Could not set a schunk with a canonical key",
+        blosc2_dict_store_set(ds, (const uint8_t*)"a/b/c", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[0]}) == 0);
+    mu_assert("ERROR: Could not set a schunk with another key",
+        blosc2_dict_store_set(ds, (const uint8_t*)"x/y", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[1]}) == 0);
+    mu_assert("ERROR: Unexpected length after inserting the schunks",
+        blosc2_dict_store_get_length(ds) == 2);
+
+    /* Equivalent spellings must address the very same entry */
+    static const uint8_t* equivalents[] = {
+        (const uint8_t*)"a/b/c",
+        (const uint8_t*)"/a/b/c",
+        (const uint8_t*)"a//b/c",
+        (const uint8_t*)"a/./b/c",
+        (const uint8_t*)"//a/b/c",
+    };
+    for (size_t i = 0; i < ARRAY_SIZE(equivalents); i+=1) {
+        mu_assert("ERROR: contains_key() failed for an equivalent key",
+            blosc2_dict_store_contains_key(ds, equivalents[i]));
+
+        blosc2_store_value item = {0};
+        mu_assert("ERROR: get() failed for an equivalent key",
+            blosc2_dict_store_get(ds, equivalents[i], &item) == 0);
+        mu_assert("ERROR: get() returned a wrong schunk for an equivalent key",
+            item.schunk == b2_schunks[0]);
+    }
+
+    mu_assert("ERROR: contains_key() failed for a leading-slash variant",
+        blosc2_dict_store_contains_key(ds, (const uint8_t*)"/x/y"));
+    mu_assert("ERROR: The length changed after the equivalent lookups",
+        blosc2_dict_store_get_length(ds) == 2);
+
+    /* Removing through an equivalent spelling removes the canonical entry */
+    mu_assert("ERROR: remove() failed for an equivalent key",
+        blosc2_dict_store_remove(ds, (const uint8_t*)"a/./b/./c") == 0);
+    mu_assert("ERROR: The key was not removed",
+        !blosc2_dict_store_contains_key(ds, (const uint8_t*)"a/b/c"));
+    mu_assert("ERROR: Unexpected length after removing a key",
+        blosc2_dict_store_get_length(ds) == 1);
+
+    /* Invalid keys must be rejected */
+    mu_assert("ERROR: set() must reject an empty key",
+        blosc2_dict_store_set(ds, (const uint8_t*)"", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[2]}) == BLOSC2_ERROR_INVALID_PARAM);
+    mu_assert("ERROR: set() must reject a key that escapes the root",
+        blosc2_dict_store_set(ds, (const uint8_t*)"a/../../b", &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[2]}) != 0);
+    mu_assert("ERROR: contains_key() must return false for an invalid key",
+        !blosc2_dict_store_contains_key(ds, (const uint8_t*)"a/../../b"));
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_overwrite_memory(void) {
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+
+    mu_assert("ERROR: Could not insert the first schunk",
+        blosc2_dict_store_set(ds, (const uint8_t*)paths[0], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[0]}) == 0);
+    mu_assert("ERROR: Unexpected length after the first insertion",
+        blosc2_dict_store_get_length(ds) == 1);
+
+    /* Overwriting must keep the length and replace the value */
+    mu_assert("ERROR: Could not overwrite an existing key",
+        blosc2_dict_store_set(ds, (const uint8_t*)paths[0], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[1]}) == 0);
+    mu_assert("ERROR: The length changed after overwriting an entry",
+        blosc2_dict_store_get_length(ds) == 1);
+
+    blosc2_store_value item = {0};
+    mu_assert("ERROR: Could not get the overwritten entry",
+        blosc2_dict_store_get(ds, (const uint8_t*)paths[0], &item) == 0);
+    mu_assert("ERROR: The entry was not overwritten",
+        item.schunk == b2_schunks[1]);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_iter_count_memory(void) {
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+
+    /* An empty dict_store must yield no entries */
+    size_t iters = 0;
+    mu_assert("ERROR: The iterator of an empty dict_store must be exhausted",
+        s_count_iterated(ds, &iters) == 0);
+    mu_assert("ERROR: The empty dict_store iterator must yield 0 entries",
+        iters == 0);
+
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
+
+    iters = 0;
+    mu_assert("ERROR: Could not iterate the dict_store",
+        s_count_iterated(ds, &iters) == 0);
+    mu_assert("ERROR: The iterator did not yield all the inserted keys",
+        iters == SCHUNKS_SIZE);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_invalid_params(void) {
+    /* new() */
+    mu_assert("ERROR: new() must fail when dstore is NULL",
+        blosc2_dict_store_new(NULL, NULL, NULL, -1) != 0);
+    mu_assert("ERROR: new() must fail with an empty urlpath",
+        blosc2_dict_store_new(&ds, (const uint8_t*)"", NULL, -1) != 0);
+    mu_assert("ERROR: ds must remain NULL after a failed new", ds == NULL);
+    mu_assert("ERROR: new() must fail with an unknown extension",
+        blosc2_dict_store_new(&ds, wrong_archive_path, NULL, -1) != 0);
+    mu_assert("ERROR: ds must remain NULL after a failed new", ds == NULL);
+
+    /* open() */
+    mu_assert("ERROR: open() must fail when dstore is NULL",
+        blosc2_dict_store_open(NULL, archive_path, BLOSC2_STORE_OPEN_MODE_RDONLY) != 0);
+    mu_assert("ERROR: open() must fail when urlpath is NULL",
+        blosc2_dict_store_open(&ds, NULL, BLOSC2_STORE_OPEN_MODE_RDONLY) != 0);
+    mu_assert("ERROR: open() must fail with an empty urlpath",
+        blosc2_dict_store_open(&ds, (const uint8_t*)"", BLOSC2_STORE_OPEN_MODE_RDONLY) != 0);
+    mu_assert("ERROR: open() must fail with an unknown extension",
+        blosc2_dict_store_open(&ds, wrong_archive_path, BLOSC2_STORE_OPEN_MODE_RDONLY) != 0);
+    mu_assert("ERROR: open() must fail with an unknown open mode",
+        blosc2_dict_store_open(&ds, archive_path, (blosc2_store_open_mode)42) != 0);
+    mu_assert("ERROR: ds must remain NULL after a failed open", ds == NULL);
+
+    /* close() */
+    mu_assert("ERROR: close() must fail when dstore is NULL",
+        blosc2_dict_store_close(NULL) != 0);
+
+    /* NULL arguments for the serialization helpers */
+    mu_assert("ERROR: to_b2z() must fail when dstore is NULL",
+        blosc2_dict_store_to_b2z(NULL, archive_path) != 0);
+    mu_assert("ERROR: to_b2d() must fail when dstore is NULL",
+        blosc2_dict_store_to_b2d(NULL, dir_path) != 0);
+    void* dummy_buffer = NULL;
+    mu_assert("ERROR: to_buffer() must fail when dstore is NULL",
+        blosc2_dict_store_to_buffer(NULL, &dummy_buffer, NULL) != 0);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_to_from_buffer(void) {
+    mu_assert("ERROR: Could not create an in-memory dict_store",
+        blosc2_dict_store_new(&ds, NULL, NULL, -1) == 0);
+    mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
+
+    mu_assert("ERROR: Could not set a schunk in the dict_store",
+        s_set_all_schunks(ds) == 0);
+
+    void* buffer = NULL;
+    size_t buffer_size = 0;
+    mu_assert("ERROR: to_buffer() must fail with a NULL pbuffer",
+        blosc2_dict_store_to_buffer(ds, NULL, &buffer_size) == BLOSC2_ERROR_NULL_POINTER);
+    mu_assert("ERROR: to_buffer() must fail with a NULL dstore",
+        blosc2_dict_store_to_buffer(NULL, &buffer, &buffer_size) == BLOSC2_ERROR_NULL_POINTER);
+
+    mu_assert("ERROR: Could not serialize the in-memory dict_store",
+        blosc2_dict_store_to_buffer(ds, &buffer, &buffer_size) == 0);
+    mu_assert("ERROR: The buffer is NULL after a successful to_buffer()", buffer != NULL);
+    mu_assert("ERROR: The buffer size is 0 after a successful to_buffer()", buffer_size > 0);
+
+    blosc2_dict_store* decoded = NULL;
+    mu_assert("ERROR: from_buffer() must fail with a NULL dstore",
+        blosc2_dict_store_from_buffer(NULL, buffer, buffer_size) == BLOSC2_ERROR_NULL_POINTER);
+    mu_assert("ERROR: from_buffer() must fail with a NULL buffer",
+        blosc2_dict_store_from_buffer(&decoded, NULL, buffer_size) == BLOSC2_ERROR_NULL_POINTER);
+    mu_assert("ERROR: from_buffer() must fail with a size of 0",
+        blosc2_dict_store_from_buffer(&decoded, buffer, 0) == BLOSC2_ERROR_INVALID_PARAM);
+
+    uint8_t garbage[64];
+    memset(garbage, 0xff, sizeof(garbage));
+    decoded = NULL;
+    mu_assert("ERROR: from_buffer() must fail with an invalid buffer",
+        blosc2_dict_store_from_buffer(&decoded, garbage, sizeof(garbage)) != 0);
+    mu_assert("ERROR: decoded must be NULL after a failed from_buffer()",
+        decoded == NULL);
+
+    mu_assert("ERROR: Could not create a dict_store from the buffer",
+        blosc2_dict_store_from_buffer(&decoded, buffer, buffer_size) == 0);
+    mu_assert("ERROR: decoded is NULL after a successful from_buffer()", decoded != NULL);
+    mu_assert("ERROR: A decoded dict_store must use B2_DS_MEMORY_CONTIGUOUS",
+        blosc2_dict_store_get_storage_type(decoded) == B2_DS_MEMORY_CONTIGUOUS);
+    mu_assert("ERROR: A decoded dict_store must be opened in RDONLY mode",
+        blosc2_dict_store_get_open_mode(decoded) == BLOSC2_STORE_OPEN_MODE_RDONLY);
+    mu_assert("ERROR: Unexpected length after decoding the buffer",
+        blosc2_dict_store_get_length(decoded) == SCHUNKS_SIZE);
+
+    mu_assert("ERROR: set() must fail on a RDONLY decoded dict_store",
+        blosc2_dict_store_set(decoded, (const uint8_t*)paths[0], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[0]}) == BLOSC2_ERROR_FAILURE);
+
+    /* The decoded store owns freshly opened schunks, so each one is checked and
+       released individually. */
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        mu_assert("ERROR: Could not find a key in the decoded dict_store",
+            blosc2_dict_store_contains_key(decoded, (const uint8_t*)paths[i]));
+
+        blosc2_store_value item = {0};
+        mu_assert("ERROR: Could not get a schunk from the decoded dict_store",
+            blosc2_dict_store_get(decoded, (const uint8_t*)paths[i], &item) == 0);
+        mu_assert("ERROR: The decoded container is NULL", item.schunk != NULL);
+        mu_assert("ERROR: The decoded container has a wrong tag",
+            item.tag == BLOSC2_STORE_VALUE_SCHUNK);
+        mu_assert("ERROR: The decoded container has a wrong size",
+            item.schunk->nbytes == (int64_t)(SCHUNKS_SIZE * SCHUNKS_SIZE));
+        blosc2_schunk_free(item.schunk);
+    }
+
+    mu_assert("ERROR: Could not close the decoded dict_store",
+        blosc2_dict_store_close(decoded) == 0);
+    /* blosc2_dict_store_free() does not release the buffer for a
+       B2_DS_MEMORY_CONTIGUOUS dictionary: the buffer is owned by the caller and
+       must remain valid while the dictionary is alive. */
+    blosc2_dict_store_free(decoded);
+    free(buffer);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_remove_b2z(void) {
+    remove((const char*)archive_path);
+
+    mu_assert("ERROR: Could not create a b2z dict_store",
+        blosc2_dict_store_new(&ds, archive_path, NULL, -1) == 0);
+    mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
+
+    mu_assert("ERROR: Could not set a schunk in the b2z dict_store",
+        s_set_all_schunks(ds) == 0);
+
+    /* remove() must delete both the backing file and the in-memory index entry */
+    for (size_t i = 0; i < SCHUNKS_SIZE / 2; i+=1) {
+        mu_assert("ERROR: Could not remove a key from the b2z dict_store",
+            blosc2_dict_store_remove(ds, (const uint8_t*)paths[i]) == 0);
+        mu_assert("ERROR: The removed key is still reported as present in the b2z dict_store",
+            !blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+        blosc2_store_value item = {0};
+        mu_assert("ERROR: get() must return NOT_FOUND after removing a key from the b2z dict_store",
+            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == BLOSC2_ERROR_NOT_FOUND);
+    }
+    mu_assert("ERROR: The length was not updated after removing keys from the b2z dict_store",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+
+    /* Removing a missing key must be a silent no-op */
+    mu_assert("ERROR: remove() of a missing key must succeed",
+        blosc2_dict_store_remove(ds, (const uint8_t*)"/does/not/exist") == 0);
+    mu_assert("ERROR: The length changed after removing a missing key",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+
+    mu_assert("ERROR: Could not close the b2z dict_store",
+        blosc2_dict_store_close(ds) == 0);
+    blosc2_dict_store_free(ds);
+    ds = NULL;
+
+    /* Reopen and verify the removal survived a roundtrip to disk */
+    mu_assert("ERROR: Could not reopen the b2z dict_store",
+        blosc2_dict_store_open(&ds, archive_path, BLOSC2_STORE_OPEN_MODE_RDONLY) == 0);
+    mu_assert("ERROR: The length after reopening the b2z dict_store is wrong",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+    for (size_t i = 0; i < SCHUNKS_SIZE / 2; i+=1) {
+        mu_assert("ERROR: A removed key is present after reopening the b2z dict_store",
+            !blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+    }
+    for (size_t i = SCHUNKS_SIZE / 2; i < SCHUNKS_SIZE; i+=1) {
+        mu_assert("ERROR: A surviving key is missing after reopening the b2z dict_store",
+            blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+    }
+    mu_assert("ERROR: Could not close the reopened b2z dict_store",
+        blosc2_dict_store_close(ds) == 0);
+
+
+    return EXIT_SUCCESS;
+}
+
+static char* test_dict_store_remove_b2d(void) {
+    remove_dir_recursive(dir_path);
+
+    mu_assert("ERROR: Could not create a b2d dict_store",
+        blosc2_dict_store_new(&ds, dir_path, NULL, -1) == 0);
+    mu_assert("ERROR: ds is NULL after a successful new", ds != NULL);
+
+    mu_assert("ERROR: Could not set a schunk in the b2d dict_store",
+        s_set_all_schunks(ds) == 0);
+
+    /* remove() must delete both the backing file and the in-memory index entry */
+    for (size_t i = 0; i < SCHUNKS_SIZE / 2; i+=1) {
+        mu_assert("ERROR: Could not remove a key from the b2d dict_store",
+            blosc2_dict_store_remove(ds, (const uint8_t*)paths[i]) == 0);
+        mu_assert("ERROR: The removed key is still reported as present in the b2d dict_store",
+            !blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+        blosc2_store_value item = {0};
+        mu_assert("ERROR: get() must return NOT_FOUND after removing a key from the b2d dict_store",
+            blosc2_dict_store_get(ds, (const uint8_t*)paths[i], &item) == BLOSC2_ERROR_NOT_FOUND);
+    }
+    mu_assert("ERROR: The length was not updated after removing keys from the b2d dict_store",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+
+    /* Removing a missing key must be a silent no-op */
+    mu_assert("ERROR: remove() of a missing key must succeed",
+        blosc2_dict_store_remove(ds, (const uint8_t*)"/does/not/exist") == 0);
+    mu_assert("ERROR: The length changed after removing a missing key",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+
+    mu_assert("ERROR: Could not close the b2d dict_store",
+        blosc2_dict_store_close(ds) == 0);
+    blosc2_dict_store_free(ds);
+    ds = NULL;
+
+    /* Reopen and verify the removal survived a roundtrip to disk */
+    mu_assert("ERROR: Could not reopen the b2d dict_store",
+        blosc2_dict_store_open(&ds, dir_path, BLOSC2_STORE_OPEN_MODE_RDONLY) == 0);
+    mu_assert("ERROR: The length after reopening the b2d dict_store is wrong",
+        blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE - SCHUNKS_SIZE / 2);
+    for (size_t i = 0; i < SCHUNKS_SIZE / 2; i+=1) {
+        mu_assert("ERROR: A removed key is present after reopening the b2d dict_store",
+            !blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+    }
+    for (size_t i = SCHUNKS_SIZE / 2; i < SCHUNKS_SIZE; i+=1) {
+        mu_assert("ERROR: A surviving key is missing after reopening the b2d dict_store",
+            blosc2_dict_store_contains_key(ds, (const uint8_t*)paths[i]));
+    }
+    mu_assert("ERROR: Could not close the reopened b2d dict_store",
+        blosc2_dict_store_close(ds) == 0);
+    remove_dir_recursive(dir_path);
+
+
+    return EXIT_SUCCESS;
+}
+
 static char* all_tests(void) {
     /* Tests when the dict_store data structure only stores data in memory */
     RUN_TEST(test_dict_store_new_memory);
+
+    RUN_TEST(test_dict_store_introspection_memory); // It also tests get_capacity/get_storage_type/get_open_mode
+
+    RUN_TEST(test_dict_store_threshold);
 
     RUN_TEST(test_dict_store_set_memory); // It also tests the iterator
 
     RUN_TEST(test_dict_store_get_memory);
 
+    RUN_TEST(test_dict_store_contains_key_memory);
+
+    RUN_TEST(test_dict_store_key_normalization_memory);
+
+    RUN_TEST(test_dict_store_overwrite_memory);
+
+    RUN_TEST(test_dict_store_iter_count_memory);
+
     RUN_TEST(test_dict_store_remove_memory);
 
     RUN_TEST(test_dict_store_to_b2z_memory);
+
+    RUN_TEST(test_dict_store_to_from_buffer); // It also tests to_buffer/from_buffer
+
+    RUN_TEST(test_dict_store_invalid_params);
 
     /* b2z tests */
     RUN_TEST(test_dict_store_new_b2z);
@@ -897,10 +1339,14 @@ static char* all_tests(void) {
 
     RUN_TEST(test_dict_store_open_b2z);
 
+    RUN_TEST(test_dict_store_remove_b2z);
+
     /* b2d tests */
     RUN_TEST(test_dict_store_new_b2d);
 
     RUN_TEST(test_dict_store_open_b2d);
+
+    RUN_TEST(test_dict_store_remove_b2d);
 
     RUN_TEST(test_dict_store_to_b2z);
 
