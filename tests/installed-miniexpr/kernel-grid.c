@@ -95,11 +95,13 @@ int main(void) {
         if (scalar) {
             state = (fixture){.array = array, .scalar = true, .logical = true};
             CHECK(b2nd_eval_kernel_partitions_1d(7, 3, kernel, 1, &width, 4 * width - 1,
-                read_block, &state, write_block, &state, NULL) == BLOSC2_ERROR_INVALID_PARAM);
+                read_block, &state, write_block, &state, NULL, NULL) == BLOSC2_ERROR_INVALID_PARAM);
             CHECK(state.reads == 0 && state.writes == 0);
+            me_fp_status fp;
             CHECK(b2nd_eval_kernel_partitions_1d(7, 3, kernel, 1, &width, 4 * width,
-                read_block, &state, write_block, &state, NULL) == 0);
+                read_block, &state, write_block, &state, &fp, NULL) == 0);
             CHECK(state.reads == 3 && state.writes == 3);
+            CHECK(fp.supported && fp.flags == 0);
         }
         me_kernel_free(kernel);
     }
