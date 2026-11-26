@@ -365,6 +365,7 @@ endif()
 set(BLOSC2_MINIEXPR_ROOT "" CACHE PATH
     "Optional prebuilt miniexpr source/install root for b2nd ramp constructors")
 if(BLOSC2_MINIEXPR_ROOT)
+    list(APPEND SOURCES blosc/b2nd-kernel.c)
     get_filename_component(_miniexpr_root "${BLOSC2_MINIEXPR_ROOT}"
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
     find_package(miniexpr CONFIG QUIET HINTS "${_miniexpr_root}")

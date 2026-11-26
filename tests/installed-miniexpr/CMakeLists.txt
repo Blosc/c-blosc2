@@ -11,3 +11,9 @@ set_property(TARGET installed_miniexpr_consumer PROPERTY NO_SYSTEM_FROM_IMPORTED
 target_link_libraries(installed_miniexpr_consumer PRIVATE Blosc2::blosc2_static)
 enable_testing()
 add_test(NAME installed_miniexpr_consumer COMMAND installed_miniexpr_consumer)
+
+add_executable(installed_kernel_grid kernel-grid.c)
+set_property(TARGET installed_kernel_grid PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+target_include_directories(installed_kernel_grid PRIVATE ../../blosc)
+target_link_libraries(installed_kernel_grid PRIVATE Blosc2::blosc2_static miniexpr::core)
+add_test(NAME installed_kernel_grid COMMAND installed_kernel_grid)
