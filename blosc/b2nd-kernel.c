@@ -9,6 +9,38 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef B2ND_RESIDENT_MIN_I64_API
+int b2nd_min_i64_prepare(int64_t items, int64_t tile, b2nd_min_i64_plan *plan) {
+    if (!plan || items <= 0 || (uint64_t)items > SIZE_MAX / sizeof(int64_t) || tile <= 0) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    *plan = (b2nd_min_i64_plan){items, tile};
+    return BLOSC2_ERROR_SUCCESS;
+}
+
+int b2nd_min_i64_execute(const b2nd_min_i64_plan *plan, const int64_t *input,
+                         int64_t items, int64_t *output, int64_t *tiles, size_t *scratch) {
+    if (!plan || !input || !output || !tiles || !scratch || items != plan->items ||
+        items <= 0 || (uint64_t)items > SIZE_MAX / sizeof(*input) || plan->tile <= 0) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    uint64_t best = 0;
+    int64_t count = 0;
+    for (int64_t pos = 0; pos < items; count++) {
+        int64_t remaining = items - pos;
+        int64_t span = remaining < plan->tile ? remaining : plan->tile;
+        if (!me_extrema_span(ME_INT64, input + pos, (size_t)span, best, pos != 0, true, &best)) {
+            return BLOSC2_ERROR_INVALID_PARAM;
+        }
+        pos += span;
+    }
+    memcpy(output, &best, sizeof(*output));
+    *tiles = count;
+    *scratch = sizeof(best);
+    return BLOSC2_ERROR_SUCCESS;
+}
+#endif
+
 static int eval_kernel_grid(const me_grid_spec *spec, int64_t nchunks, int64_t nblocks,
                             size_t lanes, const me_kernel *kernel, size_t ninputs,
                             const size_t *input_widths, size_t max_scratch, b2nd_kernel_read read,

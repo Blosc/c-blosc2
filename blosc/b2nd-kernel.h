@@ -7,6 +7,22 @@
 
 #include "b2nd.h"
 #include "miniexpr_grid.h"
+#include "miniexpr_reduce.h"
+
+/* Internal specialized plan for input(int64, rank=1) -> whole-axis min.
+ * The plan contains only immutable geometry. Execute borrows a contiguous
+ * resident view for this call and publishes the scalar only on success. */
+#ifdef ME_EXTREMA_SPAN_API
+#define B2ND_RESIDENT_MIN_I64_API 1
+typedef struct {
+    int64_t items;
+    int64_t tile;
+} b2nd_min_i64_plan;
+
+int b2nd_min_i64_prepare(int64_t items, int64_t tile, b2nd_min_i64_plan *plan);
+int b2nd_min_i64_execute(const b2nd_min_i64_plan *plan, const int64_t *input,
+                         int64_t items, int64_t *output, int64_t *tiles, size_t *scratch);
+#endif
 
 typedef int (*b2nd_kernel_read)(void *context, size_t input, int64_t chunk, int64_t block,
                                const me_grid_block_info *info, me_mut_buffer out);

@@ -61,6 +61,27 @@ static int write_block(void *context, int64_t chunk, int64_t block,
 }
 
 int main(void) {
+#ifdef B2ND_RESIDENT_MIN_I64_API
+    b2nd_min_i64_plan plan;
+    int64_t values[] = {INT64_MAX, 7, 7, INT64_MIN, INT64_MIN};
+    int64_t output = 19, tiles = 0;
+    size_t scratch = 0;
+    CHECK(b2nd_min_i64_prepare(0, 2, &plan) == BLOSC2_ERROR_INVALID_PARAM);
+    CHECK(b2nd_min_i64_prepare(5, 0, &plan) == BLOSC2_ERROR_INVALID_PARAM);
+    CHECK(b2nd_min_i64_prepare(5, 2, &plan) == 0);
+    CHECK(b2nd_min_i64_execute(&plan, values, 4, &output, &tiles, &scratch) ==
+          BLOSC2_ERROR_INVALID_PARAM);
+    CHECK(output == 19 && tiles == 0 && scratch == 0);
+    CHECK(b2nd_min_i64_execute(&plan, values, 5, &output, &tiles, &scratch) == 0);
+    CHECK(output == INT64_MIN && tiles == 3 && scratch == sizeof(uint64_t));
+    /* Reuse immutable geometry with fresh input and a short final tile. */
+    values[3] = values[4] = INT64_MAX;
+    CHECK(b2nd_min_i64_execute(&plan, values, 5, &output, &tiles, &scratch) == 0);
+    CHECK(output == 7 && tiles == 3);
+    CHECK(b2nd_min_i64_prepare(5, INT64_MAX, &plan) == 0);
+    CHECK(b2nd_min_i64_execute(&plan, values, 5, &output, &tiles, &scratch) == 0);
+    CHECK(output == 7 && tiles == 1);
+#endif
     const int64_t shape[] = {7};
     const int32_t chunks[] = {5}, blocks[] = {2};
     blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;
