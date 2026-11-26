@@ -1,33 +1,105 @@
 Roadmap to 4.0
 ==============
 
-This document lists the main goals for the C-Blosc2 4.x series.  Most of them
-are features that were originally planned for 3.0 but were deferred (see
-`ROADMAP-TO-3.0.rst <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP-TO-3.0.rst>`_
-for the historical record).  Contributions towards any of them are very welcome.
+This document outlines the main goals for the C-Blosc2 4.x series.  The core
+deliverables are funded by a contract from the
+`Sovereign Tech Agency (STA) <https://www.sovereign.tech/>`_
+(see the `announcement blog post <https://www.blosc.org/posts/sta-award-blosc2/>`_)
+to modernize, expand, and harden the C-Blosc2 foundation so that Blosc2's most
+powerful container, querying, compute, and security capabilities are natively
+available in C—and therefore accessible from C/C++, Rust, Julia, Go,
+WebAssembly, and Python without requiring a Python runtime.
 
-New Features in C-Blosc2
-------------------------
+For historical context on earlier milestones, see
+`ROADMAP-TO-3.0.rst <https://github.com/Blosc/c-blosc2/blob/main/ROADMAP-TO-3.0.rst>`_.
+Community feedback and contributions toward any of these goals are warmly
+welcomed.
 
-* Move lazy expressions to C-Blosc2:  right now, lazy expressions are only supported in the Python wrapper (python-blosc2).  Moving them to C-Blosc2 would allow other wrappers (Java, R, Julia...) to benefit from this powerful feature.
+Sovereign Tech Agency (STA) Core Pillars
+----------------------------------------
 
-* Optimization for multi-socket machines:  right now, C-Blosc2 is optimized for single-socket machines.  However, in multi-socket machines, memory access is not uniform (NUMA architecture), so optimizations are needed to make sure that every thread is accessing to local memory as much as possible.  This would require to use e.g. `numactl <https://linux.die.net/man/8/numactl>`_ or `libnuma <https://man7.org/linux/man-pages/man3/numa.3.html>`_ so as to pin threads and memory allocations to the local socket.
+1. Open Data Standards & Native C Containers
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Support for GPUs:  nowadays, GPUs are becoming more and more powerful, and having support for them in C-Blosc2 would be a great addition.  The idea is to offload the compression, but most importantly, decompression tasks to the GPU, so that the CPU is free to do other tasks.  This would require to use e.g. `CUDA <https://developer.nvidia.com/cuda-toolkit>`_ or `ROCm <https://rocm.docs.amd.com/>`_ so as to access to the GPU capabilities.
+* **Formal open binary specifications (RFCs):** Draft formal, vendor-neutral
+  RFC blueprints defining byte-level layouts for Blosc2's advanced containers,
+  enabling independent third-party readers, writers, and verifiers.
+* **Native C container implementations:** Bring containers currently available
+  only in Python-Blosc2 directly into C-Blosc2 with guaranteed cross-platform
+  compatibility:
 
-* ACID version of the frame format:  right now, frames are not ACID compliant (Atomicity, Consistency, Isolation and Durability).  This means that if a frame is being written and the process is interrupted (e.g. power failure, crash...), the frame may be left in an inconsistent state.  Making frames ACID compliant would require to implement a journaling mechanism so that changes are first written to a journal before being applied to the frame.  This would ensure that frames are always in a consistent state, even in the event of a failure.  The 3.2 series already added related (but weaker) guarantees: growth-SWMR (single writer, multiple readers) support and optional file locking for multi-process access.
+  * **DictStore:** Hierarchical / dictionary store for organizing arrays,
+    tables, and metadata.
+  * **EmbedStore:** Portable, embedded container storage (including framed
+    representations).
+  * **CTable:** Compressed columnar table format with typed schemas and
+    segment indexing.
 
-* Framed version of the `TreeStore <https://www.blosc.org/posts/new-treestore-blosc2/>`_:  the TreeStore is a data structure developed in Python-Blosc2. It is meant to be a hierarchical data structure that allows to store and access data in a tree-like fashion.  Making it framed would allow to transfer it more easily between different machines, as well as storing it in memory.
+* **Open governance:** Review and endorse all format specifications through
+  open community discussions and the reactivated **Blosc Steering Council**.
 
-General improvements
---------------------
+2. Intelligent Slicing & Fast Data Skipping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **Improve the safety of the library:**  even if we have already made a long way in improving our safety, mainly thanks to the efforts of Nathan Moinvaziri, we take safety seriously, so this is always a work in progress.
+* **Advanced multidimensional slicing in C:** Implement strided slices,
+  boolean masks, and sophisticated indexing directly in the C core.
+* **Array & columnar indexing with chunk pruning:** Add native indexing and
+  metadata inspection so C-Blosc2 can prune (skip) irrelevant compressed chunks
+  during queries and slices, reducing both I/O and memory consumption on large
+  datasets.
 
-* **Checksums:** the frame can benefit from having a checksum per every chunk/index/metalayer.  This will provide more safety towards frames that are damaged for whatever reason.  Also, this would provide better feedback when trying to determine the parts of the frame that are corrupted.  Candidates for checksums can be the xxhash32 or xxhash64, depending on the goals (to be decided).
+3. Computing Directly on Compressed Data (Zero Dependencies)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **Multiple index chunks in frames:** right now, only `one chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_ is allowed for indexing other chunks.  Provided the 2GB limit for a chunksize, that means that 'only' 256 million of chunks can be stored in a frame.  Allowing for more than one index chunk would overcome this limitation.
+* **Embedded ``miniexpr`` engine:** Embed the lightweight, high-performance
+  ``miniexpr`` math engine directly into C-Blosc2.
+* **Streaming evaluation on compressed data:** Evaluate mathematical
+  expressions and table queries (e.g. ``temperature > 30``) directly as
+  cache-sized blocks stream through the CPU, avoiding full decompression into
+  RAM—completely self-contained in C with **zero external runtime
+  dependencies** (no Python or NumPy required).
 
-* **More robust detection of CPU capabilities:** although currently this detection is quite sophisticated, the code responsible for that has organically grown for more than 10 years and it is time to come with a more modern and robust way of doing this. https://github.com/google/cpu_features may be a good helper for doing this refactoring.
+4. Built-in Data Encryption & Hardened Security
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* **Documentation:** utterly important for attracting new users and making the life easier for existing ones.  Besides keeping the quality of the API docstrings, more documentation materials should be provided, like tutorials or a book about Blosc (or at least, the beginnings of it).
+* **Transparent software encryption:** Introduce native encryption in C-Blosc2
+  so datasets can be encrypted and authenticated at rest.
+* **Continuous fuzzing & static analysis:** Expand continuous fuzz testing with
+  **Google OSS-Fuzz** and integrate static analysis into CI to catch memory
+  errors, undefined behavior, and other vulnerabilities early.
+* **Security governance:** Establish a formal vulnerability disclosure policy
+  (``SECURITY.md``) with standardized CVE reporting workflows and a documented,
+  risk-based security review process.
+
+Cross-Cutting Deliverables
+--------------------------
+
+* **Compatibility & downstream integration testing:** Expand CI matrices and
+  run cross-version compatibility and integration test suites against major
+  downstream libraries (such as PyTables, ``hdf5plugin``, Zarr/``numcodecs``,
+  and DKFZ's nnU-Net) prior to releases.
+* **Documentation & contributor onboarding:** Overhaul the C-Blosc2
+  documentation with a comprehensive C API reference, clear tutorials,
+  in-depth technical articles, and a welcoming onboarding guide for new
+  contributors.
+
+Longer-Term / Community Goals
+-----------------------------
+
+These items remain on the broader C-Blosc2 wishlist beyond the STA contract
+scope; contributions are welcome:
+
+* **Checksums in frames:** Per-chunk, per-index, and per-metalayer checksums
+  (e.g. xxHash32/xxHash64) to detect and localize frame corruption.
+* **Multiple index chunks in frames:** Overcome the single
+  `index chunk <https://github.com/Blosc/c-blosc2/blob/main/README_CFRAME_FORMAT.rst#chunks>`_
+  limit (~256 million chunks per frame at the 2 GB chunk limit).
+* **ACID / journaling frames:** Build on the 3.2 growth-SWMR and optional file
+  locking mechanisms with journaling for crash-safe atomic updates.
+* **NUMA / multi-socket optimizations:** Thread and memory pinning (e.g. via
+  ``libnuma``) to improve memory locality on multi-socket systems.
+* **GPU offloading:** Offload compression and decompression workloads to GPUs
+  (e.g. via CUDA or ROCm).
+* **Modernized CPU capability detection:** Refactor the organically grown
+  CPU feature detection layer (potentially leveraging
+  `google/cpu_features <https://github.com/google/cpu_features>`_).
