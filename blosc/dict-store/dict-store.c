@@ -217,12 +217,18 @@ static int s_zip_write_all_pairs(const dict_store *ds, zip_archive *za) {
     return rc;
 }
 
-// abs_relative is the relative path from the top most directory, the first directory in the recursion chain
-// parent_dir_fd is the file descriptor for the immediate parent dir
-// A function frame has no ownership of the parameters parent_dir_fd and abs_relative
-static int s_tree_walker(int parent_dir_fd, const char* abs_relative, bool* pembed_found) {
+// TODO: This is not platform independent
+static int s_b2d_fill_pairs_recursive(dict_store* dstore, int parent_dir_fd, const char* abs_relative) {
 
-    int fd = openat(parent_dir_fd, abs_relative, O_DIRECTORY | O_CLOEXEC | O_RDONLY);
+    int fd = -1;
+    // In case abs_relative is the empty string
+    bool abs_relative_is_empty = abs_relative[0] == '\0';
+    if (abs_relative_is_empty) {
+        fd = parent_dir_fd;
+    } else {
+        fd = openat(parent_dir_fd, abs_relative, O_DIRECTORY | O_CLOEXEC | O_RDONLY);
+    }
+
     if (fd < 0) {
         BLOSC_TRACE_ERROR("Could not open directory at relative %s", abs_relative);
         return BLOSC2_ERROR_FILE_OPEN;
@@ -231,18 +237,23 @@ static int s_tree_walker(int parent_dir_fd, const char* abs_relative, bool* pemb
     if (dir == NULL) {
         BLOSC_TRACE_ERROR("Could not fdopendir at relative %s", abs_relative);
         close(fd);
+        return BLOSC2_ERROR_FILE_OPEN;
     }
     fd = dirfd(dir); // Just in case...
     int rc = BLOSC2_ERROR_SUCCESS;
     struct dirent* entry;
     while ( (entry = readdir(dir)) != NULL ) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0 || strcmp(entry->d_name, (const char*)b2e_name) == 0) {
             continue;
         }
 
         const char* filename = entry->d_name;
         char* new_abs_relative = NULL;
-        rc = fs_path_join(abs_relative, filename, &new_abs_relative);
+        if (abs_relative_is_empty) {
+            rc = string_duplicate((uint8_t*)filename, (uint8_t**)&new_abs_relative);
+        } else {
+            rc = fs_path_join(abs_relative, filename, &new_abs_relative);
+        }
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not join paths");
             break;
@@ -257,13 +268,34 @@ static int s_tree_walker(int parent_dir_fd, const char* abs_relative, bool* pemb
         }
 
         if (S_ISDIR(st.st_mode)) {
-            rc = s_tree_walker(fd, new_abs_relative, pembed_found);
-            if (rc < 0) {
-                free(new_abs_relative);
-            }
+            rc = s_b2d_fill_pairs_recursive(dstore, parent_dir_fd, new_abs_relative);
+            free(new_abs_relative);
+            if (rc < 0) break;
         } else if (S_ISREG(st.st_mode)) {
             // Insert new entry and take ownership of abs_relative.
-            
+
+            // 1) Remove extension
+            uint8_t* key = NULL;
+            rc = string_remove_extension((uint8_t*)new_abs_relative, &key);
+            if (rc < 0) {
+                BLOSC_TRACE_ERROR("Could not remove extension from string");
+                free(new_abs_relative);
+                break;
+            }
+            // There is no need to normalize. Key is directly derived from the path, so it is already normalized
+            bool needs_free = false;
+            b2_ds_value value;
+            value.f_dir.localpath = (uint8_t*)new_abs_relative;
+            value.f_dir.localpath_length = strlen(new_abs_relative);
+            rc = hash_map_put(&dstore->map, key, &value, &needs_free);
+            if (rc < 0) {
+                BLOSC_TRACE_ERROR("Could not insert element in hash_map");
+                free(key);
+                free(new_abs_relative);
+                break;
+            }
+            if (needs_free) free(key);
+
         } else {
             free(new_abs_relative);
         }
@@ -272,115 +304,43 @@ static int s_tree_walker(int parent_dir_fd, const char* abs_relative, bool* pemb
     return rc;
 }
 
-// (todo): This is not platform independent
-static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, size_t urlpath_len, bool _embed_found) {
-    // ds is valid and urlpath is a directory
-
-    bool embed_found = _embed_found;
-    DIR *d = NULL;
-    d = opendir((const char*)urlpath);
-    if (d == NULL) {
-        BLOSC_TRACE_ERROR("Could not open the directory %s", (const char*)urlpath);
-        return BLOSC2_ERROR_FILE_OPEN;
-    }
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    struct dirent *entry = NULL;
-    while ( (entry = readdir(d)) != NULL ) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-
-        const char* filename = entry->d_name;
-        size_t filename_len = strlen(filename);
-        uint8_t* concat = NULL;
-        size_t concat_len = filename_len + urlpath_len + 1;
-        concat = malloc(concat_len + 1);
-        if (concat == NULL) {
-            BLOSC_TRACE_ERROR("Could not allocate memory to fill entries in b2d");
-            error_code = BLOSC2_ERROR_MEMORY_ALLOC;
-            break;
-        }
-        snprintf((char*)concat, concat_len + 1, "%s/%s", (const char*)urlpath, (const char*)filename);
-
-        struct stat st = {0};
-        stat((const char*)concat, &st);
-        if (S_ISDIR(st.st_mode)) {
-            error_code = s_b2d_fill_pairs_recursive(ds, concat, concat_len, embed_found);
-            free((void*)concat);
-            if (error_code < 0) {
-                // Here no BLOSC_TRACE_ERROR should be declared. In case of error, a big, BIG trace could be printed
-                return error_code;
-            }
-        } else if (S_ISREG(st.st_mode)) {
-            // Get filename
-
-            if (!embed_found && strcmp((const char*)b2e_name, filename) == 0) {
-                embed_found = true;
-                blosc2_embed_store* estore = NULL;
-                error_code = blosc2_embed_store_open(&estore, concat, ds->mode);
-                if (error_code < 0) {
-                    BLOSC_TRACE_ERROR("Could not open EmbedStore in B2D");
-                    free(concat);
-                    return error_code;
-                }
-                free(concat);
-                ds->estore = estore;
-                continue;
-            }
-
-            b2_ds_value v = {0};
-            const uint8_t* first_bar = (const uint8_t*) strchr((const char*)concat, '/');
-            error_code = string_duplicate(first_bar + 1, (uint8_t**)&(v.f_dir.localpath));
-            free((void*)concat);
-            if (error_code != 0) {
-                BLOSC_TRACE_ERROR("Could not duplicate string");
-                break;
-            }
-            v.f_dir.localpath_length = strlen((const char*)v.f_dir.localpath);
-
-            uint8_t* key_extensionless = NULL;
-            error_code = string_remove_extension(v.f_dir.localpath, &key_extensionless);
-            if (error_code != 0) {
-                BLOSC_TRACE_ERROR("Could not allocate memory to remove extension");
-                free((void*)v.f_dir.localpath);
-                break;
-            }
-
-            uint8_t* key = NULL;
-            error_code = key_normalize_copy(key_extensionless, &key);
-            free((void*)key_extensionless);
-            if (error_code != 0) {
-                free((void*)v.f_dir.localpath);
-                break;
-            }
-
-            bool needs_free = false;
-            error_code = hash_map_put(&ds->map, key, &v, &needs_free);
-            if (needs_free) {
-                free(key);
-            }
-            if (error_code < 0) {
-                BLOSC_TRACE_ERROR("Could not set pair in hash_map");
-                break;
-            }
-        }
-    }
-    closedir(d);
-    return error_code;
-}
-
 static int s_b2d_fill_pairs(dict_store *ds, const uint8_t* urlpath) {
     // ds is not null and valid
 
     struct stat st = {0};
-    if (stat((const char*)urlpath, &st) != 0) {
+    if (lstat((const char*)urlpath, &st) != 0) {
         return BLOSC2_ERROR_FILE_OPEN;
     }
     if (!S_ISDIR(st.st_mode)) {
         return BLOSC2_ERROR_FILE_OPEN;
     }
 
-    return s_b2d_fill_pairs_recursive(ds, urlpath, strlen((const char*)urlpath), false);
+    int fd = open((const char*)urlpath, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0) {
+        BLOSC_TRACE_ERROR("Could not open %s", (const char*)urlpath);
+        return BLOSC2_ERROR_FILE_OPEN;
+    }
+
+    char* estore_path = NULL;
+    int rc = fs_path_join((const char*)urlpath, (const char*)b2e_name, &estore_path);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not join paths");
+        close(fd);
+        return rc;
+    }
+
+    blosc2_embed_store* estore = NULL;
+    rc = blosc2_embed_store_open(&estore, (const uint8_t*)estore_path, ds->mode);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("EmbedStore was not found or not in frame format, ignoring...");
+    } else {
+        ds->estore = estore;
+    }
+    free(estore_path);
+
+    // s_b2d_fill_pairs_recursive is in charge of closing file descriptors, that means
+    // that fd will be closed by this function
+    return s_b2d_fill_pairs_recursive(ds, fd, "");
 }
 
 // (note) If the nomenclature of the function is confuse, here there is an explanation
