@@ -1,6 +1,32 @@
 name: CI CMake
 on: [push, pull_request]
 jobs:
+  installed-miniexpr:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - name: Build and test an installed static consumer
+      run: |
+        git clone https://codeberg.org/Blosc/miniexpr.git "$RUNNER_TEMP/miniexpr"
+        git -C "$RUNNER_TEMP/miniexpr" checkout 1f26f0625efe471de3c2dc0c7579b5fb8297ea10
+        cmake -S "$RUNNER_TEMP/miniexpr" -B build-me \
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/me-install" \
+          -DMINIEXPR_BUILD_SHARED=OFF -DMINIEXPR_BUILD_ARTIFACT=OFF \
+          -DMINIEXPR_BUILD_TESTS=OFF -DMINIEXPR_BUILD_EXAMPLES=OFF -DMINIEXPR_BUILD_BENCH=OFF \
+          -DMINIEXPR_ENABLE_TCC_JIT=OFF -DMINIEXPR_USE_SLEEF=OFF
+        cmake --build build-me --parallel
+        cmake --install build-me
+        cmake -S . -B build-blosc \
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/blosc-install" \
+          -DBLOSC2_MINIEXPR_ROOT="$RUNNER_TEMP/me-install" -DBUILD_SHARED=OFF \
+          -DBUILD_TESTS=OFF -DBUILD_FUZZERS=OFF -DBUILD_BENCHMARKS=OFF -DBUILD_EXAMPLES=OFF
+        cmake --build build-blosc --parallel
+        cmake --install build-blosc
+        cmake -S tests/installed-miniexpr -B build-consumer \
+          -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/blosc-install;$RUNNER_TEMP/me-install"
+        cmake --build build-consumer
+        ctest --test-dir build-consumer --output-on-failure
+
   ci-cmake:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}

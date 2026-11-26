@@ -45,6 +45,10 @@ else()
     set(Blosc2_THREADS_FOUND FALSE)
 endif()
 
+if(@BLOSC2_MINIEXPR_CONFIG_DEPENDENCY@)
+    find_dependency(miniexpr CONFIG)
+endif()
+
 if(NOT DEACTIVATE_IPP AND HAVE_IPP)
     find_dependency(IPP)
     set(Blosc2_IPP_FOUND FALSE)
@@ -174,4 +178,3 @@ if(NOT TARGET Blosc2::blosc2_static)
     )
   endif()
 endif()
-

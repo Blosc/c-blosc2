@@ -746,6 +746,7 @@ else()
     endif()
 endif()
 
+set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY OFF)
 add_subdirectory(blosc)
 
 if(BUILD_TESTS)

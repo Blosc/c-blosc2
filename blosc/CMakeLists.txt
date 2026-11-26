@@ -369,6 +369,11 @@ if(BLOSC2_MINIEXPR_ROOT)
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
     find_package(miniexpr CONFIG QUIET HINTS "${_miniexpr_root}")
     if(miniexpr_FOUND)
+        # A private dependency of a static library is still needed when a
+        # consumer links the installed target.
+        if(BUILD_STATIC)
+            set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY ON PARENT_SCOPE)
+        endif()
         foreach(_target blosc2_shared blosc2_static blosc_testing)
             if(TARGET ${_target})
                 target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
