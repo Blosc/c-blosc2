@@ -8,7 +8,7 @@ jobs:
     - name: Build and test an installed static consumer
       run: |
         git clone https://codeberg.org/Blosc/miniexpr.git "$RUNNER_TEMP/miniexpr"
-        git -C "$RUNNER_TEMP/miniexpr" checkout 1f26f0625efe471de3c2dc0c7579b5fb8297ea10
+        git -C "$RUNNER_TEMP/miniexpr" checkout e8bf228c63b10f678e08902faf68c26e1401dd66
         cmake -S "$RUNNER_TEMP/miniexpr" -B build-me \
           -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/me-install" \
           -DMINIEXPR_BUILD_SHARED=OFF -DMINIEXPR_BUILD_ARTIFACT=OFF \
@@ -26,6 +26,19 @@ jobs:
           -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/blosc-install;$RUNNER_TEMP/me-install"
         cmake --build build-consumer
         ctest --test-dir build-consumer --output-on-failure
+    - name: Build and install with one parent-provided miniexpr core
+      run: |
+        cmake -S tests/installed-miniexpr/superbuild -B build-parent \
+          -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/parent-install" \
+          -DMINIEXPR_SOURCE_DIR="$RUNNER_TEMP/miniexpr" -DBLOSC_INSTALL=ON
+        cmake --build build-parent --parallel
+        ctest --test-dir build-parent --output-on-failure
+        cmake --install build-parent
+        cmake -S tests/installed-miniexpr -B build-parent-consumer \
+          -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/parent-install"
+        cmake --build build-parent-consumer
+        ctest --test-dir build-parent-consumer --output-on-failure
+        test -z "$(find build-parent "$RUNNER_TEMP/parent-install" -iname '*yyjson*' -print)"
 
   ci-cmake:
     name: ${{ matrix.name }}

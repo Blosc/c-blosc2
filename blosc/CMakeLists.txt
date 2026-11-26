@@ -364,7 +364,29 @@ endif()
 # add libraries for dependencies that are not CMake targets
 set(BLOSC2_MINIEXPR_ROOT "" CACHE PATH
     "Optional prebuilt miniexpr source/install root for b2nd ramp constructors")
-if(BLOSC2_MINIEXPR_ROOT)
+option(BLOSC2_USE_PARENT_MINIEXPR "Use an existing miniexpr::core target supplied by the parent build" OFF)
+if(BLOSC2_USE_PARENT_MINIEXPR AND BLOSC2_MINIEXPR_ROOT)
+    message(FATAL_ERROR "Select either BLOSC2_USE_PARENT_MINIEXPR or BLOSC2_MINIEXPR_ROOT, not both")
+endif()
+if(BLOSC2_USE_PARENT_MINIEXPR)
+    if(NOT TARGET miniexpr::core)
+        message(FATAL_ERROR "BLOSC2_USE_PARENT_MINIEXPR requires the parent to define miniexpr::core first")
+    endif()
+    list(APPEND SOURCES blosc/b2nd-kernel.c)
+    if(BUILD_STATIC)
+        set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY ON PARENT_SCOPE)
+    endif()
+    foreach(_target blosc2_shared blosc2_static blosc_testing)
+        if(TARGET ${_target})
+            target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
+            target_link_libraries(${_target} PRIVATE
+                "$<BUILD_INTERFACE:miniexpr::core>"
+                "$<INSTALL_INTERFACE:miniexpr::core>"
+                ${CMAKE_DL_LIBS})
+        endif()
+    endforeach()
+    message(STATUS "b2nd ramp constructors: parent miniexpr backend")
+elseif(BLOSC2_MINIEXPR_ROOT)
     list(APPEND SOURCES blosc/b2nd-kernel.c)
     get_filename_component(_miniexpr_root "${BLOSC2_MINIEXPR_ROOT}"
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")

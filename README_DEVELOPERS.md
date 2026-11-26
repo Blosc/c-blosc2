@@ -13,6 +13,13 @@ The 1.0 cleanup baseline is miniexpr
 Install `miniexpr_types.h` alongside the kernel/grid/reduction headers; new
 constructor code does not depend on the callback-bearing compatibility API.
 
+A parent CMake build can instead set `BLOSC2_USE_PARENT_MINIEXPR=ON` after
+defining `miniexpr::core` and before adding C-Blosc2. Do not also set
+`BLOSC2_MINIEXPR_ROOT`. This shares one core with other targets in the parent
+build. To install static C-Blosc2 when miniexpr is also built from source in
+the parent, configure miniexpr with `MINIEXPR_INSTALL_CORE=ON` so both packages
+are exported for downstream consumers.
+
 For sibling checkouts, run from the repository root:
 
 ```sh
