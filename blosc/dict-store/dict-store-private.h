@@ -33,13 +33,7 @@ typedef struct {
         struct {
             blosc2_schunk* schunk;
         }f_mem;
-
-        struct {
-            uint8_t* urlbase;
-            uint8_t* path;
-        }remote;
     };
-    bool has_remote; // If has_remote is true, then retrieve remote
 }b2_ds_value;
 
 typedef enum {
