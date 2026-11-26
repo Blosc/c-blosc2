@@ -1,5 +1,5 @@
 /*********************************************************************
-Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
@@ -799,13 +799,11 @@ static int s_v1_try_deserialize_embed_map(const uint8_t* packed, size_t* pindex,
     return rc;
 }
 
-int msgpack_embed_store_deserialize_v1(const uint8_t* packed_buffer, size_t packed_buffer_size, blosc2_embed_store* es) {
+int msgpack_embed_store_deserialize_v1(const uint8_t* packed_buffer, blosc2_embed_store* es) {
     assert(packed_buffer != NULL);
-    assert(packed_buffer_size > 0);
     assert(es != NULL);
 
     size_t index = 0;
-
     // Deserialize map
     if ((packed_buffer[index] & MAP_FIX_TAG_MASK) != MAP_FIX_TAG || (packed_buffer[index] & MAP_FIX_LEN_MASK) != 2) {
         BLOSC_TRACE_ERROR("The tag was not of a fixmap or its length was not equal to 2");

@@ -1,5 +1,5 @@
 /*********************************************************************
-Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
@@ -30,7 +30,7 @@ int msgpack_embed_store_serialize(const blosc2_embed_store* es, uint8_t** pout_b
 int msgpack_embed_store_deserialize(const uint8_t* packed_buffer, size_t packed_buffer_size, blosc2_embed_store* es);
 
 /* This function does the same as the above, with the difference that is reads the first version of the EmbedStore serialization. See the docs README_B2E.md */
-int msgpack_embed_store_deserialize_v1(const uint8_t* packed_buffer, size_t packed_buffer_size, blosc2_embed_store* es);
+int msgpack_embed_store_deserialize_v1(const uint8_t* packed_buffer, blosc2_embed_store* es);
 
 /* On success, returns the version, a positive value, on error, a negative error code */
 int msgpack_validate_and_return_version(const uint8_t* packed, size_t packed_size);

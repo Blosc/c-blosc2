@@ -1,5 +1,5 @@
 /*********************************************************************
-Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org

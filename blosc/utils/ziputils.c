@@ -194,7 +194,7 @@ int ziputils_reader_iter_get_filename( zip_archive_iter *iter, uint8_t** pfilena
 
     filename_length = mz_zip_reader_get_filename(iter->archive, iter->index, (char*)filename_buffer, filename_length);
 
-    *pfilename_buffer = filename_buffer;
+    *pfilename_buffer = (uint8_t*)filename_buffer;
     *pfilename_length = filename_length;
     return BLOSC2_ERROR_SUCCESS;
 }

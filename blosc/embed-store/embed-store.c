@@ -1,5 +1,5 @@
 /*********************************************************************
-Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
@@ -145,9 +145,9 @@ static int s_embed_load_local_schunk(blosc2_schunk* origin, b2_es_value_local lo
 
 static int s_embed_load_value(embed_store* es, b2_es_value* value, blosc2_store_value* item) {
     int rc = BLOSC2_ERROR_SUCCESS;
+    blosc2_schunk* schunk = NULL;
     switch (value->tag) {
     case BLOSC2_STORE_VALUE_SCHUNK:
-        blosc2_schunk* schunk = NULL;
         rc = s_embed_load_local_schunk(es->schunk, s_value_get_local(value), &schunk);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not load local SChunk");
@@ -183,13 +183,11 @@ static int s_embed_load_value(embed_store* es, b2_es_value* value, blosc2_store_
  * Un schunk vacío tiene chunksize == -1: el primer append lo fija.
  */
 static int s_set_slice(blosc2_schunk *schunk, int64_t start, int64_t stop,
-                       const void *buffer, int64_t buffer_len) {
+                       const void *buffer) {
     assert(schunk != NULL);
     assert(buffer != NULL);
-    assert(buffer_len >= 0);
     assert(schunk->typesize == 1);
     assert(start >= 0 && start <= stop);
-    assert(stop - start <= buffer_len);
     assert(start <= schunk->nbytes);
 
     const uint8_t *src = (const uint8_t *)buffer;
@@ -295,7 +293,7 @@ static int s_embed_save_schunk(embed_store* es, const uint8_t* key, blosc2_schun
 
     int64_t start = es->current_offset;
     int64_t stop = start + frame_length;
-    rc = s_set_slice(es->schunk, start, stop, frame, frame_length);
+    rc = s_set_slice(es->schunk, start, stop, frame);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not set slice buffer");
         goto cleanup;
@@ -406,7 +404,7 @@ static int s_embed_deserialize_map_v1(embed_store* es) {
         BLOSC_TRACE_ERROR("Could not retrieve serialized vlmeta");
         return rc;
     }
-    rc = msgpack_embed_store_deserialize_v1(packed, packed_size, es);
+    rc = msgpack_embed_store_deserialize_v1(packed, es);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not deserialize msgpack buffer v1");
     }
@@ -749,9 +747,10 @@ int blosc2_embed_store_set(blosc2_embed_store* estore, const uint8_t* key, blosc
         return rc;
     }
 
+    blosc2_schunk* schunk = NULL;
     switch (value->tag) {
     case BLOSC2_STORE_VALUE_SCHUNK:
-        blosc2_schunk* schunk = value->schunk;
+        schunk = value->schunk;
         rc = s_embed_save_schunk(estore, key, schunk);
         break;
     case BLOSC2_STORE_VALUE_REMOTE:

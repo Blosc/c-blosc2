@@ -527,7 +527,7 @@ static char* test_deserialize_embed_store_v1_from_file() {
     size_t packed_v1_size = 0;
     rc = s_open_msgpack(packed_file_v1, &packed_v1, &packed_v1_size);
     mu_assert("ERROR: Could not read v1 msgpack", rc == 0);
-    rc = msgpack_embed_store_deserialize_v1(packed_v1, packed_v1_size, es);
+    rc = msgpack_embed_store_deserialize_v1(packed_v1, es);
     mu_assert("ERROR: Could not deserialize msgpack v1", rc == 0);
     free(packed_v1);
 
