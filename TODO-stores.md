@@ -11,6 +11,9 @@ This file documents certain todos regarding stores (EmbedStore, DictStore, ...).
 - Add to_b2z and to_b2d when storage type is MEMORY_CONTIGUOUS.
 - dstore.urlpath should be an absolute path or a file descriptor (`openat(...)`).
 
+- Decide what to do with blosc2_dict_store_to_buffer. It should accept B2Z and B2D?
+- Better path handling
+
 ## EmbedStore
 
 

@@ -23,13 +23,13 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <sys/stat.h>
 
 #include <b2nd.h>
+#include <fcntl.h>
 
 typedef blosc2_dict_store dict_store;
 
 /* == Static functions (and some constants) == */
 
 static const uint8_t b2e_name[] = "embed.b2e"; // Used to identify the EmbedStore in the filesystem
-static size_t b2e_name_length = sizeof(b2e_name) - 1;
 static const uint8_t b2z_extension[] = "b2z";
 static const uint8_t b2d_extension[] = "b2d";
 static const uint8_t schunk_extension[] = "b2f";
@@ -150,6 +150,17 @@ static b2_ds_storage_type s_get_storage_type_from_extension(const uint8_t* urlpa
     return -1;
 }
 
+/* Base directory where the keys of this dict_store live on disk: the temporary
+   directory for b2z, the store's own directory for b2d. */
+static const uint8_t* s_storage_prefix(const dict_store* ds) {
+    return (ds->storage_type == B2_DS_B2Z) ? ds->tmpdir : ds->urlpath;
+}
+
+/* Resolve `relative` against the store's base directory. The caller owns *out. */
+static int s_storage_path(const dict_store* ds, const char* relative, char** out) {
+    return fs_path_join((const char*)s_storage_prefix(ds), relative, out);
+}
+
 static int s_inode_exists(const uint8_t* path) {
     struct stat st;
     if (stat((const char*)path, &st) == 0) {
@@ -203,6 +214,61 @@ static int s_zip_write_all_pairs(const dict_store *ds, zip_archive *za) {
         }
     }
 
+    return rc;
+}
+
+// abs_relative is the relative path from the top most directory, the first directory in the recursion chain
+// parent_dir_fd is the file descriptor for the immediate parent dir
+// A function frame has no ownership of the parameters parent_dir_fd and abs_relative
+static int s_tree_walker(int parent_dir_fd, const char* abs_relative, bool* pembed_found) {
+
+    int fd = openat(parent_dir_fd, abs_relative, O_DIRECTORY | O_CLOEXEC | O_RDONLY);
+    if (fd < 0) {
+        BLOSC_TRACE_ERROR("Could not open directory at relative %s", abs_relative);
+        return BLOSC2_ERROR_FILE_OPEN;
+    }
+    DIR* dir = fdopendir(fd);
+    if (dir == NULL) {
+        BLOSC_TRACE_ERROR("Could not fdopendir at relative %s", abs_relative);
+        close(fd);
+    }
+    fd = dirfd(dir); // Just in case...
+    int rc = BLOSC2_ERROR_SUCCESS;
+    struct dirent* entry;
+    while ( (entry = readdir(dir)) != NULL ) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        const char* filename = entry->d_name;
+        char* new_abs_relative = NULL;
+        rc = fs_path_join(abs_relative, filename, &new_abs_relative);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not join paths");
+            break;
+        }
+
+        struct stat st;
+        if (fstatat(fd, filename, &st, AT_SYMLINK_NOFOLLOW) < 0) {
+            BLOSC_TRACE_ERROR("Could not make fstatat");
+            rc = BLOSC2_ERROR_FILE_READ;
+            free(new_abs_relative);
+            break;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            rc = s_tree_walker(fd, new_abs_relative, pembed_found);
+            if (rc < 0) {
+                free(new_abs_relative);
+            }
+        } else if (S_ISREG(st.st_mode)) {
+            // Insert new entry and take ownership of abs_relative.
+            
+        } else {
+            free(new_abs_relative);
+        }
+    }
+    closedir(dir); // Also closes the file descriptor
     return rc;
 }
 
@@ -528,8 +594,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         goto cleanup;
     }
 
-    uint8_t full_path[PATH_MAX];
-    const size_t full_path_length = PATH_MAX;
+    char* full_path = NULL;
     while (ziputils_reader_iter_next(iter)) {
         b2_ds_value val = {0};
         uint8_t* key_with_extension = NULL;
@@ -541,13 +606,12 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
             if (val.f_dir.localpath != NULL) free((void*)val.f_dir.localpath);
             goto cleanup;
         }
-        if (val.f_dir.localpath_length + tmpdir_length + 1 >= full_path_length) {
-            BLOSC_TRACE_ERROR("Maximum size reached for %s", (const char*)val.f_dir.localpath);
+        error_code = fs_path_join((const char*)tmpdir, (const char*)val.f_dir.localpath, &full_path);
+        if (error_code != 0) {
+            BLOSC_TRACE_ERROR("Could not build path for %s", (const char*)val.f_dir.localpath);
             free((void*)val.f_dir.localpath);
-            error_code = BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
             goto cleanup;
         }
-        snprintf((char*)full_path, full_path_length, "%s/%s", (const char*)tmpdir, (const char*)val.f_dir.localpath);
 
         error_code = key_normalize_copy(val.f_dir.localpath, &key_with_extension);
         if (error_code != 0) {
@@ -567,7 +631,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
 
         size_t file_index = ziputils_reader_iter_get_file_index(iter);
         fs_create_dir_recursive((const char*)full_path);
-        if (!ziputils_reader_extract_to_file(za, full_path, file_index)) {
+        if (!ziputils_reader_extract_to_file(za, (const uint8_t*)full_path, file_index)) {
             BLOSC_TRACE_ERROR("Could not extract file in archive to file in filesystem");
             free((void*)key);
             free((void*)val.f_dir.localpath);
@@ -583,6 +647,8 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
             BLOSC_TRACE_ERROR("Coudl not set element in hash_map");
             goto cleanup;
         }
+        free(full_path);
+        full_path = NULL;
     }
     pds->tmpdir = tmpdir;
     pds->tmpdir_length = tmpdir_length;
@@ -595,6 +661,7 @@ cleanup:
         *ds = NULL;
         blosc2_dict_store_free(pds);
     }
+    if (full_path != NULL) free(full_path);
     if (remove_tmpdir) {
         fs_remove_dir_recursive((const char*)tmpdir);
     }
@@ -717,27 +784,14 @@ static int s_get_b2x(dict_store *ds, b2_ds_value* value, blosc2_store_value* ite
         }
         /* Intentional fallthrough */
     case BLOSC2_STORE_OPEN_MODE_RDWR:{
-        uint8_t* prefix;
-        size_t prefix_length;
-        if (ds->storage_type == B2_DS_B2Z) {
-            prefix = ds->tmpdir;
-            prefix_length = ds->tmpdir_length;
-        } else {
-            prefix = ds->urlpath;
-            prefix_length = ds->urlpath_length;
+        char* concat = NULL;
+        int rc = s_storage_path(ds, (const char*)value->f_dir.localpath, &concat);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not build path for the requested key");
+            return rc;
         }
-
-        uint8_t* localpath = value->f_dir.localpath;
-        size_t localpath_length = value->f_dir.localpath_length;
-        size_t concat_size = prefix_length + localpath_length + 2;
-        uint8_t* concat = malloc(concat_size);
-        if (concat == NULL) {
-            BLOSC_TRACE_ERROR("Could not allocate memory for path joining");
-            return BLOSC2_ERROR_MEMORY_ALLOC;
-        }
-        snprintf((char*)concat, concat_size, "%s/%s", (const char*)prefix, (const char*)localpath);
         free_path = true;
-        path = concat;
+        path = (uint8_t*)concat;
         break;
     }
     default:
@@ -790,15 +844,6 @@ static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* 
     *free_key = true;
 
     int rc = BLOSC2_ERROR_SUCCESS;
-    uint8_t* prefix = NULL;
-    size_t prefix_length = 0;
-    if (ds->storage_type == B2_DS_B2Z) {
-        prefix = ds->tmpdir;
-        prefix_length = ds->tmpdir_length;
-    } else {
-        prefix = ds->urlpath;
-        prefix_length = ds->urlpath_length;
-    }
 
     uint8_t* localpath = NULL;
     size_t localpath_length = 0;
@@ -817,14 +862,12 @@ static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* 
     }
 
     // Build full path
-    size_t full_path_size = prefix_length + localpath_length + 2;
-    uint8_t* full_path = malloc(full_path_size);
-    if (full_path == NULL) {
+    char* full_path = NULL;
+    rc = s_storage_path(ds, (const char*)localpath, &full_path);
+    if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory for path concatenation");
-        rc = BLOSC2_ERROR_MEMORY_ALLOC;
         goto cleanup;
     }
-    snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)prefix, (const char*)localpath);
     rc = fs_create_dir_recursive((const char*)full_path);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not create recursively the directory");
@@ -895,9 +938,6 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
     hash_map_iter iter = {0};
     hash_map_iter* piter= &iter;
     hash_map_iter_init(piter, &ds->map);
-    size_t destination_urlpath_length = strlen((const char*)destination_urlpath);
-    size_t full_path_size = destination_urlpath_length + 1;
-    uint8_t* full_path = NULL;
 
     while (hash_map_iter_next(piter)) {
         const uint8_t* key = hash_map_iter_get_key(piter);
@@ -905,31 +945,24 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
         blosc2_schunk* schunk = value->f_mem.schunk;
 
         uint8_t* key_with_extension = NULL;
-        size_t key_with_extension_length = 0;
-        rc = s_add_extension_to_key(key, schunk, &key_with_extension, &key_with_extension_length);
+        rc = s_add_extension_to_key(key, schunk, &key_with_extension, NULL);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not add extension to key");
             break;
         }
 
-        size_t new_full_path_size = key_with_extension_length + destination_urlpath_length + 2;
-        if (new_full_path_size > full_path_size) {
-            if (full_path != NULL) free(full_path);
-            full_path_size = new_full_path_size;
-            full_path = malloc(full_path_size);
-            if (full_path == NULL) {
-                BLOSC_TRACE_ERROR("Could not allocate memory for path concatenation");
-                free(key_with_extension);
-                rc = BLOSC2_ERROR_MEMORY_ALLOC;
-                break;
-            }
-        }
-        snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)destination_urlpath, (const char*)key_with_extension);
+        char* full_path = NULL;
+        rc = fs_path_join((const char*)destination_urlpath, (const char*)key_with_extension, &full_path);
         free(key_with_extension);
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not build destination path");
+            break;
+        }
         rc = fs_create_dir_recursive((const char*)full_path);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)full_path);
             free(full_path);
+            break;
         }
         if (blosc2_schunk_to_file(schunk, (const char*)full_path) < 0) {
             BLOSC_TRACE_ERROR("Could not write schunk to %s", (const char*)full_path);
@@ -937,6 +970,7 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
             rc = BLOSC2_ERROR_FILE_WRITE;
             break;
         }
+        free(full_path);
     }
     if (rc < 0) {
         BLOSC_TRACE_ERROR("There was an error creating a b2d from memory");
@@ -944,7 +978,6 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
             fs_remove_dir_recursive((const char*)destination_urlpath);
         }
     }
-    if (full_path != NULL) free(full_path);
     return rc;
 }
 
@@ -966,34 +999,44 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
             hash_map_iter_init(piter, &ds->map);
 
             const uint8_t* tmpdir = ds->tmpdir;
-            uint8_t full_path_origin[PATH_MAX];
-            uint8_t full_path_destination[PATH_MAX];
 
             while (hash_map_iter_next(piter)) {
                 b2_ds_value* value = hash_map_iter_get_value(piter);
                 const uint8_t* localpath = value->f_dir.localpath;
-                if (snprintf((char*)full_path_origin, PATH_MAX, "%s/%s", (const char*)tmpdir, (const char*)localpath) < 0) {
-                    BLOSC_TRACE_ERROR("The resultant string's length was greater than %d", PATH_MAX);
-                    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+
+                char* full_path_origin = NULL;
+                error_code = fs_path_join((const char*)tmpdir, (const char*)localpath, &full_path_origin);
+                if (error_code != 0) {
+                    BLOSC_TRACE_ERROR("Could not build the source path");
+                    return error_code;
                 }
-                if (snprintf((char*)full_path_destination, PATH_MAX, "%s/%s", (const char*)destination_urlpath, (const char*)localpath) < 0) {
-                    BLOSC_TRACE_ERROR("The resultant string's length was greater than %d", PATH_MAX);
-                    return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
+                char* full_path_destination = NULL;
+                error_code = fs_path_join((const char*)destination_urlpath, (const char*)localpath, &full_path_destination);
+                if (error_code != 0) {
+                    BLOSC_TRACE_ERROR("Could not build the destination path");
+                    free(full_path_origin);
+                    return error_code;
                 }
                 int error = fs_create_dir_recursive((const char*)full_path_destination);
                 if (error != 0) {
                     BLOSC_TRACE_ERROR("Could not create directories at %s", (const char*)full_path_destination);
+                    free(full_path_origin);
+                    free(full_path_destination);
                     return BLOSC2_ERROR_FAILURE;
                 }
 
                 blosc2_schunk* schunk = blosc2_schunk_open((const char*)full_path_origin);
                 if (schunk == NULL) {
                     BLOSC_TRACE_ERROR("Could not read schunk from %s", (const char*)full_path_origin);
+                    free(full_path_origin);
+                    free(full_path_destination);
                     error_code = BLOSC2_ERROR_FILE_READ;
                     break;
                 }
                 blosc2_schunk_to_file(schunk, (const char*)full_path_destination);
                 blosc2_schunk_free(schunk); // Free memory allocated
+                free(full_path_origin);
+                free(full_path_destination);
             }
             break;
         }
@@ -1026,39 +1069,16 @@ static int s_remove_b2x(dict_store* ds, const uint8_t* key) {
         return BLOSC2_ERROR_SUCCESS;
     }
 
-    uint8_t* prefix;
-    size_t prefix_length;
-    if (ds->storage_type == B2_DS_B2Z) {
-        prefix = ds->tmpdir;
-        prefix_length = ds->tmpdir_length;
-    } else {
-        prefix = ds->urlpath;
-        prefix_length = ds->urlpath_length;
-    }
-
     uint8_t* localpath = value->f_dir.localpath;
-    size_t localpath_length = value->f_dir.localpath_length;
 
     char* full_path = NULL;
-    size_t full_path_size = prefix_length + localpath_length + 2; // +1 for the / and +1 for NUL
-    full_path = malloc(full_path_size);
-    if (full_path == NULL) {
+    int error_code = s_storage_path(ds, (const char*)localpath, &full_path);
+    if (error_code != BLOSC2_ERROR_SUCCESS) {
         BLOSC_TRACE_ERROR("Could not allocate memory to create path");
-        return BLOSC2_ERROR_MEMORY_ALLOC;
+        return error_code;
     }
-    snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)prefix, (const char*)localpath);
 
-    struct stat st = {0};
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    if (stat(full_path, &st) != 0) {
-        BLOSC_TRACE_ERROR("Could not make stat over %s", full_path);
-        error_code = BLOSC2_ERROR_FILE_REMOVE;
-    }
-    if ((st.st_mode & S_IFMT) != S_IFREG) {
-        BLOSC_TRACE_ERROR("%s is not a regular file", full_path);
-        error_code = BLOSC2_ERROR_FILE_REMOVE;
-    }
-    if (remove(full_path) != 0) {
+    if (blosc2_remove_urlpath(full_path) != 0) {
         BLOSC_TRACE_ERROR("Could not remove %s", full_path);
         error_code = BLOSC2_ERROR_FILE_REMOVE;
     }
@@ -1078,20 +1098,21 @@ static int s_persist_embed_store( blosc2_embed_store* estore, const uint8_t* url
     assert(estore != NULL);
     assert(urlpath != NULL);
 
+    (void)urlpath_length;  // no longer needed now that the path is built with fs_path_join
+
     int rc = blosc2_embed_store_close(estore);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not close EmbedStore");
         return rc;
     }
-    size_t concat_size = urlpath_length + b2e_name_length + 2;
-    uint8_t* concat = malloc(concat_size);
-    if (concat == NULL) {
+    char* concat = NULL;
+    rc = fs_path_join((const char*)urlpath, (const char*)b2e_name, &concat);
+    if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to concat paths");
-        return BLOSC2_ERROR_MEMORY_ALLOC;
+        return rc;
     }
-    snprintf((char*)concat, concat_size, "%s/%s", (const char*)urlpath, (const char*)b2e_name);
 
-    int64_t fileframe_size = blosc2_embed_store_to_file(estore, concat);
+    int64_t fileframe_size = blosc2_embed_store_to_file(estore, (const uint8_t*)concat);
     if (fileframe_size < 0) {
         BLOSC_TRACE_ERROR("There was an error while persisting the EmbedStore to %s", (const char*)concat);
         rc = (int)fileframe_size;

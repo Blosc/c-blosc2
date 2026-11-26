@@ -12,6 +12,7 @@ See LICENSE.txt for details about copyright and rights to use.
 
 #include <blosc2.h>
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -23,6 +24,7 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <libgen.h>
 
 #include <string_manipulation.h>
+#include "blosc-checked.h"
 
 #if defined(_WIN32) || defined (__MINGW32__)
 #include <direct.h>
@@ -35,10 +37,7 @@ typedef struct _stat struct stat;
 #endif
 
 int fs_mkdir(const char* path) {
-    if (path == NULL) {
-        BLOSC_TRACE_ERROR("Path cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(path != NULL);
     if (path[0] == '\0') {
         BLOSC_TRACE_ERROR("Path cannot be equal to the empty string");
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -50,6 +49,31 @@ int fs_mkdir(const char* path) {
         }
         return BLOSC2_ERROR_FAILURE;
     }
+    return BLOSC2_ERROR_SUCCESS;
+}
+
+/* Join `base` and `relative` with a '/' separator into a new string.
+   The caller owns *out and must release it with free(). */
+int fs_path_join(const char* base, const char* relative, char** out) {
+    assert(base != NULL && relative != NULL && out != NULL);
+
+    size_t total;
+    if (!blosc2_checked_add_size(strlen(base), strlen(relative) + 2, &total)) {
+        BLOSC_TRACE_ERROR("Path is too long to join");
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    char* path = malloc(total);
+    if (path == NULL) {
+        BLOSC_TRACE_ERROR("Could not allocate memory for joined path");
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    int written = snprintf(path, total, "%s/%s", base, relative);
+    if (written < 0 || (size_t)written >= total) {
+        BLOSC_TRACE_ERROR("Error building joined path");
+        free(path);
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    *out = path;
     return BLOSC2_ERROR_SUCCESS;
 }
 
@@ -137,7 +161,7 @@ static int s_remove_dir_recursive(const char* dir_path) {
                 // Recursive descent
                 s_remove_dir_recursive(fname);
             } else {
-                ret = remove(fname);
+                ret = blosc2_remove_urlpath(fname);
                 if (ret < 0) {
                     int err = errno;
                     switch (err) {
@@ -171,10 +195,7 @@ static int s_remove_dir_recursive(const char* dir_path) {
 }
 
 int fs_remove_dir_recursive(const char* dir_path) {
-    if (dir_path == NULL) {
-        BLOSC_TRACE_ERROR("dir_path cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(dir_path != NULL);
     if (dir_path[0] == '\0') {
         BLOSC_TRACE_ERROR("dir_path cannot be an empty string");
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -183,10 +204,8 @@ int fs_remove_dir_recursive(const char* dir_path) {
 }
 
 int fs_create_dir_recursive(const char* dir_path) {
-    if (dir_path == NULL) {
-        BLOSC_TRACE_ERROR("dir_path cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(dir_path != NULL);
+
     if (dir_path[0] == '\0') {
         BLOSC_TRACE_ERROR("dir_path cannot be an empty string");
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -225,10 +244,8 @@ int fs_create_dir_recursive(const char* dir_path) {
 }
 
 int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
-    if (dir_path == NULL) {
-        BLOSC_TRACE_ERROR("dir_path cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(dir_path != NULL);
+
     if (dir_path[0] == '\0') {
         BLOSC_TRACE_ERROR("dir_path cannot be an empty string");
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -273,7 +290,7 @@ int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
         while (ptr_last > first_slash) {
             if (*ptr_last == '/') {
                 *ptr_last = '\0';
-                remove((const char*)tmp);
+                blosc2_remove_urlpath((const char*)tmp);
                 *ptr_last = '/';
             }
 
@@ -287,11 +304,7 @@ int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
 }
 
 int fs_create_tmp_dir(char** ptmpdir_path) {
-    if (ptmpdir_path == NULL) {
-        BLOSC_TRACE_ERROR("ptmpdir_path cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
-    *ptmpdir_path = NULL;
+    assert(ptmpdir_path != NULL);
 
     const char* template = ".b2.XXXXXX";
     size_t template_length = strlen(template);
@@ -332,10 +345,8 @@ int fs_create_tmp_dir(char** ptmpdir_path) {
 }
 
 int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
-    if (localpath == NULL || tmp_path == NULL) {
-        BLOSC_TRACE_ERROR("Function arguments cannot be NULL");
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(localpath != NULL && tmp_path != NULL);
+
     *tmp_path = NULL;
     if (localpath[0] == '\0') {
         BLOSC_TRACE_ERROR("Path cannot be the empty string");
@@ -377,7 +388,7 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
     if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
         int err = errno;
         close(fd);
-        unlink(tmpl);
+        blosc2_remove_urlpath(tmpl);
         free(tmpl);
         BLOSC_TRACE_ERROR("Could not set FD_CLOEXEC: %s", strerror(err));
     }
@@ -388,6 +399,8 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
 }
 
 int fs_sync_parent_dir(const char* path) {
+    assert(path != NULL);
+
     char* buf = NULL;
     size_t buf_len = strlen(path) + 1;
     buf = malloc(buf_len);
@@ -432,6 +445,8 @@ int fs_sync_parent_dir(const char* path) {
 }
 
 int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
+    assert(path != NULL && schunk != NULL);
+
     char* tmp_file_path = NULL;
     int error_code = 0;
     bool tmp_exists = true;
@@ -443,7 +458,7 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
         goto cleanup;
     }
     if (schunk->storage->urlpath != NULL) {
-        error_code = remove(tmp_file_path); // Let blosc2_schunk_to_file create it
+        error_code = blosc2_remove_urlpath(tmp_file_path); // Let blosc2_schunk_to_file create it
         if (error_code < 0) {
             BLOSC_TRACE_ERROR("Could not remove %s", tmp_file_path);
             free(tmp_file_path);
@@ -496,15 +511,13 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
 
 cleanup:
     if (fd >= 0) close(fd);
-    if (tmp_exists) remove(tmp_file_path);
+    if (tmp_exists) blosc2_remove_urlpath(tmp_file_path);
     free((void*)tmp_file_path);
     return error_code;
 }
 
 int fs_realpath(const char* path, char** out_path) {
-    if (path == NULL || out_path == NULL) {
-        return BLOSC2_ERROR_NULL_POINTER;
-    }
+    assert(path != NULL && out_path != NULL);
     *out_path = NULL;
 
     char* real = realpath((const char*)path, NULL);

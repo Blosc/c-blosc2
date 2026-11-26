@@ -17,6 +17,7 @@ See LICENSE.txt for details about copyright and rights to use.
 
 //char* blosc2_normalize_dirpath(const char* dir_path);
 int fs_mkdir(const char* dir_path);
+int fs_path_join(const char* base, const char* relative, char** out);
 int fs_create_tmp_dir(char** ptmpdir_path);
 int fs_remove_dir_recursive(const char* dir_path);
 int fs_create_dir_recursive(const char* dir_path);
