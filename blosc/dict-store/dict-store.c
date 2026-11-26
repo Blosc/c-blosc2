@@ -31,13 +31,9 @@ typedef blosc2_dict_store dict_store;
 static const uint8_t b2e_name[] = "embed.b2e"; // Used to identify the EmbedStore in the filesystem
 static size_t b2e_name_length = sizeof(b2e_name) - 1;
 static const uint8_t b2z_extension[] = "b2z";
-//static const size_t b2z_extension_len = sizeof(b2z_extension) - 1;
 static const uint8_t b2d_extension[] = "b2d";
-//static const size_t b2d_extension_len = 3;
 static const uint8_t schunk_extension[] = "b2f";
-static const size_t schunk_extension_len = sizeof(schunk_extension) - 1;
 static const uint8_t b2nd_extension[] = "b2nd";
-static const size_t b2nd_extension_len = sizeof(b2nd_extension) - 1;
 
 // Enum used to specify if a value was inserted in the EmbedStore successfully
 enum {
@@ -101,32 +97,47 @@ static bool s_schunk_is_ndarray(blosc2_schunk *schunk) {
     return blosc2_meta_exists(schunk, "b2nd") >= 0;
 }
 
-static int s_add_extension_to_key( const uint8_t* key, blosc2_schunk *container, uint8_t** pkey_with_extension, size_t* length ) {
+/* Extension used to persist a schunk on disk: ndarrays have their own. */
+static const uint8_t* s_schunk_extension(const blosc2_schunk* schunk) {
+    return s_schunk_is_ndarray((blosc2_schunk*)schunk) ? b2nd_extension : schunk_extension;
+}
 
-    uint8_t* key_with_extension = NULL;
-    const uint8_t* extension = NULL;
-    size_t extension_length = 0;
-
-    if (s_schunk_is_ndarray(container)) {
-        extension = b2nd_extension;
-        extension_length = b2nd_extension_len;
-    } else {
-        extension = schunk_extension;
-        extension_length = schunk_extension_len;
+/* Return a malloc-ed copy of `key` with the schunk's extension appended. */
+static int s_add_extension_to_key(const uint8_t* key, blosc2_schunk* container, uint8_t** pkey_with_extension, size_t* length) {
+    int rc = string_append_extension(key, s_schunk_extension(container), pkey_with_extension);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not add extension to key");
+        return rc;
     }
-
-    size_t key_length = strlen((const char*)key);
-    size_t key_with_extension_length = key_length + extension_length + 2;
-    key_with_extension = malloc(key_with_extension_length);
-    if (key_with_extension == NULL) {
-        BLOSC_TRACE_ERROR("Could not allocate buffer to add extension to key");
-        return BLOSC2_ERROR_MEMORY_ALLOC;
+    if (length != NULL) {
+        *length = strlen((const char*)*pkey_with_extension);
     }
-    snprintf((char*)key_with_extension, key_with_extension_length, "%s.%s", (const char*)key, (const char*)extension);
-
-    *pkey_with_extension = key_with_extension;
-    if (length) *length = key_with_extension_length - 1;
     return BLOSC2_ERROR_SUCCESS;
+}
+
+/* Resolve `key` to its canonical form. When `key` is already canonical, *out
+   borrows it and *owned is set to NULL; otherwise *out points to a malloc-ed
+   copy stored in *owned that the caller must release. Returns 0 on success. */
+static int s_resolve_key(const uint8_t* key, const uint8_t** out, uint8_t** owned) {
+    *owned = NULL;
+    if (key_is_canonical(key)) {
+        *out = key;
+        return BLOSC2_ERROR_SUCCESS;
+    }
+    int rc = key_normalize_copy(key, owned);
+    if (rc < 0) {
+        return rc;
+    }
+    *out = *owned;
+    return BLOSC2_ERROR_SUCCESS;
+}
+
+/* Return a malloc-ed canonical copy of `key`, owned by the caller. */
+static int s_canonical_key_copy(const uint8_t* key, uint8_t** out) {
+    if (key_is_canonical(key)) {
+        return string_duplicate(key, out);
+    }
+    return key_normalize_copy(key, out);
 }
 
 static b2_ds_storage_type s_get_storage_type_from_extension(const uint8_t* urlpath) {
@@ -422,34 +433,13 @@ static int s_open_rdonly_b2d(dict_store **ds, const uint8_t* urlpath) {
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not fill entries from %s", (const char*)urlpath);
         blosc2_dict_store_free(pds);
+        return error_code;
     }
 
     *ds = pds;
     return error_code;
 }
 
-static int s_open_rdonly(dict_store **ds, const uint8_t* urlpath, int storage_type) {
-    // Preconditions
-    //      - ds != NULL
-    //      - urlpath is not NULL and a valid storage point
-    //      - storage_type is either B2_DS_B2Z or B2_DS_B2D
-
-    if (s_inode_exists(urlpath) != 0) {
-        return BLOSC2_ERROR_FILE_OPEN;
-    }
-
-    switch (storage_type) {
-        case B2_DS_B2Z: {
-            return s_open_rdonly_b2z(ds, urlpath);
-        }
-
-        case B2_DS_B2D: {
-            return s_open_rdonly_b2d(ds, urlpath);
-        }
-
-        default: return BLOSC2_ERROR_INVALID_PARAM;
-    }
-}
 
 static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
 
@@ -494,29 +484,6 @@ static int s_open_wronly_b2d(dict_store **ds, const uint8_t* urlpath) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_open_wronly(dict_store **ds, const uint8_t* urlpath, int storage_type) {
-    // Preconditions
-    //      - ds != NULL
-    //      - urlpath is not NULL and a valid storage point
-    //      - storage_type is either B2_DS_B2Z or B2_DS_B2D
-
-    if (s_inode_exists(urlpath) == 0) {
-        BLOSC_TRACE_ERROR("Cannot open blosc2_dict_store when urlpath already points to an existing file %s", (const char*)urlpath);
-        return BLOSC2_ERROR_FILE_OPEN;
-    }
-
-    switch (storage_type) {
-        case B2_DS_B2Z: {
-            return s_open_wronly_b2z(ds, urlpath);
-        }
-
-        case B2_DS_B2D: {
-            return s_open_wronly_b2d(ds, urlpath);
-        }
-
-        default: return BLOSC2_ERROR_INVALID_PARAM;
-    }
-}
 
 static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
 
@@ -670,28 +637,49 @@ static int s_open_rdwr_b2d(dict_store **ds, const uint8_t* urlpath) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_open_rdwr(dict_store **ds, const uint8_t* urlpath, int storage_type) {
+static int s_open(dict_store** ds, const uint8_t* urlpath, b2_ds_storage_type storage_type, blosc2_store_open_mode mode) {
     // Preconditions
     //      - ds != NULL
-    //      - urlpath is not NULL and a valid storage point
+    //      - urlpath is not NULL and points to a valid storage location
     //      - storage_type is either B2_DS_B2Z or B2_DS_B2D
 
-    if (s_inode_exists(urlpath) != 0) {
-        BLOSC_TRACE_ERROR("Can't open in RDWD mode when %s does not exist", (const char*)urlpath);
-        return BLOSC2_ERROR_FILE_OPEN;
+    // The existence policy depends on the mode: RDONLY/RDWR require the path to
+    // exist, while WRONLY requires it not to.
+    int inode = s_inode_exists(urlpath);
+    switch (mode) {
+        case BLOSC2_STORE_OPEN_MODE_RDONLY:
+        case BLOSC2_STORE_OPEN_MODE_RDWR:
+            if (inode != BLOSC2_ERROR_SUCCESS) {
+                BLOSC_TRACE_ERROR("Cannot open %s because it does not exist", (const char*)urlpath);
+                return BLOSC2_ERROR_FILE_OPEN;
+            }
+            break;
+        case BLOSC2_STORE_OPEN_MODE_WRONLY:
+            if (inode == BLOSC2_ERROR_SUCCESS) {
+                BLOSC_TRACE_ERROR("Cannot open %s because it already exists", (const char*)urlpath);
+                return BLOSC2_ERROR_FILE_OPEN;
+            }
+            break;
+        default:
+            return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    switch (storage_type) {
-        case B2_DS_B2Z: {
-            return s_open_rdwr_b2z(ds, urlpath);
+    if (storage_type == B2_DS_B2Z) {
+        switch (mode) {
+            case BLOSC2_STORE_OPEN_MODE_RDONLY: return s_open_rdonly_b2z(ds, urlpath);
+            case BLOSC2_STORE_OPEN_MODE_WRONLY: return s_open_wronly_b2z(ds, urlpath);
+            case BLOSC2_STORE_OPEN_MODE_RDWR:   return s_open_rdwr_b2z(ds, urlpath);
+            default: break;
         }
-
-        case B2_DS_B2D: {
-            return s_open_rdwr_b2d(ds, urlpath);
+    } else if (storage_type == B2_DS_B2D) {
+        switch (mode) {
+            case BLOSC2_STORE_OPEN_MODE_RDONLY: return s_open_rdonly_b2d(ds, urlpath);
+            case BLOSC2_STORE_OPEN_MODE_WRONLY: return s_open_wronly_b2d(ds, urlpath);
+            case BLOSC2_STORE_OPEN_MODE_RDWR:   return s_open_rdwr_b2d(ds, urlpath);
+            default: break;
         }
-
-        default: return BLOSC2_ERROR_INVALID_PARAM;
     }
+    return BLOSC2_ERROR_INVALID_PARAM;
 }
 
 // (note): s_get_mem_sparse is implemented directly in the switch statement in blosc2_dict_store_get
@@ -1012,8 +1000,13 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
     }
 
     if (error_code != 0) {
-        if (s_inode_exists(destination_urlpath) != 0) {
+        error_code = s_inode_exists(destination_urlpath);
+        if (error_code == BLOSC2_ERROR_SUCCESS) {
             fs_remove_dir_recursive((const char*)destination_urlpath);
+        } else if (error_code == BLOSC2_ERROR_NOT_FOUND) {
+            error_code = BLOSC2_ERROR_SUCCESS;
+        } else {
+            BLOSC_TRACE_ERROR("There was an error while requesting filesystem data (lstat)");
         }
     } else {
         BLOSC_TRACE_ERROR("There was an error while converting the b2d to a b2z");
@@ -1173,13 +1166,8 @@ static int s_try_set_value_in_embed(blosc2_embed_store* estore, int64_t threshol
         return EMBED_NOT_INSERTED;
     }
     case BLOSC2_STORE_VALUE_REMOTE:{
-        size_t urlbase_length = strlen((const char*)value->remote.urlbase);
-        size_t path_length = strlen((const char*)value->remote.path);
-        size_t total_length = urlbase_length + path_length;
-        if (total_length < (size_t)threshold) {
-            break;
-        }
-        return EMBED_NOT_INSERTED;
+        // It is always inserted
+        break;
     }
     default:
         BLOSC_TRACE_ERROR("An unexpected tag was found on value");
@@ -1298,25 +1286,7 @@ int blosc2_dict_store_open(blosc2_dict_store** dstore, const uint8_t* urlpath, b
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    int error_code = BLOSC2_ERROR_SUCCESS;
-    switch (open_mode) {
-        case BLOSC2_STORE_OPEN_MODE_RDONLY: {
-            error_code = s_open_rdonly(dstore, urlpath, storage_type);
-            break;
-        }
-        case BLOSC2_STORE_OPEN_MODE_WRONLY: {
-            error_code = s_open_wronly(dstore, urlpath, storage_type);
-            break;
-        }
-        case BLOSC2_STORE_OPEN_MODE_RDWR: {
-            error_code = s_open_rdwr(dstore, urlpath, storage_type);
-            break;
-        }
-        default: {
-            error_code = BLOSC2_ERROR_INVALID_PARAM;
-            break;
-        }
-    }
+    int error_code = s_open(dstore, urlpath, storage_type, open_mode);
 
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not open %s", (const char*)urlpath);
@@ -1392,23 +1362,19 @@ int blosc2_dict_store_get_storage_type(blosc2_dict_store *dstore) {
 bool blosc2_dict_store_contains_key(blosc2_dict_store *dstore, const uint8_t* key) {
     if (dstore == NULL || key == NULL) return false;
 
-    /* Keep the same key handling as get()/set()/remove(): canonical keys are
-       searched as-is, non-canonical ones are normalized first. */
-
+    /* Keep the same key handling as get()/set()/remove(): the EmbedStore is
+       queried with the raw key, and the dict_store map with the canonical one. */
     if (dstore->estore != NULL && blosc2_embed_store_contains_key(dstore->estore, key)) {
         return true;
     }
 
-    if (key_is_canonical(key)) {
-        return hash_map_contains_key(&dstore->map, key);
-    }
-
-    uint8_t* normalized_key = NULL;
-    if (key_normalize_copy(key, &normalized_key) != BLOSC2_ERROR_SUCCESS) {
+    const uint8_t* canonical_key = NULL;
+    uint8_t* owned_key = NULL;
+    if (s_resolve_key(key, &canonical_key, &owned_key) != BLOSC2_ERROR_SUCCESS) {
         return false;
     }
-    bool contains = hash_map_contains_key(&dstore->map, normalized_key);
-    free(normalized_key);
+    bool contains = hash_map_contains_key(&dstore->map, canonical_key);
+    free(owned_key);
     return contains;
 }
 
@@ -1495,7 +1461,7 @@ int blosc2_dict_store_to_buffer(blosc2_dict_store *dstore, void** pbuffer, size_
         BLOSC_TRACE_ERROR("ds cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (dstore->storage_type == B2_DS_B2D || dstore->storage_type == B2_DS_B2Z) {
+    if (dstore->storage_type == B2_DS_B2D || dstore->storage_type == B2_DS_B2Z || dstore->storage_type == B2_DS_MEMORY_CONTIGUOUS) {
         BLOSC_TRACE_ERROR("This function is only supported for B2_DS_MEMORY storage type");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1645,20 +1611,15 @@ int blosc2_dict_store_get(blosc2_dict_store* dstore, const uint8_t* key, blosc2_
     }
     // EmbedStore END
 
-    error_code = BLOSC2_ERROR_SUCCESS;
-    b2_ds_value* value = NULL;
-    if (!key_is_canonical(key)) {
-        uint8_t* processed_key = NULL;
-        error_code = key_normalize_copy(key, &processed_key);
-        if (error_code < 0) {
-            BLOSC_TRACE_ERROR("Could not normalize key");
-            return error_code;
-        }
-        value = hash_map_get(&dstore->map, processed_key);
-        free(processed_key);
-    } else {
-        value = hash_map_get(&dstore->map, key);
+    const uint8_t* canonical_key = NULL;
+    uint8_t* owned_key = NULL;
+    error_code = s_resolve_key(key, &canonical_key, &owned_key);
+    if (error_code < 0) {
+        BLOSC_TRACE_ERROR("Could not normalize key");
+        return error_code;
     }
+    b2_ds_value* value = hash_map_get(&dstore->map, canonical_key);
+    free(owned_key);
 
     if (value == NULL) {
         return BLOSC2_ERROR_NOT_FOUND;
@@ -1704,18 +1665,11 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sto
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    // The stripped key is a malloc(ed) string that belongs to the map
+    // The key stored in the map is a malloc-ed canonical string owned by the map
     uint8_t* processed_key = NULL;
-    if (!key_is_canonical(key)) {
-        error_code = key_normalize_copy(key, &processed_key);
-        if (error_code != 0) {
-            return error_code;
-        }
-    } else {
-        error_code = string_duplicate(key, &processed_key);
-        if (error_code != 0) {
-            return error_code;
-        }
+    error_code = s_canonical_key_copy(key, &processed_key);
+    if (error_code != 0) {
+        return error_code;
     }
     bool free_processed = true;
 
@@ -1779,8 +1733,9 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     }
     // EmbedStore END
 
-    uint8_t* processed_key;
-    error_code = key_normalize_copy(key, &processed_key);
+    const uint8_t* canonical_key = NULL;
+    uint8_t* owned_key = NULL;
+    error_code = s_resolve_key(key, &canonical_key, &owned_key);
     if (error_code != BLOSC2_ERROR_SUCCESS) {
         BLOSC_TRACE_ERROR("Could not process and validate key");
         return error_code;
@@ -1789,21 +1744,21 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     switch (ds->storage_type) {
         case B2_DS_B2Z:
         case B2_DS_B2D:
-            error_code = s_remove_b2x(ds, processed_key);
+            error_code = s_remove_b2x(ds, canonical_key);
             if (error_code < 0) {
                 BLOSC_TRACE_ERROR("Could not remove element with key  %s", (const char*)key);
             }
             break;
         case B2_DS_MEMORY_SPARSE:
             // This returns true if deleted, false if not. It cannot fail in MEMORY_SPARSE
-            hash_map_remove(&ds->map, processed_key);
+            hash_map_remove(&ds->map, canonical_key);
             break;
         default:
             BLOSC_TRACE_ERROR("Invalid storage_type detected");
             error_code = BLOSC2_ERROR_INVALID_PARAM;
     }
 
-    free((void*)processed_key);
+    free(owned_key);
     return error_code;
 }
 
@@ -1815,6 +1770,11 @@ blosc2_dict_store_iter* blosc2_dict_store_iter_new( blosc2_dict_store *ds ) {
     }
 
     blosc2_dict_store_iter* iter = calloc(1, sizeof(blosc2_dict_store_iter));
+    if (iter == NULL) {
+        BLOSC_TRACE_ERROR("Could not allocate blosc2_dict_store_iter");
+        return NULL;
+    }
+
     if (ds->estore != NULL) {
         priv_embed_store_iter_init(&iter->embed_iter, ds->estore);
         iter->state = B2_DS_ITER_EMBED;

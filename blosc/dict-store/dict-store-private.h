@@ -18,22 +18,21 @@ Blosc - Blocked Shuffling and Compression Library
 #define BLOSC2_DICT_STORE_LOAD_FACTOR 0.75f
 #define BLOSC2_DICT_STORE_RESIZE_FACTOR 2
 
-typedef struct {
-    union {
-        struct {
-            int64_t offset;
-            size_t length;
-        }f_zip;
+// The discriminator is the blosc2_store_open_mode and the b2_ds_storage_type
+typedef union {
+    struct {
+        int64_t offset;
+        size_t length;
+    }f_zip;
 
-        struct {
-            uint8_t* localpath; // (note): Localpath is used to store de filesystem path of the file associated in the key
-            size_t localpath_length; // (note): Storing this, the amount of strlen made is less
-        }f_dir;
+    struct {
+        uint8_t* localpath; // (note): Localpath is used to store de filesystem path of the file associated in the key
+        size_t localpath_length; // (note): Storing this, the amount of strlen made is less
+    }f_dir;
 
-        struct {
-            blosc2_schunk* schunk;
-        }f_mem;
-    };
+    struct {
+        blosc2_schunk* schunk;
+    }f_mem;
 }b2_ds_value;
 
 typedef enum {
