@@ -157,7 +157,7 @@ static void s_bench_set_b2d(void) {
   PRINT_RESULT("B2D close", totaltime);
 
   blosc2_dict_store_free(ds);
-  blosc2_remove_dir_recursive((const char*)dir_path);
+  fs_remove_dir_recursive((const char*)dir_path);
 }
 
 static void s_bench_open_b2z(void) {
@@ -235,7 +235,7 @@ static void s_bench_open_b2d(void) {
         blosc2_dict_store_free(arr_ds[i]);
     }
 
-    blosc2_remove_dir_recursive((const char*)dir_path);
+    fs_remove_dir_recursive((const char*)dir_path);
 }
 
 static void s_bench_get_memory(void) {
@@ -368,7 +368,7 @@ static void s_bench_get_b2d(void) {
     blosc2_dict_store_close(ds);
     blosc2_dict_store_free(ds);
     PRINT_RESULT("B2D get - RDWR", totaltime / (double)SCHUNKS_SIZE);
-    blosc2_remove_dir_recursive((const char*)dir_path);
+    fs_remove_dir_recursive((const char*)dir_path);
 }
 
 static void s_bench_to_buffer(void) {

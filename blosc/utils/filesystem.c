@@ -34,7 +34,7 @@ typedef struct _stat struct stat;
 #define STAT(filename, buf) stat(filename, buf)
 #endif
 
-int blosc2_mkdir(const char* path) {
+int fs_mkdir(const char* path) {
     if (path == NULL) {
         BLOSC_TRACE_ERROR("Path cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -170,7 +170,7 @@ static int s_remove_dir_recursive(const char* dir_path) {
 
 }
 
-int blosc2_remove_dir_recursive(const char* dir_path) {
+int fs_remove_dir_recursive(const char* dir_path) {
     if (dir_path == NULL) {
         BLOSC_TRACE_ERROR("dir_path cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -182,7 +182,7 @@ int blosc2_remove_dir_recursive(const char* dir_path) {
     return s_remove_dir_recursive(dir_path);
 }
 
-int blosc2_create_dir_recursive(const char* dir_path) {
+int fs_create_dir_recursive(const char* dir_path) {
     if (dir_path == NULL) {
         BLOSC_TRACE_ERROR("dir_path cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -224,7 +224,7 @@ int blosc2_create_dir_recursive(const char* dir_path) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_create_dir_recursive_check_extension_paths(const char* dir_path) {
+int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
     if (dir_path == NULL) {
         BLOSC_TRACE_ERROR("dir_path cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -286,7 +286,7 @@ int blosc2_create_dir_recursive_check_extension_paths(const char* dir_path) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_create_tmp_dir(char** ptmpdir_path) {
+int fs_create_tmp_dir(char** ptmpdir_path) {
     if (ptmpdir_path == NULL) {
         BLOSC_TRACE_ERROR("ptmpdir_path cannot be NULL");
         return BLOSC2_ERROR_NULL_POINTER;
@@ -387,7 +387,7 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
     return fd;
 }
 
-int blosc2_sync_parent_dir(const char* path) {
+int fs_sync_parent_dir(const char* path) {
     char* buf = NULL;
     size_t buf_len = strlen(path) + 1;
     buf = malloc(buf_len);
@@ -431,7 +431,7 @@ int blosc2_sync_parent_dir(const char* path) {
     return error_code;
 }
 
-int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp) {
+int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp) {
     const char* tmp_file_path = NULL;
     int error_code = 0;
     bool tmp_exists = true;
@@ -487,7 +487,7 @@ int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool cre
         goto cleanup;
     }
     tmp_exists = false;
-    error_code = blosc2_sync_parent_dir(path);
+    error_code = fs_sync_parent_dir(path);
 
 cleanup:
     if (fd >= 0) close(fd);
@@ -496,7 +496,7 @@ cleanup:
     return error_code;
 }
 
-int blosc2_realpath(const char* path, char** out_path) {
+int fs_realpath(const char* path, char** out_path) {
     if (path == NULL || out_path == NULL) {
         return BLOSC2_ERROR_NULL_POINTER;
     }

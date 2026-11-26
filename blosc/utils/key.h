@@ -15,18 +15,18 @@ See LICENSE.txt for details about copyright and rights to use.
 #include <stddef.h>
 #include <stdint.h>
 /* This is the function that the EmbedStore uses to check whether the keys passed to it are valid */
-bool blosc2_embed_key_is_valid(const char* key);
+bool key_embed_is_valid(const char* key);
 
 /* Returns true when key is already in canonical form.  Never allocates. */
-bool blosc2_key_is_canonical(const uint8_t* key);
+bool key_is_canonical(const uint8_t* key);
 
 /* Canonicalizes key in place.  On success, writes the resulting length to
  * out_length when it is not NULL.  The buffer is left in an unspecified
  * state on error. */
-int blosc2_key_normalize_inplace(uint8_t* key, size_t* out_length);
+int key_normalize_inplace(uint8_t* key, size_t* out_length);
 
 /* Returns a canonical copy owned by the caller.  The caller must free it
  * with free().  On error, *out is set to NULL. */
-int blosc2_key_normalize_copy(const uint8_t* key, uint8_t** out);
+int key_normalize_copy(const uint8_t* key, uint8_t** out);
 
 #endif //BLOSC_KEY_H

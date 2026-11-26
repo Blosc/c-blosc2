@@ -293,7 +293,7 @@ int hash_map_set(hash_map* hm, const uint8_t* key, void* value) {
     bool is_update = s_key_is_live(p.key);
     if (!is_update) {
         uint8_t* dup = NULL;
-        int rc = blosc2_string_duplicate(key, &dup);
+        int rc = string_duplicate(key, &dup);
         if (rc != 0) {
             BLOSC_TRACE_ERROR("Could not allocate new key");
             return rc;

@@ -17,7 +17,7 @@ See LICENSE.txt for details about copyright and rights to use.
 static const char s_invalid_key_chars[] = ":\0\n\r\t";
 static const size_t s_invalid_key_chars_size = sizeof(s_invalid_key_chars) - 1;
 
-bool blosc2_embed_key_is_valid(const char* key) {
+bool key_embed_is_valid(const char* key) {
     size_t key_len = strlen(key);
     if (key_len == 0) {
         BLOSC_TRACE_ERROR("Key cannot be empty");
@@ -44,7 +44,7 @@ bool blosc2_embed_key_is_valid(const char* key) {
     return true;
 }
 
-bool blosc2_key_is_canonical(const uint8_t* key) {
+bool key_is_canonical(const uint8_t* key) {
     if (key == NULL || key[0] == '\0') {
         return false;
     }
@@ -82,7 +82,7 @@ bool blosc2_key_is_canonical(const uint8_t* key) {
     }
 }
 
-int blosc2_key_normalize_inplace(uint8_t* key, size_t* out_length) {
+int key_normalize_inplace(uint8_t* key, size_t* out_length) {
     if (key == NULL) {
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -143,7 +143,7 @@ int blosc2_key_normalize_inplace(uint8_t* key, size_t* out_length) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_key_normalize_copy(const uint8_t* key, uint8_t** out) {
+int key_normalize_copy(const uint8_t* key, uint8_t** out) {
     if (key == NULL || out == NULL) {
         return BLOSC2_ERROR_NULL_POINTER;
     }
@@ -156,7 +156,7 @@ int blosc2_key_normalize_copy(const uint8_t* key, uint8_t** out) {
     }
     memcpy(normalized, key, key_length + 1);
 
-    int error_code = blosc2_key_normalize_inplace(normalized, NULL);
+    int error_code = key_normalize_inplace(normalized, NULL);
     if (error_code != BLOSC2_ERROR_SUCCESS) {
         free(normalized);
         return error_code;

@@ -72,7 +72,7 @@ static int s_dict_store_alloc_urlpath(dict_store** dstore, const uint8_t* urlpat
         BLOSC_TRACE_ERROR("Could not allocate memory for blosc2_dict_store structure");
         return error_code;
     }
-    error_code = blosc2_string_duplicate(urlpath, (uint8_t**)&pds->urlpath);
+    error_code = string_duplicate(urlpath, (uint8_t**)&pds->urlpath);
     if (error_code < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to duplicate string");
         blosc2_dict_store_free(pds);
@@ -130,10 +130,10 @@ static int s_add_extension_to_key( const uint8_t* key, blosc2_schunk *container,
 }
 
 static b2_ds_storage_type s_get_storage_type_from_extension(const uint8_t* urlpath) {
-    if (blosc2_string_has_extension(urlpath, b2z_extension)) {
+    if (string_has_extension(urlpath, b2z_extension)) {
         return B2_DS_B2Z;
     }
-    if (blosc2_string_has_extension(urlpath, b2d_extension)) {
+    if (string_has_extension(urlpath, b2d_extension)) {
         return B2_DS_B2D;
     }
     return -1;
@@ -253,7 +253,7 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
 
             b2_ds_value v = {0};
             const uint8_t* first_bar = (const uint8_t*) strchr((const char*)concat, '/');
-            error_code = blosc2_string_duplicate(first_bar + 1, (uint8_t**)&(v.f_dir.localpath));
+            error_code = string_duplicate(first_bar + 1, (uint8_t**)&(v.f_dir.localpath));
             free((void*)concat);
             if (error_code != 0) {
                 BLOSC_TRACE_ERROR("Could not duplicate string");
@@ -262,7 +262,7 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
             v.f_dir.localpath_length = strlen((const char*)v.f_dir.localpath);
 
             uint8_t* key_extensionless = NULL;
-            error_code = blosc2_string_remove_extension(v.f_dir.localpath, &key_extensionless);
+            error_code = string_remove_extension(v.f_dir.localpath, &key_extensionless);
             if (error_code != 0) {
                 BLOSC_TRACE_ERROR("Could not allocate memory to remove extension");
                 free((void*)v.f_dir.localpath);
@@ -270,7 +270,7 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
             }
 
             uint8_t* key = NULL;
-            error_code = blosc2_key_normalize_copy(key_extensionless, &key);
+            error_code = key_normalize_copy(key_extensionless, &key);
             free((void*)key_extensionless);
             if (error_code != 0) {
                 free((void*)v.f_dir.localpath);
@@ -376,7 +376,7 @@ static int s_open_rdonly_b2z(dict_store **ds, const uint8_t* urlpath) {
         }
 
         // Filename comes with extension, we need an extensionless version
-        error_code = blosc2_string_remove_extension_inplace(filename);
+        error_code = string_remove_extension_inplace(filename);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not allocate memory to remoev extension");
             break;
@@ -463,7 +463,7 @@ static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
         return error_code;
     }
 
-    error_code = blosc2_create_tmp_dir((char**)&tmpdir);
+    error_code = fs_create_tmp_dir((char**)&tmpdir);
     if (error_code != 0) {
         blosc2_dict_store_free(pds);
         return error_code;
@@ -535,7 +535,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         return error_code;
     }
 
-    error_code = blosc2_create_tmp_dir((char**)&tmpdir);
+    error_code = fs_create_tmp_dir((char**)&tmpdir);
     if (error_code != 0) {
         BLOSC_TRACE_ERROR("Could not create temporal directory at %s", (const char*)urlpath);
         blosc2_dict_store_free(pds);
@@ -582,14 +582,14 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         }
         snprintf((char*)full_path, full_path_length, "%s/%s", (const char*)tmpdir, (const char*)val.f_dir.localpath);
 
-        error_code = blosc2_key_normalize_copy(val.f_dir.localpath, &key_with_extension);
+        error_code = key_normalize_copy(val.f_dir.localpath, &key_with_extension);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not process and validate key %s", (const char*)val.f_dir.localpath);
             free((void*)val.f_dir.localpath);
             if (key_with_extension != NULL) free((void*)key_with_extension);
             goto cleanup;
         }
-        error_code = blosc2_string_remove_extension(key_with_extension, (uint8_t**)&key);
+        error_code = string_remove_extension(key_with_extension, (uint8_t**)&key);
         free((void*)key_with_extension);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not remove extension");
@@ -599,7 +599,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         }
 
         size_t file_index = ziputils_reader_iter_get_file_index(iter);
-        blosc2_create_dir_recursive((const char*)full_path);
+        fs_create_dir_recursive((const char*)full_path);
         if (!ziputils_reader_extract_to_file(za, full_path, file_index)) {
             BLOSC_TRACE_ERROR("Could not extract file in archive to file in filesystem");
             free((void*)key);
@@ -629,7 +629,7 @@ cleanup:
         blosc2_dict_store_free(pds);
     }
     if (remove_tmpdir) {
-        blosc2_remove_dir_recursive((const char*)tmpdir);
+        fs_remove_dir_recursive((const char*)tmpdir);
     }
     if (iter != NULL) ziputils_reader_iter_free(iter);
     ziputils_reader_end(za);
@@ -837,13 +837,13 @@ static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* 
         goto cleanup;
     }
     snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)prefix, (const char*)localpath);
-    rc = blosc2_create_dir_recursive((const char*)full_path);
+    rc = fs_create_dir_recursive((const char*)full_path);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not create recursively the directory");
         free(full_path);
         goto cleanup;
     }
-    if (blosc2_atomic_schunk_write((const char*)full_path, schunk, schunk->storage->urlpath == NULL) < 0) {
+    if (fs_atomic_schunk_write((const char*)full_path, schunk, schunk->storage->urlpath == NULL) < 0) {
         BLOSC_TRACE_ERROR("Could not write atomically the schunk to %s", (const char*)full_path);
         free(full_path);
         rc = BLOSC2_ERROR_FILE_WRITE;
@@ -938,7 +938,7 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
         }
         snprintf((char*)full_path, full_path_size, "%s/%s", (const char*)destination_urlpath, (const char*)key_with_extension);
         free(key_with_extension);
-        rc = blosc2_create_dir_recursive((const char*)full_path);
+        rc = fs_create_dir_recursive((const char*)full_path);
         if (rc < 0) {
             BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)full_path);
             free(full_path);
@@ -953,7 +953,7 @@ static int s_to_b2d_from_memory(dict_store *ds, const uint8_t* destination_urlpa
     if (rc < 0) {
         BLOSC_TRACE_ERROR("There was an error creating a b2d from memory");
         if (s_inode_exists(destination_urlpath) != 0) {
-            blosc2_remove_dir_recursive((const char*)destination_urlpath);
+            fs_remove_dir_recursive((const char*)destination_urlpath);
         }
     }
     if (full_path != NULL) free(full_path);
@@ -992,7 +992,7 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
                     BLOSC_TRACE_ERROR("The resultant string's length was greater than %d", PATH_MAX);
                     return BLOSC2_ERROR_MAX_BUFSIZE_EXCEEDED;
                 }
-                int error = blosc2_create_dir_recursive((const char*)full_path_destination);
+                int error = fs_create_dir_recursive((const char*)full_path_destination);
                 if (error != 0) {
                     BLOSC_TRACE_ERROR("Could not create directories at %s", (const char*)full_path_destination);
                     return BLOSC2_ERROR_FAILURE;
@@ -1013,7 +1013,7 @@ static int s_to_b2d_from_b2z(dict_store *ds, const uint8_t* destination_urlpath)
 
     if (error_code != 0) {
         if (s_inode_exists(destination_urlpath) != 0) {
-            blosc2_remove_dir_recursive((const char*)destination_urlpath);
+            fs_remove_dir_recursive((const char*)destination_urlpath);
         }
     } else {
         BLOSC_TRACE_ERROR("There was an error while converting the b2d to a b2z");
@@ -1122,7 +1122,7 @@ static int s_close_b2z( dict_store *ds ) {
                 return BLOSC2_ERROR_FILE_WRITE;
             }
             // Remove temporal directory
-            error_code = blosc2_remove_dir_recursive((const char*)ds->tmpdir);
+            error_code = fs_remove_dir_recursive((const char*)ds->tmpdir);
             break;
         }
         default: return BLOSC2_ERROR_INVALID_PARAM;
@@ -1196,7 +1196,7 @@ int blosc2_dict_store_new(blosc2_dict_store** dstore, const uint8_t* urlpath, bl
     cb_free_value cb = NULL;
 
     if (urlpath != NULL) {
-        if (!blosc2_string_has_extension(urlpath, b2z_extension) && !blosc2_string_has_extension(urlpath, b2d_extension)) {
+        if (!string_has_extension(urlpath, b2z_extension) && !string_has_extension(urlpath, b2d_extension)) {
             BLOSC_TRACE_ERROR("urlpath must contain an extension, either b2z or b2d");
             return BLOSC2_ERROR_INVALID_PARAM;
         }
@@ -1225,7 +1225,7 @@ int blosc2_dict_store_new(blosc2_dict_store** dstore, const uint8_t* urlpath, bl
         }
         if (storage_type == B2_DS_B2Z) {
             uint8_t* tmpdir = NULL;
-            if ((rc = blosc2_create_tmp_dir((char**)&tmpdir)) != 0) {
+            if ((rc = fs_create_tmp_dir((char**)&tmpdir)) != 0) {
                 BLOSC_TRACE_ERROR("Could not create temporal directory");
                 blosc2_dict_store_free(ds);
                 return rc;
@@ -1233,7 +1233,7 @@ int blosc2_dict_store_new(blosc2_dict_store** dstore, const uint8_t* urlpath, bl
             ds->tmpdir = tmpdir;
             ds->tmpdir_length = strlen((const char*)tmpdir);
         } else {
-            rc = blosc2_mkdir((const char*)urlpath);
+            rc = fs_mkdir((const char*)urlpath);
             if (rc < 0) {
                 BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)urlpath);
                 blosc2_dict_store_free(ds);
@@ -1382,12 +1382,12 @@ bool blosc2_dict_store_contains_key(blosc2_dict_store *dstore, const uint8_t* ke
 
     /* Keep the same key handling as get()/set()/remove(): canonical keys are
        searched as-is, non-canonical ones are normalized first. */
-    if (blosc2_key_is_canonical(key)) {
+    if (key_is_canonical(key)) {
         return hash_map_contains_key(&dstore->map, key);
     }
 
     uint8_t* normalized_key = NULL;
-    if (blosc2_key_normalize_copy(key, &normalized_key) != BLOSC2_ERROR_SUCCESS) {
+    if (key_normalize_copy(key, &normalized_key) != BLOSC2_ERROR_SUCCESS) {
         return false;
     }
     bool contains = hash_map_contains_key(&dstore->map, normalized_key);
@@ -1400,7 +1400,7 @@ int blosc2_dict_store_to_b2z(blosc2_dict_store *dstore, const uint8_t* destinati
         BLOSC_TRACE_ERROR("All parameters must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (!blosc2_string_has_extension(destination_urlpath, (const uint8_t*)"b2z")) {
+    if (!string_has_extension(destination_urlpath, (const uint8_t*)"b2z")) {
         BLOSC_TRACE_ERROR("destination_urlpath does not contain b2z as an extension");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1439,7 +1439,7 @@ int blosc2_dict_store_to_b2d(blosc2_dict_store *dstore, const uint8_t* destinati
         BLOSC_TRACE_ERROR("Every parameter must be different from NULL");
         return BLOSC2_ERROR_NULL_POINTER;
     }
-    if (!blosc2_string_has_extension(destination_urlpath, b2d_extension)) {
+    if (!string_has_extension(destination_urlpath, b2d_extension)) {
         BLOSC_TRACE_ERROR("destination_urlpath does not contain b2d as an extension");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -1560,7 +1560,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** dstore, void* buffer, size
             goto cleanup;
         }
 
-        error_code = blosc2_string_remove_extension_inplace(filename);
+        error_code = string_remove_extension_inplace(filename);
         if (error_code != 0) {
             BLOSC_TRACE_ERROR("Could not remove extension to %s", (const char*)filename);
             free(filename);
@@ -1568,7 +1568,7 @@ int blosc2_dict_store_from_buffer(blosc2_dict_store** dstore, void* buffer, size
         }
 
         size_t out_length = 0;
-        error_code = blosc2_key_normalize_inplace(filename, &out_length);
+        error_code = key_normalize_inplace(filename, &out_length);
         // filename is not NULL
         if (error_code == BLOSC2_ERROR_INVALID_PARAM) {
             BLOSC_TRACE_ERROR("Parameter is not valid, ignoring...");
@@ -1629,9 +1629,9 @@ int blosc2_dict_store_get(blosc2_dict_store* dstore, const uint8_t* key, blosc2_
 
     error_code = BLOSC2_ERROR_SUCCESS;
     b2_ds_value* value = NULL;
-    if (!blosc2_key_is_canonical(key)) {
+    if (!key_is_canonical(key)) {
         uint8_t* processed_key = NULL;
-        error_code = blosc2_key_normalize_copy(key, &processed_key);
+        error_code = key_normalize_copy(key, &processed_key);
         if (error_code < 0) {
             BLOSC_TRACE_ERROR("Could not normalize key");
             return error_code;
@@ -1688,13 +1688,13 @@ int blosc2_dict_store_set( blosc2_dict_store* ds, const uint8_t* key, blosc2_sto
 
     // The stripped key is a malloc(ed) string that belongs to the map
     uint8_t* processed_key = NULL;
-    if (!blosc2_key_is_canonical(key)) {
-        error_code = blosc2_key_normalize_copy(key, &processed_key);
+    if (!key_is_canonical(key)) {
+        error_code = key_normalize_copy(key, &processed_key);
         if (error_code != 0) {
             return error_code;
         }
     } else {
-        error_code = blosc2_string_duplicate(key, &processed_key);
+        error_code = string_duplicate(key, &processed_key);
         if (error_code != 0) {
             return error_code;
         }
@@ -1762,7 +1762,7 @@ int blosc2_dict_store_remove( blosc2_dict_store* ds, const uint8_t* key ) {
     // EmbedStore END
 
     uint8_t* processed_key;
-    error_code = blosc2_key_normalize_copy(key, &processed_key);
+    error_code = key_normalize_copy(key, &processed_key);
     if (error_code != BLOSC2_ERROR_SUCCESS) {
         BLOSC_TRACE_ERROR("Could not process and validate key");
         return error_code;

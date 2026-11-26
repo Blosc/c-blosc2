@@ -312,12 +312,12 @@ cleanup:
 static int s_embed_save_remote(embed_store* estore, const uint8_t* key, const uint8_t* urlbase, const uint8_t* path) {
     b2_es_value val = {0};
     val.tag = BLOSC2_STORE_VALUE_REMOTE;
-    int rc = blosc2_string_duplicate(urlbase, &val.f_remote.urlbase);
+    int rc = string_duplicate(urlbase, &val.f_remote.urlbase);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to duplicate urlbase");
         return rc;
     }
-    rc = blosc2_string_duplicate(path, &val.f_remote.path);
+    rc = string_duplicate(path, &val.f_remote.path);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not allocate memory to duplicate path");
         free(val.f_remote.urlbase);
@@ -694,7 +694,7 @@ int64_t blosc2_embed_store_to_file(blosc2_embed_store* estore, const uint8_t* ur
     }
 
     int rc = BLOSC2_ERROR_SUCCESS;
-    rc = blosc2_atomic_schunk_write((const char*)urlpath, estore->schunk, estore->schunk->storage->urlpath == NULL);
+    rc = fs_atomic_schunk_write((const char*)urlpath, estore->schunk, estore->schunk->storage->urlpath == NULL);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not write EmbedStore atomically");
     }

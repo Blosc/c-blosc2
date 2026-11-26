@@ -15,7 +15,7 @@ Blosc - Blocked Shuffling and Compression Library
 #include <stdlib.h>
 #include <string.h>
 
-bool blosc2_string_check_dirs_are_extensionless(const uint8_t* path) {
+bool string_check_dirs_are_extensionless(const uint8_t* path) {
     assert(path != NULL);
 
     const char* cpath = (const char*)path;
@@ -32,13 +32,13 @@ bool blosc2_string_check_dirs_are_extensionless(const uint8_t* path) {
     return true;
 }
 
-bool blosc2_string_has_char(const uint8_t* str, char character) {
+bool string_has_char(const uint8_t* str, char character) {
     assert(str != NULL);
 
     return character != '\0' && strchr((const char*)str, character) != NULL;
 }
 
-bool blosc2_string_has_extension(const uint8_t* str, const uint8_t* extension) {
+bool string_has_extension(const uint8_t* str, const uint8_t* extension) {
     assert(str != NULL);
     assert(extension != NULL && extension[0] != '\0');
 
@@ -49,7 +49,7 @@ bool blosc2_string_has_extension(const uint8_t* str, const uint8_t* extension) {
     return strcmp(last_dot + 1, (const char*)extension) == 0;
 }
 
-int blosc2_string_strip_set(const uint8_t* str, const uint8_t* strip_set, uint8_t** out) {
+int string_strip_set(const uint8_t* str, const uint8_t* strip_set, uint8_t** out) {
     assert(str != NULL);
     assert(strip_set != NULL && strip_set[0] != '\0');
     assert(out != NULL);
@@ -79,12 +79,12 @@ int blosc2_string_strip_set(const uint8_t* str, const uint8_t* strip_set, uint8_
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_string_strip(const uint8_t* str, uint8_t** out) {
+int string_strip(const uint8_t* str, uint8_t** out) {
     static const uint8_t whitespace[] = " ";
-    return blosc2_string_strip_set(str, whitespace, out);
+    return string_strip_set(str, whitespace, out);
 }
 
-int blosc2_string_duplicate(const uint8_t* str, uint8_t** out) {
+int string_duplicate(const uint8_t* str, uint8_t** out) {
     assert(str != NULL);
     assert(out != NULL);
 
@@ -100,7 +100,7 @@ int blosc2_string_duplicate(const uint8_t* str, uint8_t** out) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_string_get_extension(const uint8_t* str, uint8_t** out) {
+int string_get_extension(const uint8_t* str, uint8_t** out) {
     assert(str != NULL);
     assert(out != NULL);
 
@@ -123,7 +123,7 @@ int blosc2_string_get_extension(const uint8_t* str, uint8_t** out) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_string_append_extension(const uint8_t* str, const uint8_t* extension, uint8_t** out) {
+int string_append_extension(const uint8_t* str, const uint8_t* extension, uint8_t** out) {
     assert(str != NULL);
     assert(extension != NULL && extension[0] != '\0');
     assert(out != NULL);
@@ -141,7 +141,7 @@ int blosc2_string_append_extension(const uint8_t* str, const uint8_t* extension,
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_string_remove_extension_inplace(uint8_t* str) {
+int string_remove_extension_inplace(uint8_t* str) {
     assert(str != NULL);
     if (str[0] == '\0') return BLOSC2_ERROR_INVALID_PARAM;
 
@@ -152,7 +152,7 @@ int blosc2_string_remove_extension_inplace(uint8_t* str) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_string_remove_extension(const uint8_t* str, uint8_t** out) {
+int string_remove_extension(const uint8_t* str, uint8_t** out) {
     assert(str != NULL);
     assert(out != NULL);
     if (str[0] == '\0') return BLOSC2_ERROR_INVALID_PARAM;
@@ -165,7 +165,7 @@ int blosc2_string_remove_extension(const uint8_t* str, uint8_t** out) {
     }
     memcpy(out_str, str, str_size);
 
-    int rc = blosc2_string_remove_extension_inplace(out_str);
+    int rc = string_remove_extension_inplace(out_str);
     if (rc != BLOSC2_ERROR_SUCCESS) {
         free(out_str);
         return rc;
