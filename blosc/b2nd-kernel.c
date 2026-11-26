@@ -9,30 +9,28 @@
 #include <stdlib.h>
 #include <string.h>
 
-int b2nd_eval_kernel_grid(const b2nd_array_t *geometry, const me_kernel *kernel,
-                         size_t ninputs, const size_t *input_widths, size_t max_scratch,
-                         b2nd_kernel_read read, void *read_context,
-                         b2nd_kernel_write write, void *write_context, me_error *error) {
+static int eval_kernel_grid(const me_grid_spec *spec, int64_t nchunks, int64_t nblocks,
+                            size_t lanes, const me_kernel *kernel, size_t ninputs,
+                            const size_t *input_widths, size_t max_scratch, b2nd_kernel_read read,
+                            void *read_context, b2nd_kernel_write write, void *write_context,
+                            me_error *error) {
     enum { max_inputs = 128 };
     if (error != NULL) {
         memset(error, 0, sizeof(*error));
     }
     me_kernel_info kernel_info = ME_KERNEL_INFO_INITIALIZER;
-    if (geometry == NULL || geometry->sc == NULL || write == NULL ||
+    if (write == NULL ||
         ninputs > max_inputs || (ninputs && (read == NULL || input_widths == NULL)) ||
         me_describe(kernel, &kernel_info) != ME_SUCCESS ||
-        (kernel_info.context_ndim && kernel_info.context_ndim != geometry->ndim)) {
+        (kernel_info.context_ndim && kernel_info.context_ndim != spec->ndim)) {
         return BLOSC2_ERROR_INVALID_PARAM;
     }
-    if (geometry->nitems == 0) {
+    if (nchunks == 0) {
         return BLOSC2_ERROR_SUCCESS;
     }
-    if (geometry->blocknitems <= 0 || geometry->extchunknitems <= 0 ||
-        geometry->extchunknitems % geometry->blocknitems || geometry->sc->nchunks <= 0) {
+    if (nchunks < 0 || nblocks <= 0 || !lanes) {
         return BLOSC2_ERROR_INVALID_PARAM;
     }
-    const int64_t nblocks = geometry->extchunknitems / geometry->blocknitems;
-    const size_t lanes = (size_t)geometry->blocknitems;
     size_t sizes[max_inputs];
     size_t output_bytes;
     if (!blosc2_checked_mul_size(kernel_info.cardinality == ME_BLOCK_SCALAR ? 1 : lanes,
@@ -50,9 +48,7 @@ int b2nd_eval_kernel_grid(const b2nd_array_t *geometry, const me_kernel *kernel,
     }
 
     me_grid *grid = NULL;
-    me_grid_spec spec = {sizeof(spec), geometry->ndim, geometry->shape,
-                        geometry->chunkshape, geometry->blockshape};
-    me_status status = me_grid_create(&spec, &grid, error);
+    me_status status = me_grid_create(spec, &grid, error);
     if (status != ME_SUCCESS) {
         return status == ME_ERR_OOM ? BLOSC2_ERROR_MEMORY_ALLOC : BLOSC2_ERROR_INVALID_PARAM;
     }
@@ -71,7 +67,7 @@ int b2nd_eval_kernel_grid(const b2nd_array_t *geometry, const me_kernel *kernel,
         inputs[i] = (me_buffer){storage[i], sizes[i]};
     }
 
-    for (int64_t chunk = 0; chunk < geometry->sc->nchunks; chunk++) {
+    for (int64_t chunk = 0; chunk < nchunks; chunk++) {
         for (int64_t block = 0; block < nblocks; block++) {
             me_grid_block_info info = ME_GRID_BLOCK_INFO_INITIALIZER;
             if (me_grid_describe_block(grid, chunk, block, &info, error) != ME_SUCCESS ||
@@ -109,5 +105,45 @@ cleanup:
     }
     me_grid_free(grid);
     return rc;
+}
+
+int b2nd_eval_kernel_grid(const b2nd_array_t *geometry, const me_kernel *kernel,
+                         size_t ninputs, const size_t *input_widths, size_t max_scratch,
+                         b2nd_kernel_read read, void *read_context,
+                         b2nd_kernel_write write, void *write_context, me_error *error) {
+    if (error != NULL) {
+        memset(error, 0, sizeof(*error));
+    }
+    if (geometry == NULL || geometry->sc == NULL) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    if (geometry->nitems && (geometry->blocknitems <= 0 || geometry->extchunknitems <= 0 ||
+        geometry->extchunknitems % geometry->blocknitems || geometry->sc->nchunks <= 0)) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    me_grid_spec spec = {sizeof(spec), geometry->ndim, geometry->shape,
+                        geometry->chunkshape, geometry->blockshape};
+    int64_t nchunks = geometry->nitems ? geometry->sc->nchunks : 0;
+    int64_t nblocks = nchunks ? geometry->extchunknitems / geometry->blocknitems : 0;
+    return eval_kernel_grid(&spec, nchunks, nblocks, (size_t)geometry->blocknitems, kernel,
+                            ninputs, input_widths, max_scratch, read, read_context, write, write_context, error);
+}
+
+int b2nd_eval_kernel_partitions_1d(int64_t size, int32_t partition, const me_kernel *kernel,
+                                 size_t ninputs, const size_t *input_widths, size_t max_scratch,
+                                 b2nd_kernel_read read, void *read_context,
+                                 b2nd_kernel_write write, void *write_context, me_error *error) {
+    if (size < 0 || partition <= 0) {
+        if (error != NULL) {
+            memset(error, 0, sizeof(*error));
+        }
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    /* One virtual chunk and one block per logical partition. Storage
+     * geometry is known only to the callbacks and cannot change grouping. */
+    me_grid_spec spec = {sizeof(spec), 1, &size, &partition, &partition};
+    int64_t groups = size / partition + (size % partition != 0);
+    return eval_kernel_grid(&spec, groups, 1, (size_t)partition, kernel, ninputs, input_widths,
+                            max_scratch, read, read_context, write, write_context, error);
 }
 #endif

@@ -24,4 +24,11 @@ int b2nd_eval_kernel_grid(const b2nd_array_t *geometry, const me_kernel *kernel,
                          b2nd_kernel_read read, void *read_context,
                          b2nd_kernel_write write, void *write_context, me_error *error);
 
+/* Internal logical-grid pilot. Each nonempty group is one callback chunk
+ * with block index zero, including a possibly short final group. */
+int b2nd_eval_kernel_partitions_1d(int64_t size, int32_t partition, const me_kernel *kernel,
+                                 size_t ninputs, const size_t *input_widths, size_t max_scratch,
+                                 b2nd_kernel_read read, void *read_context,
+                                 b2nd_kernel_write write, void *write_context, me_error *error);
+
 #endif

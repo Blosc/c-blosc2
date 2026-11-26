@@ -9,7 +9,7 @@
 typedef struct {
     const b2nd_array_t *array;
     int reads, writes;
-    bool scalar, fail_read;
+    bool scalar, fail_read, logical;
 } fixture;
 
 static int read_block(void *context, size_t input, int64_t chunk, int64_t block,
@@ -17,7 +17,8 @@ static int read_block(void *context, size_t input, int64_t chunk, int64_t block,
     (void)chunk;
     (void)block;
     fixture *state = context;
-    if (input != 0 || info->ndim != 1 || !info->valid_nitems || info->padded_nitems != 2) {
+    if (input != 0 || info->ndim != 1 || !info->valid_nitems ||
+        info->padded_nitems != (state->logical ? 3 : 2)) {
         return BLOSC2_ERROR_INVALID_PARAM;
     }
     state->reads++;
@@ -34,6 +35,14 @@ static int write_block(void *context, int64_t chunk, int64_t block,
                        const me_grid_block_info *info, me_buffer result) {
     fixture *state = context;
     const double *values = result.data;
+    if (state->logical) {
+        const double sums[] = {3, 12, 6};
+        if (block != 0 || chunk < 0 || chunk >= 3 || chunk != state->writes++ ||
+            result.capacity != sizeof(double)) {
+            return BLOSC2_ERROR_INVALID_PARAM;
+        }
+        return values[0] == sums[chunk] ? 0 : BLOSC2_ERROR_FAILURE;
+    }
     if (chunk * 3 + block != state->writes++ ||
         result.capacity != (state->scalar ? 1 : 2) * sizeof(double)) {
         return BLOSC2_ERROR_INVALID_PARAM;
@@ -83,6 +92,15 @@ int main(void) {
         CHECK(b2nd_eval_kernel_grid(array, kernel, 1, &width, budget,
             read_block, &state, write_block, &state, NULL) == BLOSC2_ERROR_READ_BUFFER);
         CHECK(state.reads == 1 && state.writes == 0);
+        if (scalar) {
+            state = (fixture){.array = array, .scalar = true, .logical = true};
+            CHECK(b2nd_eval_kernel_partitions_1d(7, 3, kernel, 1, &width, 4 * width - 1,
+                read_block, &state, write_block, &state, NULL) == BLOSC2_ERROR_INVALID_PARAM);
+            CHECK(state.reads == 0 && state.writes == 0);
+            CHECK(b2nd_eval_kernel_partitions_1d(7, 3, kernel, 1, &width, 4 * width,
+                read_block, &state, write_block, &state, NULL) == 0);
+            CHECK(state.reads == 3 && state.writes == 3);
+        }
         me_kernel_free(kernel);
     }
     b2nd_free(array);
