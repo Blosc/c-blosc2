@@ -20,20 +20,26 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <dirent.h>
 #include <libgen.h>
+#include <time.h>
 
 #include <string_manipulation.h>
 #include "blosc-checked.h"
 
+#define MY_MKDTEMP_MAX_ATTEMPTS 10
+
 #if defined(_WIN32) || defined (__MINGW32__)
 #include <direct.h>
+#include <process.h>
 #define MKDIR(path) _mkdir(path)
 #define STAT(filename, buf) _stat(filename, buf)
+#define GETPID() _getpid()
 typedef struct _stat struct stat;
 #else
+#include <unistd.h>
 #define MKDIR(path) mkdir(path, 0700)
 #define STAT(filename, buf) stat(filename, buf)
+#define GETPID() getpid()
 #endif
 
 int fs_mkdir(const char* path) {
@@ -213,7 +219,7 @@ int fs_create_dir_recursive(const char* dir_path) {
 
     size_t dir_path_size = strlen(dir_path) + 1;
     if (dir_path_size >= PATH_MAX) {
-        BLOSC_TRACE_ERROR("Fiel ");
+        BLOSC_TRACE_ERROR("dir_path too large ");
         return BLOSC2_ERROR_INVALID_PARAM;
     }
     char tmp[PATH_MAX];
@@ -229,7 +235,7 @@ int fs_create_dir_recursive(const char* dir_path) {
 
             if (stat(tmp, &st) != 0) {
                 if (errno == ENOENT) {
-                    mkdir(tmp, 0700);
+                    MKDIR(tmp);
                 } else {
                     BLOSC_TRACE_ERROR("Could not create directory");
                     return BLOSC2_ERROR_FILE_OPEN;
@@ -303,6 +309,72 @@ int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
+
+// This function is a reimplementation of mkdtemp from POSIX, it is needed in case Clang is defined
+// as a C compiler
+BLOSC_ATTRIBUTE_UNUSED
+static int my_mkdtemp(char* template) {
+    static const char alphabet[] = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const size_t nchars = sizeof(alphabet) - 1;
+    static unsigned long counter = 0;
+
+    if (template == NULL) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    size_t len = strlen(template);
+    if (len < 6 || strcmp(template + len - 6, "XXXXXX") != 0) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+    char* suffix = template + len - 6;
+
+    uint64_t state = (uint64_t)time(NULL)
+                   ^ ((uint64_t)GETPID() << 32)
+                   ^ (uint64_t)(uintptr_t)template;
+
+    for (int attempt = 0; attempt < MY_MKDTEMP_MAX_ATTEMPTS; attempt++) {
+        for (int i = 0; i < 6; i++) {
+            state = state * 6364136223846793005ULL + 1442695040888963407ULL + counter++;
+            suffix[i] = alphabet[(size_t)((state >> 33) % nchars)];
+        }
+
+        errno = 0;
+        if (MKDIR(template) == 0) {
+            return BLOSC2_ERROR_SUCCESS;
+        }
+        if (errno != EEXIST) {
+            /* Fallo real (permisos, ruta inexistente, disco de solo lectura...) */
+            memcpy(suffix, "XXXXXX", 6);
+            return BLOSC2_ERROR_FILE_OPEN;
+        }
+        /* El nombre ya existía: se reintenta con otro sufijo. */
+    }
+
+    memcpy(suffix, "XXXXXX", 6);
+    return BLOSC2_ERROR_FILE_OPEN;
+}
+
+static int mkdtemp_wrap(char* template) {
+#if  defined(__clang__)
+    return my_mkdtemp(template);
+#elif defined(__GNUC__)
+    if (mkdtemp(template) == NULL) {
+        int err = errno;
+        switch (err) {
+        case ENOSPC:
+        case EDQUOT: {
+            BLOSC_TRACE_ERROR("There is no space left to create the directory");
+            return BLOSC2_ERROR_FILE_WRITE;
+        }
+        default: {
+            BLOSC_TRACE_ERROR("Unexpected error, could not create temporal directory");
+            return BLOSC2_ERROR_FAILURE;
+        }
+        }
+    }
+    return BLOSC2_ERROR_SUCCESS;
+#endif
+}
+
 int fs_create_tmp_dir(char** ptmpdir_path) {
     assert(ptmpdir_path != NULL);
 
@@ -315,20 +387,11 @@ int fs_create_tmp_dir(char** ptmpdir_path) {
     }
     memcpy(path, template, template_length + 1);
 
-    if (mkdtemp(path) == NULL) {
-        int err = errno;
+    int rc = mkdtemp_wrap(path);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not create temporal directory");
         free(path);
-        switch (err) {
-        case ENOSPC:
-        case EDQUOT: {
-            BLOSC_TRACE_ERROR("There is no space left to create the directory");
-            return BLOSC2_ERROR_FILE_WRITE;
-        }
-        default: {
-            BLOSC_TRACE_ERROR("Unexpected error, could not create temporal directory");
-            return BLOSC2_ERROR_FAILURE;
-        }
-        }
+        return rc;
     }
 
     char* abs_path = realpath(path, NULL);
