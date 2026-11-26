@@ -85,6 +85,14 @@ typedef struct {
     size_t output_items;
 } b2nd_exec_schedule_info;
 
+typedef struct {
+    size_t tiles;
+    size_t map_calls;
+    size_t direct_tiles;
+    size_t mapped_bytes;
+    me_fp_status fp;
+} b2nd_exec_report;
+
 /* Prepare copies all retained descriptor data and owns its kernel. Metadata
  * specialization reads no input values. Schedules BORROW plans: destroy every
  * schedule before its plan. Independent calls share no mutable scratch. */
@@ -98,6 +106,14 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
                               b2nd_exec_schedule **out, me_error *error);
 me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule,
                                      b2nd_exec_schedule_info *out);
+/* Native, aligned, contiguous, disjoint buffers in slot order. Reduction
+ * output is published only on success; map output may contain earlier tiles
+ * on failure. Buffers/report/options are invocation-local and never retained.
+ * mapped_bytes excludes core evaluation/compiler allocation. */
+me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
+                            const me_buffer *inputs, size_t ninputs,
+                            me_mut_buffer output, unsigned raise_mask,
+                            b2nd_exec_report *report, me_error *error);
 void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule);
 void b2nd_exec_plan_free(b2nd_exec_plan *plan);
 

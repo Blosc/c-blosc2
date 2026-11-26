@@ -3,7 +3,9 @@
   License: BSD 3-Clause (see LICENSE.txt)
 **********************************************************************/
 #include "b2nd-exec.h"
+#include "miniexpr_reduce.h"
 
+#include <fenv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,13 +37,7 @@ static me_status exec_error(me_error *error, me_status status, const char *messa
 /* Descriptor admission only: arithmetic inference remains in the typed core.
  * Strings/complex extrema are deliberately not admitted by this first slice. */
 static size_t numeric_width(me_dtype dtype) {
-    switch (dtype) {
-        case ME_BOOL: case ME_INT8: case ME_UINT8: return 1;
-        case ME_INT16: case ME_UINT16: return 2;
-        case ME_INT32: case ME_UINT32: case ME_FLOAT32: return 4;
-        case ME_INT64: case ME_UINT64: case ME_FLOAT64: return 8;
-        default: return 0;
-    }
+    return me_extrema_itemsize(dtype);
 }
 
 static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
@@ -112,6 +108,44 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
     return ME_SUCCESS;
 }
 
+static bool emit_text(char *source, size_t capacity, size_t *used, const char *text) {
+    size_t length = strlen(text);
+    if (length >= capacity - *used) {
+        return false;
+    }
+    memcpy(source + *used, text, length + 1);
+    *used += length;
+    return true;
+}
+
+/* Inline single-use arithmetic into one fused expression. Only shared
+ * computed nodes need temporaries: blindly expanding a DAG is exponential,
+ * while assigning every input/capture inhibits core batch fusion. */
+static bool emit_map(char *source, size_t capacity, size_t *used,
+                     const b2nd_exec_node *nodes, const unsigned *uses,
+                     uint32_t id, bool definition) {
+    const b2nd_exec_node *n = &nodes[id];
+    char name[24];
+    if (n->op == B2ND_EXEC_INPUT || n->op == B2ND_EXEC_CAPTURE || (uses[id] > 1 && !definition)) {
+        snprintf(name, sizeof(name), "%c%u",
+            n->op == B2ND_EXEC_INPUT ? 'i' : n->op == B2ND_EXEC_CAPTURE ? 'c' : 'v',
+            n->op == B2ND_EXEC_INPUT ? n->slot : id);
+        return emit_text(source, capacity, used, name);
+    }
+    if (!emit_text(source, capacity, used, n->op == B2ND_EXEC_NEGATE ? "(-" : "(") ||
+        !emit_map(source, capacity, used, nodes, uses, n->args[0], false)) {
+        return false;
+    }
+    if (n->nargs == 2) {
+        const char *op = n->op == B2ND_EXEC_ADD ? " + " : n->op == B2ND_EXEC_SUBTRACT ? " - " : " * ";
+        if (!emit_text(source, capacity, used, op) ||
+            !emit_map(source, capacity, used, nodes, uses, n->args[1], false)) {
+            return false;
+        }
+    }
+    return emit_text(source, capacity, used, ")");
+}
+
 void b2nd_exec_plan_free(b2nd_exec_plan *plan) {
     if (plan) {
         me_kernel_free(plan->kernel);
@@ -158,11 +192,13 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     uint32_t map = plan->info.reduction ? d->nodes[d->root].args[0] : d->root;
     plan->info.identity = d->nodes[map].op == B2ND_EXEC_INPUT;
     bool reachable[B2ND_EXEC_MAX_NODES] = {0};
+    unsigned uses[B2ND_EXEC_MAX_NODES] = {0};
     reachable[map] = true;
     for (size_t i = d->nnodes; i-- > 0;) {
         if (reachable[i]) {
             for (size_t a = 0; a < d->nodes[i].nargs; a++) {
                 reachable[d->nodes[i].args[a]] = true;
+                uses[d->nodes[i].args[a]]++;
             }
         }
     }
@@ -201,30 +237,24 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         }
     }
     used += (size_t)snprintf(source + used, capacity - used, "):\n");
-    for (size_t i = 0; i < d->nnodes; i++) {
-        const b2nd_exec_node *n = &plan->nodes[i];
-        if (!reachable[i]) {
-            continue;
-        }
-        switch (n->op) {
-            case B2ND_EXEC_INPUT:
-                used += (size_t)snprintf(source + used, capacity - used, "    v%zu = i%u\n", i, n->slot);
-                break;
-            case B2ND_EXEC_CAPTURE:
-                used += (size_t)snprintf(source + used, capacity - used, "    v%zu = c%zu\n", i, i);
-                break;
-            case B2ND_EXEC_NEGATE:
-                used += (size_t)snprintf(source + used, capacity - used, "    v%zu = -v%u\n", i, n->args[0]);
-                break;
-            case B2ND_EXEC_ADD: case B2ND_EXEC_SUBTRACT: case B2ND_EXEC_MULTIPLY:
-                used += (size_t)snprintf(source + used, capacity - used, "    v%zu = v%u %c v%u\n",
-                    i, n->args[0], n->op == B2ND_EXEC_ADD ? '+' : n->op == B2ND_EXEC_SUBTRACT ? '-' : '*',
-                    n->args[1]);
-                break;
-            case B2ND_EXEC_MIN: break;
+    bool emitted = true;
+    for (size_t i = 0; i < d->nnodes && emitted; i++) {
+        if (reachable[i] && uses[i] > 1 && d->nodes[i].nargs) {
+            char prefix[32];
+            snprintf(prefix, sizeof(prefix), "    v%zu = ", i);
+            emitted = emit_text(source, capacity, &used, prefix) &&
+                emit_map(source, capacity, &used, d->nodes, uses, (uint32_t)i, true) &&
+                emit_text(source, capacity, &used, "\n");
         }
     }
-    snprintf(source + used, capacity - used, "    return v%u\n", map);
+    emitted = emitted && emit_text(source, capacity, &used, "    return ") &&
+        emit_map(source, capacity, &used, d->nodes, uses, map, false) &&
+        emit_text(source, capacity, &used, "\n");
+    if (!emitted) {
+        free(source);
+        b2nd_exec_plan_free(plan);
+        return exec_error(error, ME_ERR_INVALID_ARG, "Execution map lowering exceeded source bound");
+    }
     me_signature signature = ME_SIGNATURE_INITIALIZER;
     signature.inputs = inputs;
     signature.ninputs = d->ninputs;
@@ -332,4 +362,128 @@ me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule, b2nd_e
 
 void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule) {
     free(schedule);
+}
+
+static bool valid_extent(const void *data, size_t capacity, size_t bytes, size_t alignment) {
+    return capacity >= bytes && (!bytes ||
+        (data && (uintptr_t)data % alignment == 0 && (uintptr_t)data <= UINTPTR_MAX - bytes));
+}
+
+static unsigned fp_flags(void) {
+    int flags = fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW);
+    return ((flags & FE_INVALID) ? ME_FP_INVALID : 0) |
+        ((flags & FE_DIVBYZERO) ? ME_FP_DIVIDE : 0) |
+        ((flags & FE_OVERFLOW) ? ME_FP_OVERFLOW : 0) |
+        ((flags & FE_UNDERFLOW) ? ME_FP_UNDERFLOW : 0);
+}
+
+me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
+                            const me_buffer *inputs, size_t ninputs,
+                            me_mut_buffer output, unsigned raise_mask,
+                            b2nd_exec_report *report, me_error *error) {
+    if (report) {
+        *report = (b2nd_exec_report){0};
+    }
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!schedule || !inputs || !report || ninputs != schedule->plan->info.ninputs ||
+        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
+    }
+    const b2nd_exec_plan *plan = schedule->plan;
+    size_t items = schedule->info.nitems;
+    size_t width = plan->info.itemsize;
+    size_t output_bytes = schedule->info.output_items * width;
+    if (!valid_extent(output.data, output.capacity, output_bytes, width)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent or alignment");
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        size_t bytes = items * schedule->inputs[i].itemsize;
+        if (!valid_extent(inputs[i].data, inputs[i].capacity, bytes, schedule->inputs[i].itemsize)) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input extent or alignment");
+        }
+        if (bytes && output_bytes &&
+            (uintptr_t)inputs[i].data < (uintptr_t)output.data + output_bytes &&
+            (uintptr_t)output.data < (uintptr_t)inputs[i].data + bytes) {
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Aliased execution output is not yet supported");
+        }
+    }
+    void *mapped = schedule->info.mapped_bytes ? malloc(schedule->info.mapped_bytes) : NULL;
+    if (schedule->info.mapped_bytes && !mapped) {
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution mapped tile");
+    }
+    report->mapped_bytes = schedule->info.mapped_bytes;
+    uint32_t map = plan->info.reduction ? plan->nodes[plan->root].args[0] : plan->root;
+    uint32_t direct_slot = plan->info.identity ? plan->nodes[map].slot : 0;
+    uint64_t best = 0;
+    me_status status = ME_SUCCESS;
+    /* Only floating reduction arithmetic needs a host FP scope. Integer
+     * identity reductions deliberately avoid probing floating-point status. */
+    bool floating = plan->info.reduction &&
+        (plan->info.dtype == ME_FLOAT32 || plan->info.dtype == ME_FLOAT64);
+    fenv_t saved;
+    bool scoped = floating && feholdexcept(&saved) == 0;
+    if (floating && !scoped) {
+        free(mapped);
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Cannot isolate execution floating-point status");
+    }
+    bool fp_seen = false;
+    for (size_t pos = 0; pos < items;) {
+        size_t count = items - pos < schedule->info.tile_items ?
+            items - pos : schedule->info.tile_items;
+        const void *values;
+        if (plan->info.identity) {
+            values = (const unsigned char *)inputs[direct_slot].data + pos * width;
+            report->direct_tiles++;
+        } else {
+            me_buffer spans[B2ND_EXEC_MAX_INPUTS];
+            for (size_t i = 0; i < ninputs; i++) {
+                size_t input_width = schedule->inputs[i].itemsize;
+                spans[i] = (me_buffer){
+                    (const unsigned char *)inputs[i].data + pos * input_width, count * input_width};
+            }
+            me_block block = ME_BLOCK_INITIALIZER;
+            block.nitems = count;
+            me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
+            me_fp_status fp = {0};
+            options.fp_status = &fp;
+            options.raise_mask = raise_mask;
+            status = me_eval_block(plan->kernel, spans, ninputs,
+                (me_mut_buffer){mapped, schedule->info.mapped_bytes}, &block, &options, error);
+            report->fp.flags |= fp.flags;
+            report->fp.supported = fp_seen ? report->fp.supported && fp.supported : fp.supported;
+            fp_seen = true;
+            if (status != ME_SUCCESS) {
+                break;
+            }
+            report->map_calls++;
+            values = mapped;
+        }
+        if (plan->info.reduction) {
+            if (!me_extrema_span(plan->info.dtype, values, count, best, pos != 0, true, &best)) {
+                status = exec_error(error, ME_ERR_EVAL, "Execution minimum failed");
+                break;
+            }
+        } else {
+            memcpy((unsigned char *)output.data + pos * width, values, count * width);
+        }
+        report->tiles++;
+        pos += count;
+    }
+    if (scoped) {
+        report->fp.flags |= fp_flags();
+        report->fp.supported = fp_seen ? report->fp.supported : true;
+        if (fesetenv(&saved) != 0 && status == ME_SUCCESS) {
+            status = exec_error(error, ME_ERR_UNSUPPORTED, "Cannot restore execution floating-point status");
+        }
+    }
+    free(mapped);
+    if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
+        status = exec_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
+    }
+    if (status == ME_SUCCESS && plan->info.reduction) {
+        memcpy(output.data, &best, width);
+    }
+    return status;
 }

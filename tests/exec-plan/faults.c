@@ -40,5 +40,28 @@ int main(void) {
     assert(b2nd_exec_specialize(plan, &meta, 1, 8, 0, &schedule, &error) == ME_ERR_OOM);
     assert(!schedule);
     b2nd_exec_plan_free(plan);
+
+    b2nd_exec_node nodes[2] = {node, {0}};
+    nodes[1].struct_size = sizeof(node);
+    nodes[1].id = 1;
+    nodes[1].op = B2ND_EXEC_NEGATE;
+    nodes[1].nargs = 1;
+    d.nodes = nodes;
+    d.nnodes = 2;
+    d.root = 1;
+    fail_at = 0;
+    assert(b2nd_exec_prepare(&d, NULL, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_specialize(plan, &meta, 1, 8, 64, &schedule, &error) == ME_SUCCESS);
+    int64_t values[17] = {0}, output[17];
+    memset(output, 0x55, sizeof(output));
+    me_buffer input = {values, sizeof(values)};
+    b2nd_exec_report report;
+    allocations = 0;
+    fail_at = 1;
+    assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){output, sizeof(output)},
+        0, &report, &error) == ME_ERR_OOM);
+    assert(!report.tiles && ((unsigned char *)output)[0] == 0x55);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
     return 0;
 }

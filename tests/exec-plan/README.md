@@ -14,6 +14,15 @@ Input values, callbacks and outputs are not part of preparation/specialization.
 The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
+The serial executor binds native aligned contiguous buffers in slot order.
+Computed maps use one bounded mapped tile; proven identity maps read their
+declared input slot directly without a kernel call. Minimum results publish
+only after success. Map results may contain completed tiles after a later
+failure. Buffer capacities, pointer overflow and output disjointness are
+validated before allocation/evaluation. Reports distinguish traversal tiles,
+map calls, identity tiles, mapped scratch and reducer state; compiler/core
+allocation is not included in the mapped-tile bound.
+
 Build/install miniexpr with `MINIEXPR_BUILD_ARTIFACT=OFF`, then:
 
 ```sh
