@@ -88,6 +88,7 @@ static const uint8_t* wrong_archive_path = (const uint8_t*)"archive.zip";
 
 static const uint8_t* dir_path = (const uint8_t*)"dir.b2d";
 static const uint8_t* wrong_dir_path = (const uint8_t*)"dir";
+static const int64_t threshold = 64;
 
 static uint8_t buffer[SCHUNKS_SIZE][SCHUNKS_SIZE * SCHUNKS_SIZE];
 
@@ -708,7 +709,6 @@ static char* test_dict_store_to_b2d(void) {
 
 static char* test_dict_store_embed_basic(void) {
 
-    int64_t threshold = 64;
     int rc = blosc2_dict_store_new(&ds, NULL, NULL, threshold);
     mu_assert("ERROR: The DictStore should have been created", rc == 0);
     mu_assert("ERROR: The DictStore's inner EmbedStore should have been created", ds->estore != NULL);
@@ -777,7 +777,6 @@ static char* test_dict_store_embed_basic(void) {
 
 static char* test_dict_store_embed_b2z(void) {
 
-    int64_t threshold = 64;
     int rc = blosc2_dict_store_new(&ds, archive_path, NULL, threshold);
     mu_assert("ERROR: Could not create DictStore", rc == 0);
     mu_assert("ERROR: DictStore is NULL when it shouldn't", ds != NULL);
@@ -822,6 +821,63 @@ static char* test_dict_store_embed_b2z(void) {
     return NULL;
 }
 
+static char* test_dict_store_embed_b2d(void) {
+
+    const uint8_t* key = (const uint8_t*)"/key";
+    int rc = blosc2_dict_store_new(&ds, dir_path, NULL, threshold);
+    mu_assert("ERROR: Could not create DictStore", rc == 0);
+    mu_assert("ERROR: DictStore is NULL when it shouldn't", ds != NULL);
+    mu_assert("ERROR: An EmbedStore should have been created", ds->estore != NULL);
+    mu_assert("ERROR: Threshold has a wrong value", threshold == ds->threshold);
+
+    const uint8_t* urlbase = (const uint8_t*)"urlbase";
+    const uint8_t* path = (const uint8_t*)"path";
+
+    blosc2_store_value value = {0};
+    value.tag = BLOSC2_STORE_VALUE_REMOTE;
+    value.remote.urlbase = (uint8_t*)urlbase;
+    value.remote.path = (uint8_t*)path;
+
+    rc = blosc2_dict_store_set(ds, key, &value);
+    mu_assert("ERROR: Could not insert remote value in DictStore", rc == 0);
+
+    for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
+        rc = blosc2_dict_store_set(ds, (const uint8_t*)paths[i], &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
+        mu_assert("ERROR: Could not set SChunk in DictStore", rc == 0);
+    }
+    mu_assert("ERROR: DictStore's length is wrong", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE + 1);
+
+    rc = blosc2_dict_store_close(ds);
+    mu_assert("ERROR: Could not close DicStore B2D with inner EmbedStore", rc == 0);
+    blosc2_dict_store_free(ds);
+
+    const blosc2_store_open_mode modes[] = {
+        BLOSC2_STORE_OPEN_MODE_RDONLY,
+        BLOSC2_STORE_OPEN_MODE_RDWR
+    };
+    size_t len = sizeof(modes) / sizeof(blosc2_store_open_mode);
+
+    for (size_t i = 0; i < len; i+=1) {
+        blosc2_store_open_mode mode = modes[i];
+        rc = blosc2_dict_store_open(&ds, dir_path, mode);
+        mu_assert("ERROR: Could not open DictStore B2D with inner EmbedStore", rc == 0);
+        mu_assert("ERROR: DictStore should have an inner EmbedStore", ds->estore != NULL);
+        mu_assert("ERROR: EmbedStore should have the same open mode as DictStore", ds->mode == ds->estore->mode);
+        mu_assert("ERROR: DictStore's threshold should be 0", ds->threshold == 0);
+        mu_assert("ERROR: DictStore's length is wrong", blosc2_dict_store_get_length(ds) == SCHUNKS_SIZE + 1);
+
+        memset(&value, 0, sizeof(value));
+        rc = blosc2_dict_store_get(ds, key, &value);
+        mu_assert("ERROR: Could not get SChunk from the inner EmbedStore", rc == 0);
+        mu_assert("ERROR: The value is invalid", value.tag == BLOSC2_STORE_VALUE_REMOTE);
+        rc = blosc2_dict_store_close(ds);
+        mu_assert("ERROR: Couldn't close DictStore", rc == 0);
+        blosc2_dict_store_free(ds);
+    }
+    ds = NULL; // Put this, so teardown does not attempt to free ds
+    return NULL;
+}
+
 static char* all_tests(void) {
     /* Tests when the dict_store data structure only stores data in memory */
     RUN_TEST(test_dict_store_new_memory);
@@ -853,6 +909,8 @@ static char* all_tests(void) {
     RUN_TEST(test_dict_store_embed_basic);
 
     RUN_TEST(test_dict_store_embed_b2z);
+
+    RUN_TEST(test_dict_store_embed_b2d);
 
     return EXIT_SUCCESS;
 }

@@ -23,7 +23,7 @@ int blosc2_create_dir_recursive(const char* dir_path);
 int blosc2_create_dir_recursive_check_extension_paths(const char* dir_path);
 
 int blosc2_sync_parent_dir(const char* path);
-int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk);
+int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp);
 
 int blosc2_path_verify_rel(const char* path);
 const char* blosc2_path_join(const char* p, const char* q);

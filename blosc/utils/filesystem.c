@@ -431,7 +431,7 @@ int blosc2_sync_parent_dir(const char* path) {
     return error_code;
 }
 
-int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
+int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp) {
     const char* tmp_file_path = NULL;
     int error_code = 0;
     bool tmp_exists = true;
@@ -441,6 +441,9 @@ int blosc2_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
         BLOSC_TRACE_ERROR("Could not create temporal file at %s", path);
         error_code = fd;
         goto cleanup;
+    }
+    if (!create_tmp) {
+        remove(tmp_file_path);
     }
 
 

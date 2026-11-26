@@ -51,7 +51,7 @@ static const size_t s_V1_length = 3;
 
 static bool s_str_in_array(const uint8_t* candidate, const uint8_t** arr, size_t arr_size) {
     for (size_t i = 0; i < arr_size; i+=1) {
-        if (strcmp((const char*)candidate, (const uint8_t*)arr[i]) == 0) {
+        if (strcmp((const char*)candidate, (const char*)arr[i]) == 0) {
             return true;
         }
     }
@@ -101,6 +101,8 @@ static int s_open_msgpack(const char* packed_file, uint8_t** out_buffer, size_t*
     close(fd);
     return BLOSC2_ERROR_SUCCESS;
 }
+
+BLOSC_ATTRIBUTE_UNUSED
 static int s_write_msgpack(const char* destination_file, const uint8_t* packed_buffer, size_t packed_buffer_size) {
     FILE* file = fopen(destination_file, "wb");
     fwrite(packed_buffer, sizeof(uint8_t), packed_buffer_size, file);
@@ -241,12 +243,12 @@ static char* test_embed_store_open_v2_readwrite() {
     // Reopen in read-only mode and check that the change was persisted
     rc = blosc2_embed_store_open(&es, (const uint8_t*)packed_file_v2, BLOSC2_STORE_OPEN_MODE_RDONLY);
     mu_assert("ERROR: Could not reopen the v2 embed store", rc == 0);
-    mu_assert("ERROR: The new key was not persisted", blosc2_embed_store_contains_key(es, "/new_key"));
+    mu_assert("ERROR: The new key was not persisted", blosc2_embed_store_contains_key(es, (const uint8_t*)"/new_key"));
     mu_assert("ERROR: The reopened v2 embed store's length is not the expected",
               blosc2_embed_store_get_length(es) == KEYS_LENGTH + 1);
 
     blosc2_store_value item;
-    rc = blosc2_embed_store_get(es, "/new_key", &item);
+    rc = blosc2_embed_store_get(es, (const uint8_t*)"/new_key", &item);
     mu_assert("ERROR: Could not get the newly added key's value", rc == 0);
     mu_assert("ERROR: Item tag should be LOCAL", item.tag == BLOSC2_STORE_VALUE_SCHUNK);
     mu_assert("ERROR: The newly added key's schunk is NULL", item.schunk != NULL);
@@ -429,28 +431,6 @@ static char* test_serialize_embed_store() {
     //s_write_msgpack("wrote.msgpack", packed_buffer, packed_size);
     free(packed_buffer);
     return NULL;
-}
-
-static void s_print_embed_store(blosc2_embed_store* estore) {
-    blosc2_embed_store_iter* iter = blosc2_embed_store_iter_new(estore);
-
-    while (blosc2_embed_store_iter_next(iter)) {
-        const uint8_t* key = blosc2_embed_store_iter_get_key(iter);
-        blosc2_store_value item = {0};
-        blosc2_embed_store_iter_get_container(iter, &item);
-        printf("Key: '%s'\n", (const char*)key);
-        if (item.tag == BLOSC2_STORE_VALUE_SCHUNK) {
-            printf("Local value\n");
-            if (item.schunk != NULL) {
-                blosc2_schunk_free(item.schunk);
-            }
-        } else if (item.tag == BLOSC2_STORE_VALUE_REMOTE) {
-            printf("urlbase: '%s'\n", (const char*)item.remote.urlbase);
-            printf("path: '%s'\n", (const char*)item.remote.path);
-        } else {
-            printf("Could not identify tag\n");
-        }
-    }
 }
 
 // Deserializes the canonical v2 fixture and re-serializes it, comparing the result against the

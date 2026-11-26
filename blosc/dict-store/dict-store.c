@@ -129,7 +129,7 @@ static int s_add_extension_to_key( const uint8_t* key, blosc2_schunk *container,
     return BLOSC2_ERROR_SUCCESS;
 }
 
-static int s_get_storage_type_from_extension(const uint8_t* urlpath) {
+static b2_ds_storage_type s_get_storage_type_from_extension(const uint8_t* urlpath) {
     if (blosc2_string_has_extension(urlpath, b2z_extension)) {
         return B2_DS_B2Z;
     }
@@ -196,9 +196,10 @@ static int s_zip_write_all_pairs(const dict_store *ds, zip_archive *za) {
 }
 
 // (todo): This is not platform independent
-static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, size_t urlpath_len) {
+static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, size_t urlpath_len, bool _embed_found) {
     // ds is valid and urlpath is a directory
 
+    bool embed_found = _embed_found;
     DIR *d = NULL;
     d = opendir((const char*)urlpath);
     if (d == NULL) {
@@ -227,10 +228,29 @@ static int s_b2d_fill_pairs_recursive(dict_store *ds, const uint8_t* urlpath, si
         struct stat st = {0};
         stat((const char*)concat, &st);
         if (S_ISDIR(st.st_mode)) {
-            s_b2d_fill_pairs_recursive(ds, concat, concat_len);
+            error_code = s_b2d_fill_pairs_recursive(ds, concat, concat_len, embed_found);
             free((void*)concat);
+            if (error_code < 0) {
+                // Here no BLOSC_TRACE_ERROR should be declared. In case of error, a big, BIG trace could be printed
+                return error_code;
+            }
         } else if (S_ISREG(st.st_mode)) {
             // Get filename
+
+            if (!embed_found && strcmp((const char*)b2e_name, filename) == 0) {
+                embed_found = true;
+                blosc2_embed_store* estore = NULL;
+                error_code = blosc2_embed_store_open(&estore, concat, ds->mode);
+                if (error_code < 0) {
+                    BLOSC_TRACE_ERROR("Could not open EmbedStore in B2D");
+                    free(concat);
+                    return error_code;
+                }
+                free(concat);
+                ds->estore = estore;
+                continue;
+            }
+
             b2_ds_value v = {0};
             const uint8_t* first_bar = (const uint8_t*) strchr((const char*)concat, '/');
             error_code = blosc2_string_duplicate(first_bar + 1, (uint8_t**)&(v.f_dir.localpath));
@@ -283,7 +303,7 @@ static int s_b2d_fill_pairs(dict_store *ds, const uint8_t* urlpath) {
         return BLOSC2_ERROR_FILE_OPEN;
     }
 
-    return s_b2d_fill_pairs_recursive(ds, urlpath, strlen((const char*)urlpath));
+    return s_b2d_fill_pairs_recursive(ds, urlpath, strlen((const char*)urlpath), false);
 }
 
 // (note) If the nomenclature of the function is confuse, here there is an explanation
@@ -823,7 +843,7 @@ static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* 
         free(full_path);
         goto cleanup;
     }
-    if (blosc2_atomic_schunk_write((const char*)full_path, schunk) < 0) {
+    if (blosc2_atomic_schunk_write((const char*)full_path, schunk, schunk->storage->urlpath == NULL) < 0) {
         BLOSC_TRACE_ERROR("Could not write atomically the schunk to %s", (const char*)full_path);
         free(full_path);
         rc = BLOSC2_ERROR_FILE_WRITE;
@@ -1260,8 +1280,8 @@ int blosc2_dict_store_open(blosc2_dict_store** dstore, const uint8_t* urlpath, b
     }
 
     // Check extension
-    int storage_type = s_get_storage_type_from_extension(urlpath);
-    if (storage_type == -1) { // error
+    b2_ds_storage_type storage_type = s_get_storage_type_from_extension(urlpath);
+    if ((int)storage_type == -1) { // error
         BLOSC_TRACE_ERROR("Could not infer the storage type from the urlpath's extension");
         return BLOSC2_ERROR_INVALID_PARAM;
     }

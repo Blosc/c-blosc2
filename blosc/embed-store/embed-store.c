@@ -16,6 +16,8 @@ Blosc - Blocked Shuffling and Compression Library
 #include <assert.h>
 #include <errno.h>
 
+#include "filesystem.h"
+
 typedef blosc2_embed_store embed_store;
 typedef b2_es_value value;
 
@@ -691,23 +693,12 @@ int64_t blosc2_embed_store_to_file(blosc2_embed_store* estore, const uint8_t* ur
         return BLOSC2_ERROR_NULL_POINTER;
     }
 
-    int rc = s_exists_inode((const char*)urlpath);
-    if (rc == BLOSC2_ERROR_SUCCESS) {
-        BLOSC_TRACE_ERROR("File was found at %s, remove it first!", (const char*)urlpath);
-        return BLOSC2_ERROR_FAILURE;
+    int rc = BLOSC2_ERROR_SUCCESS;
+    rc = blosc2_atomic_schunk_write((const char*)urlpath, estore->schunk, estore->schunk->storage->urlpath == NULL);
+    if (rc < 0) {
+        BLOSC_TRACE_ERROR("Could not write EmbedStore atomically");
     }
-    if (rc != BLOSC2_ERROR_NOT_FOUND) {
-        BLOSC_TRACE_ERROR("There was an error while calling stat");
-        return rc;
-    }
-    // BLOSC2_ERROR_NOT_FOUND
-
-    blosc2_schunk* schunk = estore->schunk;
-    int64_t fileframe_size = blosc2_schunk_to_file(schunk, (const char*)urlpath);
-    if (fileframe_size < 0) {
-        BLOSC_TRACE_ERROR("Could not write EmbedStore to file %s", (const char*)urlpath);
-    }
-    return fileframe_size;
+    return rc;
 }
 
 bool blosc2_embed_store_contains_key(blosc2_embed_store* estore, const uint8_t* key) {
