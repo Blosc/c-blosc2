@@ -82,6 +82,34 @@ int main(void) {
     CHECK(b2nd_min_i64_execute(&plan, values, 5, &output, &tiles, &scratch) == 0);
     CHECK(output == 7 && tiles == 1);
 #endif
+#ifdef B2ND_MAP_MIN_I64_API
+    b2nd_map_min_i64_plan *mapped_plan = NULL;
+    me_error map_error = {0};
+    b2nd_map_min_i64_report map_report;
+    const char *map_source = "def mapped(x):\n    return x + 1\n";
+    int64_t map_values[] = {8, 4, 2, -4, 9}, map_output = 23;
+    CHECK(b2nd_map_min_i64_prepare(map_source, 5, 2, 15, &mapped_plan, &map_error) ==
+          ME_ERR_INVALID_ARG);
+    CHECK(!mapped_plan);
+    CHECK(b2nd_map_min_i64_prepare("def mapped(x):\n    return x / 2\n", 5, 2, 16,
+                                  &mapped_plan, &map_error) == ME_ERR_SIGNATURE);
+    CHECK(!mapped_plan);
+    CHECK(b2nd_map_min_i64_prepare(map_source, 5, 2, 16, &mapped_plan, &map_error) == ME_SUCCESS);
+    CHECK(b2nd_map_min_i64_execute(mapped_plan, map_values, 4, &map_output, &map_report,
+                                  &map_error) == ME_ERR_INVALID_ARG);
+    CHECK(map_output == 23 && map_report.tiles == 0 && map_report.scratch == 0);
+    CHECK(b2nd_map_min_i64_execute(mapped_plan, map_values, 5, &map_output, &map_report,
+                                  &map_error) == ME_SUCCESS);
+    CHECK(map_output == -3 && map_report.tiles == 3 && map_report.scratch == 16);
+    CHECK(!map_report.fp.flags);
+    /* The prepared owner retains no values; integer overflow wraps in the core. */
+    map_values[4] = INT64_MAX;
+    CHECK(b2nd_map_min_i64_execute(mapped_plan, map_values, 5, &map_output, &map_report,
+                                  &map_error) == ME_SUCCESS);
+    CHECK(map_output == INT64_MIN && map_report.tiles == 3);
+    b2nd_map_min_i64_free(mapped_plan);
+    b2nd_map_min_i64_free(NULL);
+#endif
     const int64_t shape[] = {7};
     const int32_t chunks[] = {5}, blocks[] = {2};
     blosc2_storage storage = BLOSC2_STORAGE_DEFAULTS;

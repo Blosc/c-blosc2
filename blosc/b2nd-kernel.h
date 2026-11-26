@@ -24,6 +24,29 @@ int b2nd_min_i64_execute(const b2nd_min_i64_plan *plan, const int64_t *input,
                          int64_t items, int64_t *output, int64_t *tiles, size_t *scratch);
 #endif
 
+/* Internal map(input:int64)->min pilot. Prepare owns an interpreter-only
+ * context-free elementwise Menudet 0.2 kernel and immutable geometry. The
+ * single runtime parameter is named x. Inference must produce int64 without
+ * an implicit output conversion. Execute borrows an aligned resident vector.
+ * max_scratch bounds the reusable mapped tile, not compiler/core scratch.
+ * Output is published only on success; reports cover completed map calls. */
+#ifdef ME_EXTREMA_SPAN_API
+#define B2ND_MAP_MIN_I64_API 1
+typedef struct b2nd_map_min_i64_plan b2nd_map_min_i64_plan;
+typedef struct {
+    int64_t tiles;
+    size_t scratch;
+    me_fp_status fp;
+} b2nd_map_min_i64_report;
+
+me_status b2nd_map_min_i64_prepare(const char *source, int64_t items, int64_t tile,
+                                  size_t max_scratch, b2nd_map_min_i64_plan **out, me_error *error);
+me_status b2nd_map_min_i64_execute(const b2nd_map_min_i64_plan *plan, const int64_t *input,
+                                  int64_t items, int64_t *output,
+                                  b2nd_map_min_i64_report *report, me_error *error);
+void b2nd_map_min_i64_free(b2nd_map_min_i64_plan *plan);
+#endif
+
 typedef int (*b2nd_kernel_read)(void *context, size_t input, int64_t chunk, int64_t block,
                                const me_grid_block_info *info, me_mut_buffer out);
 typedef int (*b2nd_kernel_write)(void *context, int64_t chunk, int64_t block,
