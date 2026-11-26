@@ -843,7 +843,7 @@ static int s_set_b2x(dict_store* ds, uint8_t* key, blosc2_schunk* schunk, bool* 
         free(full_path);
         goto cleanup;
     }
-    if (fs_atomic_schunk_write((const char*)full_path, schunk, schunk->storage->urlpath == NULL) < 0) {
+    if (fs_atomic_schunk_write((const char*)full_path, schunk) < 0) {
         BLOSC_TRACE_ERROR("Could not write atomically the schunk to %s", (const char*)full_path);
         free(full_path);
         rc = BLOSC2_ERROR_FILE_WRITE;

@@ -23,7 +23,7 @@ int fs_create_dir_recursive(const char* dir_path);
 int fs_create_dir_recursive_check_extension_paths(const char* dir_path);
 
 int fs_sync_parent_dir(const char* path);
-int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp);
+int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk);
 
 int fs_realpath(const char* path, char** out_path);
 

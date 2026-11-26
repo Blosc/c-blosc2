@@ -431,8 +431,8 @@ int fs_sync_parent_dir(const char* path) {
     return error_code;
 }
 
-int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_tmp) {
-    const char* tmp_file_path = NULL;
+int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
+    char* tmp_file_path = NULL;
     int error_code = 0;
     bool tmp_exists = true;
 
@@ -442,8 +442,13 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk, bool create_
         error_code = fd;
         goto cleanup;
     }
-    if (!create_tmp) {
-        remove(tmp_file_path);
+    if (schunk->storage->urlpath != NULL) {
+        error_code = remove(tmp_file_path); // Let blosc2_schunk_to_file create it
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not remove %s", tmp_file_path);
+            free(tmp_file_path);
+            return BLOSC2_ERROR_FILE_REMOVE;
+        }
     }
 
 

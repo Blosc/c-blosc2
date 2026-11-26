@@ -694,7 +694,7 @@ int64_t blosc2_embed_store_to_file(blosc2_embed_store* estore, const uint8_t* ur
     }
 
     int rc = BLOSC2_ERROR_SUCCESS;
-    rc = fs_atomic_schunk_write((const char*)urlpath, estore->schunk, estore->schunk->storage->urlpath == NULL);
+    rc = fs_atomic_schunk_write((const char*)urlpath, estore->schunk);
     if (rc < 0) {
         BLOSC_TRACE_ERROR("Could not write EmbedStore atomically");
     }
