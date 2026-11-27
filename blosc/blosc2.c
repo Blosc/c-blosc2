@@ -181,6 +181,9 @@ struct blosc_job_group {
   bool static_schedule;
   bool completed;
   bool has_delta_sync;
+  void (*generic_dojob)(void *);
+  size_t generic_elsize;
+  void *generic_jobdata;
   blosc2_pthread_mutex_t mutex;
   blosc2_pthread_mutex_t delta_mutex;
   blosc2_pthread_cond_t delta_cv;
@@ -227,6 +230,9 @@ static int release_thread_backend(blosc2_context *context);
 static int init_threadpool(blosc2_context *context);
 #else
 static int attach_shared_pool(blosc2_context *context);
+static _Thread_local unsigned shared_pool_worker_depth = 0;
+static int run_parallel_shared_pool(int16_t nthreads, void (*dojob)(void *),
+                                    size_t jobdata_elsize, void *jobdata);
 #endif
 static int parallel_blosc(blosc2_context* context);
 
@@ -324,6 +330,7 @@ void blosc2_set_threads_callback(blosc_threads_callback callback, void *callback
   threads_callback_data = callback_data;
 }
 
+#if defined(_WIN32)
 typedef struct {
   void (*dojob)(void *);
   void *jobdata;
@@ -334,6 +341,7 @@ static void *blosc2_parallel_pthread_entry(void *arg) {
   job->dojob(job->jobdata);
   return NULL;
 }
+#endif
 
 int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
                         size_t jobdata_elsize, void *jobdata) {
@@ -351,6 +359,9 @@ int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
     return BLOSC2_ERROR_SUCCESS;
   }
 
+#if !defined(_WIN32)
+  return run_parallel_shared_pool(nthreads, dojob, jobdata_elsize, jobdata);
+#else
   blosc2_pthread_t *threads = malloc((size_t)nthreads * sizeof(blosc2_pthread_t));
   blosc2_parallel_job_data *jobs = malloc((size_t)nthreads * sizeof(blosc2_parallel_job_data));
   if (threads == NULL || jobs == NULL) {
@@ -376,6 +387,7 @@ int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
   free(jobs);
 
   return started == nthreads ? BLOSC2_ERROR_SUCCESS : BLOSC2_ERROR_THREAD_CREATE;
+#endif
 }
 
 
@@ -5746,16 +5758,18 @@ static void job_group_init(struct blosc_job_group *job, blosc2_context *context)
   memset(job, 0, sizeof(*job));
   job->context = context;
   job->next_block = 0;
-  job->output_bytes = context->output_bytes;
   job->giveup_code = 1;
   job->dref_not_init = 1;
-  bool compress = context->do_compress != 0;
-  bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
-  if (!compress && context->special_type) {
-    memcpyed = true;
+  if (context != NULL) {
+    job->output_bytes = context->output_bytes;
+    bool compress = context->do_compress != 0;
+    bool memcpyed = context->header_flags & (uint8_t)BLOSC_MEMCPYED;
+    if (!compress && context->special_type) {
+      memcpyed = true;
+    }
+    job->static_schedule = (!compress || memcpyed) && context->block_maskout == NULL;
+    job->has_delta_sync = !compress;
   }
-  job->static_schedule = (!compress || memcpyed) && context->block_maskout == NULL;
-  job->has_delta_sync = !compress;
   blosc2_pthread_mutex_init(&job->mutex, NULL);
   if (job->has_delta_sync) {
     blosc2_pthread_mutex_init(&job->delta_mutex, NULL);
@@ -5859,7 +5873,15 @@ static void* shared_pool_worker(void* arg) {
 
     thcontext->parent_context = job->context;
     thcontext->tid = logical_tid;
-    t_blosc_do_job(thcontext);
+    shared_pool_worker_depth++;
+    if (job->generic_dojob != NULL) {
+      job->generic_dojob((uint8_t *)job->generic_jobdata +
+                         (size_t)logical_tid * job->generic_elsize);
+    }
+    else {
+      t_blosc_do_job(thcontext);
+    }
+    shared_pool_worker_depth--;
     thcontext->parent_context = NULL;
 
     /* Signal job completion only on the last worker.
@@ -6029,14 +6051,15 @@ static struct blosc_shared_pool *unlink_unused_pools_locked(int keep) {
   return unused;
 }
 
-static int attach_shared_pool(blosc2_context *context) {
+static int acquire_shared_pool_ref(int16_t nthreads, struct blosc_shared_pool **pool_out,
+                                   int32_t *epoch_out) {
   struct blosc_shared_pool *pool;
 
   blosc2_init();
   static_lock(&pool_registry_mutex);
-  pool = find_shared_pool_locked(context->nthreads);
+  pool = find_shared_pool_locked(nthreads);
   if (pool == NULL) {
-    int rc = create_shared_pool(context->nthreads, &pool);
+    int rc = create_shared_pool(nthreads, &pool);
     if (rc < 0) {
       static_unlock(&pool_registry_mutex);
       return rc;
@@ -6045,11 +6068,59 @@ static int attach_shared_pool(blosc2_context *context) {
     shared_pools = pool;
   }
   pool->context_refs++;
+  *pool_out = pool;
+  *epoch_out = load_acquire_int(&g_destroy_count);
+  static_unlock(&pool_registry_mutex);
+  return 0;
+}
+
+static void release_shared_pool_ref(struct blosc_shared_pool *pool, int32_t epoch) {
+  if (pool == NULL) {
+    return;
+  }
+  static_lock(&pool_registry_mutex);
+  if (epoch != load_acquire_int(&g_destroy_count)) {
+    /* Check under the process-lifetime registry lock: destruction cannot
+     * invalidate the pool between this check and the refcount update. */
+    static_unlock(&pool_registry_mutex);
+    return;
+  }
+
+  /* A pool that no context uses any more stays registered for the next
+   * contexts with the same nthreads: contexts that live for one call
+   * (python-blosc2's compress2()/decompress2(), BLOSC_NOLOCK) would otherwise
+   * start and join all of its threads every time.  The most recently
+   * released unused pools are kept, the others destroyed (the pool moves to
+   * the front of the registry); blosc2_free_resources() destroys all. */
+  struct blosc_shared_pool *unused = NULL;
+  pool->context_refs--;
+  if (pool->context_refs == 0) {
+    struct blosc_shared_pool **prev = &shared_pools;
+    while (*prev != NULL && *prev != pool) {
+      prev = &(*prev)->next;
+    }
+    if (*prev == pool) {
+      *prev = pool->next;
+      pool->next = shared_pools;
+      shared_pools = pool;
+    }
+    unused = unlink_unused_pools_locked(BLOSC2_UNUSED_POOLS_MAX);
+  }
+  static_unlock(&pool_registry_mutex);
+  destroy_shared_pools(unused);
+}
+
+static int attach_shared_pool(blosc2_context *context) {
+  struct blosc_shared_pool *pool = NULL;
+  int32_t epoch = 0;
+  int rc = acquire_shared_pool_ref(context->nthreads, &pool, &epoch);
+  if (rc < 0) {
+    return rc;
+  }
   context->thread_pool = pool;
   context->thread_backend = BLOSC_BACKEND_SHARED_POOL;
   context->threads_started = context->nthreads;
-  context->pool_epoch = load_acquire_int(&g_destroy_count);
-  static_unlock(&pool_registry_mutex);
+  context->pool_epoch = epoch;
   return 0;
 }
 
@@ -6208,41 +6279,7 @@ static int release_thread_backend(blosc2_context *context) {
   }
 #endif  /* _WIN32 */
   else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
-    struct blosc_shared_pool *pool = context->thread_pool;
-
-    static_lock(&pool_registry_mutex);
-    if (context->pool_epoch != load_acquire_int(&g_destroy_count)) {
-      /* Check under the process-lifetime registry lock: destruction cannot
-       * invalidate the pool between this check and the refcount update. */
-      static_unlock(&pool_registry_mutex);
-      context->thread_pool = NULL;
-      context->threads_started = 0;
-      context->thread_backend = BLOSC_BACKEND_SERIAL;
-      return 0;
-    }
-
-    /* A pool that no context uses any more stays registered for the next
-     * contexts with the same nthreads: contexts that live for one call
-     * (python-blosc2's compress2()/decompress2(), BLOSC_NOLOCK) would otherwise
-     * start and join all of its threads every time.  The most recently
-     * released unused pools are kept, the others destroyed (the pool moves to
-     * the front of the registry); blosc2_free_resources() destroys all. */
-    struct blosc_shared_pool *unused = NULL;
-    pool->context_refs--;
-    if (pool->context_refs == 0) {
-      struct blosc_shared_pool **prev = &shared_pools;
-      while (*prev != NULL && *prev != pool) {
-        prev = &(*prev)->next;
-      }
-      if (*prev == pool) {
-        *prev = pool->next;
-        pool->next = shared_pools;
-        shared_pools = pool;
-      }
-      unused = unlink_unused_pools_locked(BLOSC2_UNUSED_POOLS_MAX);
-    }
-    static_unlock(&pool_registry_mutex);
-    destroy_shared_pools(unused);
+    release_shared_pool_ref(context->thread_pool, context->pool_epoch);
     context->thread_pool = NULL;
   }
 
@@ -6250,6 +6287,118 @@ static int release_thread_backend(blosc2_context *context) {
   context->thread_backend = BLOSC_BACKEND_SERIAL;
   return 0;
 }
+
+#if !defined(_WIN32)
+static int submit_shared_pool_job(struct blosc_shared_pool *pool,
+                                  struct blosc_job_group *job,
+                                  int32_t workers,
+                                  void (*main_fn)(void *),
+                                  void *main_arg) {
+  int32_t pool_workers = workers - 1;
+  job->active_workers = workers;
+  job->pending_workers = pool_workers;
+
+  if (pool_workers > 0) {
+    int32_t expected_free = 0;
+    if (__atomic_compare_exchange_n(&pool->fast_in_use, &expected_free, 1, false,
+                                    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+      pool->fast_job = job;
+      pool->fast_workers = workers;
+      __atomic_store_n(&pool->fast_remaining, pool_workers, __ATOMIC_SEQ_CST);
+      if (__atomic_load_n(&pool->sleeping_workers, __ATOMIC_SEQ_CST) > 0 &&
+          __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0) {
+        blosc2_pthread_mutex_lock(&pool->mutex);
+        bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0 &&
+                    __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0;
+        blosc2_pthread_mutex_unlock(&pool->mutex);
+        if (wake) {
+          blosc2_pthread_cond_broadcast(&pool->work_cv);
+        }
+      }
+      shared_pool_worker_depth++;
+      main_fn(main_arg);
+      shared_pool_worker_depth--;
+      wait_job_completion(job);
+      pool->fast_job = NULL;
+      __atomic_store_n(&pool->fast_in_use, 0, __ATOMIC_RELEASE);
+    }
+    else {
+      struct blosc_job_queue_entry stack_entries[64];
+      struct blosc_job_queue_entry *entries = stack_entries;
+      if (pool_workers > 64) {
+        entries = (struct blosc_job_queue_entry *)my_malloc((size_t)pool_workers * sizeof(*entries));
+        if (entries == NULL) {
+          return BLOSC2_ERROR_MEMORY_ALLOC;
+        }
+      }
+      for (int32_t tid = 0; tid < pool_workers; ++tid) {
+        entries[tid].job = job;
+        entries[tid].logical_tid = tid + 1;
+        entries[tid].next = (tid + 1 < pool_workers) ? &entries[tid + 1] : NULL;
+      }
+
+      blosc2_pthread_mutex_lock(&pool->mutex);
+      if (pool->job_queue_tail != NULL) {
+        pool->job_queue_tail->next = &entries[0];
+      }
+      else {
+        pool->job_queue_head = &entries[0];
+      }
+      pool->job_queue_tail = &entries[pool_workers - 1];
+      __atomic_add_fetch(&pool->queued_jobs, pool_workers, __ATOMIC_SEQ_CST);
+      bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0;
+      blosc2_pthread_mutex_unlock(&pool->mutex);
+      if (wake) {
+        blosc2_pthread_cond_broadcast(&pool->work_cv);
+      }
+
+      shared_pool_worker_depth++;
+      main_fn(main_arg);
+      shared_pool_worker_depth--;
+      wait_job_completion(job);
+      if (entries != stack_entries) {
+        my_free(entries);
+      }
+    }
+  }
+  else {
+    job->wait_state = 2;
+    job->completed = true;
+    shared_pool_worker_depth++;
+    main_fn(main_arg);
+    shared_pool_worker_depth--;
+  }
+  return BLOSC2_ERROR_SUCCESS;
+}
+
+static int run_parallel_shared_pool(int16_t nthreads, void (*dojob)(void *),
+                                    size_t jobdata_elsize, void *jobdata) {
+  if (shared_pool_worker_depth > 0) {
+    /* Inline nested execution prevents deadlocks on fast_in_use / worker starvation. */
+    for (int16_t i = 0; i < nthreads; ++i) {
+      dojob((uint8_t *)jobdata + (size_t)i * jobdata_elsize);
+    }
+    return BLOSC2_ERROR_SUCCESS;
+  }
+
+  struct blosc_shared_pool *pool = NULL;
+  int32_t epoch = 0;
+  int rc = acquire_shared_pool_ref(nthreads, &pool, &epoch);
+  if (rc < 0) {
+    return rc;
+  }
+
+  struct blosc_job_group job;
+  job_group_init(&job, NULL);
+  job.generic_dojob = dojob;
+  job.generic_elsize = jobdata_elsize;
+  job.generic_jobdata = jobdata;
+  rc = submit_shared_pool_job(pool, &job, nthreads, dojob, jobdata);
+  job_group_destroy(&job);
+  release_shared_pool_ref(pool, epoch);
+  return rc;
+}
+#endif
 
 static int parallel_blosc(blosc2_context* context) {
 #if defined(_WIN32)
@@ -6307,79 +6456,14 @@ static int parallel_blosc(blosc2_context* context) {
       main_thcontext->tid = 0;
       int32_t pool_workers = workers - 1;
       main_thcontext->serial = (pool_workers == 0);
-      job.active_workers = workers;
-      job.pending_workers = pool_workers;
-
-      if (pool_workers > 0) {
-        int32_t expected_free = 0;
-        if (__atomic_compare_exchange_n(&pool->fast_in_use, &expected_free, 1, false,
-                                        __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
-          pool->fast_job = &job;
-          pool->fast_workers = workers;
-          __atomic_store_n(&pool->fast_remaining, pool_workers, __ATOMIC_SEQ_CST);
-          if (__atomic_load_n(&pool->sleeping_workers, __ATOMIC_SEQ_CST) > 0 &&
-              __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0) {
-            blosc2_pthread_mutex_lock(&pool->mutex);
-            bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0 &&
-                        __atomic_load_n(&pool->fast_remaining, __ATOMIC_ACQUIRE) > 0;
-            blosc2_pthread_mutex_unlock(&pool->mutex);
-            if (wake) {
-              blosc2_pthread_cond_broadcast(&pool->work_cv);
-            }
-          }
-          t_blosc_do_job(main_thcontext);
-          wait_job_completion(&job);
-          pool->fast_job = NULL;
-          __atomic_store_n(&pool->fast_in_use, 0, __ATOMIC_RELEASE);
-        }
-        else {
-          struct blosc_job_queue_entry stack_entries[64];
-          struct blosc_job_queue_entry *entries = stack_entries;
-          if (pool_workers > 64) {
-            entries = (struct blosc_job_queue_entry *)my_malloc((size_t)pool_workers * sizeof(*entries));
-            if (entries == NULL) {
-              main_thcontext->serial = true;
-              serial_context_put(main_thcontext);
-              context->job = NULL;
-              job_group_destroy(&job);
-              return BLOSC2_ERROR_MEMORY_ALLOC;
-            }
-          }
-          for (int32_t tid = 0; tid < pool_workers; ++tid) {
-            entries[tid].job = &job;
-            entries[tid].logical_tid = tid + 1;
-            entries[tid].next = (tid + 1 < pool_workers) ? &entries[tid + 1] : NULL;
-          }
-
-          blosc2_pthread_mutex_lock(&pool->mutex);
-          if (pool->job_queue_tail != NULL) {
-            pool->job_queue_tail->next = &entries[0];
-          }
-          else {
-            pool->job_queue_head = &entries[0];
-          }
-          pool->job_queue_tail = &entries[pool_workers - 1];
-          __atomic_add_fetch(&pool->queued_jobs, pool_workers, __ATOMIC_SEQ_CST);
-          bool wake = __atomic_load_n(&pool->sleeping_workers, __ATOMIC_RELAXED) > 0;
-          blosc2_pthread_mutex_unlock(&pool->mutex);
-          if (wake) {
-            blosc2_pthread_cond_broadcast(&pool->work_cv);
-          }
-
-          t_blosc_do_job(main_thcontext);
-          wait_job_completion(&job);
-          if (entries != stack_entries) {
-            my_free(entries);
-          }
-        }
-      }
-      else {
-        job.wait_state = 2;
-        job.completed = true;
-        t_blosc_do_job(main_thcontext);
-      }
+      int submit_rc = submit_shared_pool_job(pool, &job, workers, t_blosc_do_job, main_thcontext);
       main_thcontext->serial = true;
       serial_context_put(main_thcontext);
+      if (submit_rc != BLOSC2_ERROR_SUCCESS) {
+        context->job = NULL;
+        job_group_destroy(&job);
+        return submit_rc;
+      }
     }
   }
 

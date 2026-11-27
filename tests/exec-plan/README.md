@@ -82,10 +82,11 @@ serial path only.
 
 Parallel transport is behind `b2nd-exec-launch.h`. Full library builds select
 `b2nd_exec_launch_host`, which honors the preconfigured Blosc2 thread callback
-or portable dispatcher. Without a callback this still creates threads per call;
-it is not persistent-pool reuse. Nested executor launches execute their existing
-logical jobs inline before submitting anything, avoiding recursive pool waits.
-Windows admission remains serial pending numerical/FP qualification.
+or C-Blosc2's persistent shared pool on POSIX (caller executes job 0 while
+persistent workers execute jobs `1..count-1`). Nested executor launches
+execute their existing logical jobs inline before submitting anything, avoiding
+recursive pool waits (both via `host_launch_depth` and the pool worker depth
+guard). Windows admission remains serial pending numerical/FP qualification.
 
 Standalone fixtures retain a codec-independent launcher. `launch.c` supplies a
 deterministic compile-time override and checks reversed order, non-prefix partial

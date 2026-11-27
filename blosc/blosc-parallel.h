@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Honors the synchronous threads callback, otherwise creates portable threads.
- * This is NOT currently a persistent-pool dispatcher. */
+/* Honors the synchronous threads callback, otherwise dispatches via C-Blosc2's
+ * persistent shared pool on POSIX (portable per-call threads on Windows). */
 int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
                         size_t jobdata_elsize, void *jobdata);
 #endif
