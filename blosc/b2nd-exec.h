@@ -207,6 +207,29 @@ typedef struct {
     size_t max_worker_scratch;
 } b2nd_exec_jobs;
 
+typedef struct {
+    size_t struct_size;
+    bool has_axes;
+    size_t naxes;
+    int axes[B2ND_EXEC_MAX_RANK];
+    bool keepdims;
+    bool has_initial;
+    me_dtype initial_dtype;
+    me_capture_category initial_category;
+    uint8_t initial_scalar[16];
+    size_t initial_size;
+} b2nd_exec_reduce_opts;
+
+typedef struct {
+    size_t struct_size;
+    size_t ndim;
+    int64_t domain[B2ND_EXEC_MAX_RANK];
+    int64_t partitions[B2ND_EXEC_MAX_RANK];
+    bool has_selection;
+    int64_t sel_start[B2ND_EXEC_MAX_RANK];
+    int64_t sel_stop[B2ND_EXEC_MAX_RANK];
+} b2nd_exec_partition_spec;
+
 /* Prepare copies all retained descriptor data and owns its kernel. Metadata
  * specialization reads no input values. Schedules BORROW plans: destroy every
  * schedule before its plan. Independent calls share no mutable scratch. */
@@ -216,10 +239,16 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *descriptor,
 /* Authored kernels enter the SAME scheduler without a graph/source rewrite.
  * Success transfers *kernel to the plan and clears the caller's pointer.
  * Failure leaves the caller's kernel intact. Captures/policy stay in the
- * prepared kernel. Context/block-scalar plans can be inspected but require a
- * future logical-group schedule; resident specialization rejects them. */
+ * prepared kernel. */
 me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer,
                                   b2nd_exec_plan **out, me_error *error);
+/* Borrow an already-prepared caller-owned core kernel (the caller must keep
+ * `kernel` alive until `b2nd_exec_plan_free`). Supports optional reduction opts
+ * as well as context/block-scalar/string/complex kernels for partition specs. */
+me_status b2nd_exec_prepare_borrowed_kernel(const me_kernel *kernel,
+                                           me_reduction_kind reducer,
+                                           const b2nd_exec_reduce_opts *opts,
+                                           b2nd_exec_plan **out, me_error *error);
 me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *out);
 me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
                               const b2nd_exec_input_meta *inputs, size_t ninputs,
@@ -230,6 +259,14 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
                                  size_t tile_items, size_t max_mapped_bytes,
                                  bool pairwise_sum,
                                  b2nd_exec_schedule **out, me_error *error);
+/* Specialize an elementwise/block-scalar/context plan over explicit immutable
+ * logical partitions, independent of physical storage chunks/blocks. */
+me_status b2nd_exec_specialize_partitions(const b2nd_exec_plan *plan,
+                                          const b2nd_exec_input_meta *inputs,
+                                          size_t ninputs,
+                                          const b2nd_exec_partition_spec *spec,
+                                          size_t max_group_bytes,
+                                          b2nd_exec_schedule **out, me_error *error);
 me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule,
                                      b2nd_exec_schedule_info *out);
 /* Native, aligned, contiguous, disjoint buffers in slot order. Reduction

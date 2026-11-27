@@ -43,8 +43,24 @@ const me_kernel *b2nd_exec_schedule_kernel(const b2nd_exec_schedule *schedule,
                                            b2nd_exec_plan_info *plan_out,
                                            b2nd_exec_schedule_info *sched_out,
                                            uint32_t *direct_slot_out);
+typedef struct {
+    bool is_partition_schedule;
+    size_t ndim;
+    int64_t domain[B2ND_EXEC_MAX_RANK];
+    int64_t partitions[B2ND_EXEC_MAX_RANK];
+    int64_t grid[B2ND_EXEC_MAX_RANK];
+    int64_t sel_start[B2ND_EXEC_MAX_RANK];
+    int64_t sel_stop[B2ND_EXEC_MAX_RANK];
+} b2nd_exec_partition_layout;
+me_status b2nd_exec_schedule_partitions(const b2nd_exec_schedule *schedule,
+                                        b2nd_exec_partition_layout *out);
 me_status b2nd_exec_validate_view(const b2nd_exec_schedule *schedule, size_t slot,
                                    const b2nd_exec_view *view, me_error *error);
+bool b2nd_exec_view_is_direct(const b2nd_exec_schedule *schedule, size_t slot,
+                              const b2nd_exec_view *view);
+void b2nd_exec_gather_span(const b2nd_exec_schedule *schedule, size_t slot,
+                           const b2nd_exec_view *view, size_t group,
+                           size_t pos, size_t count, unsigned char *dst);
 void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,
                           const b2nd_exec_view *view, const size_t *origin,
                           const size_t *extent, unsigned char *dst);

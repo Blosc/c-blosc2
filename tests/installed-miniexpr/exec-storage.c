@@ -2,6 +2,8 @@
 #undef NDEBUG
 #include "b2nd-exec-storage.h"
 #include <assert.h>
+#include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,6 +27,61 @@ static void poison_padding(b2nd_array_t *array) {
         assert(blosc2_schunk_update_buffer(array->sc, c, chunk, (int32_t)bytes) >= 0);
     }
     free(chunk);
+}
+
+typedef struct {
+    size_t calls;
+    size_t fail_on_call;
+    size_t expected_next;
+    bool check_sequential;
+    double scale;
+} test_cb_source_ctx;
+
+static me_status test_cb_read(void *ctx, const size_t *indices, size_t count,
+                              me_mut_buffer dst, me_error *error) {
+    test_cb_source_ctx *s = ctx;
+    s->calls++;
+    if (s->fail_on_call && s->calls == s->fail_on_call) {
+        if (error) {
+            error->status = ME_ERR_EVAL;
+            snprintf(error->message, sizeof(error->message), "injected source failure");
+        }
+        return ME_ERR_EVAL;
+    }
+    double *out = dst.data;
+    for (size_t i = 0; i < count; i++) {
+        if (s->check_sequential) {
+            assert(indices[i] == s->expected_next);
+            s->expected_next++;
+        }
+        out[i] = (double)(indices[i] % 97) * s->scale;
+    }
+    return ME_SUCCESS;
+}
+
+typedef struct {
+    size_t calls;
+    size_t fail_on_call;
+    size_t expected_offset;
+    double accum;
+} test_cb_sink_ctx;
+
+static me_status test_cb_write(void *ctx, size_t offset_items, size_t count,
+                               me_buffer src, me_error *error) {
+    test_cb_sink_ctx *s = ctx;
+    s->calls++;
+    if (s->fail_on_call && s->calls == s->fail_on_call) {
+        if (error) {
+            error->status = ME_ERR_EVAL;
+            snprintf(error->message, sizeof(error->message), "injected sink failure");
+        }
+        return ME_ERR_EVAL;
+    }
+    assert(offset_items == s->expected_offset);
+    s->expected_offset += count;
+    const double *vals = src.data;
+    for (size_t i = 0; i < count; i++) s->accum += vals[i];
+    return ME_SUCCESS;
 }
 
 int main(void) {
@@ -599,6 +656,300 @@ int main(void) {
 
         b2nd_free(acf); b2nd_free(adin); b2nd_free(ocf); b2nd_free(adout);
         remove(p_in); remove(p_out);
+    }
+
+    {
+        /* M6 Part 1: Metadata-only generic source/sink callbacks + bounded buffers. */
+        b2nd_exec_node sn[3] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT), make_node(2, B2ND_EXEC_ADD)};
+        sn[0].dtype = ME_FLOAT64; sn[0].itemsize = 8;
+        sn[1].slot = 1; sn[1].dtype = ME_FLOAT64; sn[1].itemsize = 8;
+        sn[2].nargs = 2; sn[2].args[1] = 1;
+        b2nd_exec_descriptor sd = {sizeof(sd), sn, 3, 2, 2};
+        b2nd_exec_plan *sp = NULL;
+        me_error serr;
+        assert(b2nd_exec_prepare(&sd, NULL, &sp, &serr) == ME_SUCCESS);
+
+        /* Large 200,000-item streaming domain with tile_items=128 stays strictly bounded. */
+        const size_t nbig = 200000;
+        double *res_in = malloc(nbig * sizeof(double));
+        assert(res_in);
+        double expected_sum = 0.0;
+        for (size_t i = 0; i < nbig; i++) {
+            res_in[i] = (double)(i % 19) * 0.25;
+            expected_sum += (double)(i % 97) * 1.5 + res_in[i];
+        }
+        b2nd_exec_input_meta bm[2] = {
+            {ME_FLOAT64, 8, 1, {(int64_t)nbig}}, {ME_FLOAT64, 8, 1, {(int64_t)nbig}}};
+        b2nd_exec_schedule *bs = NULL;
+        assert(b2nd_exec_specialize(sp, bm, 2, 128, 128 * 8, &bs, &serr) == ME_SUCCESS);
+
+        test_cb_source_ctx src_ctx = {0, 0, 0, true, 1.5};
+        test_cb_sink_ctx sink_ctx = {0, 0, 0, 0.0};
+        b2nd_exec_source srcs[2] = {
+            {sizeof(srcs[0]), ME_FLOAT64, 8, 1, {(int64_t)nbig}, &src_ctx, test_cb_read},
+            {sizeof(srcs[1]), ME_FLOAT64, 8, 1, {(int64_t)nbig}, NULL, NULL},
+        };
+        b2nd_exec_view rviews[2] = {
+            {0},
+            {sizeof(rviews[1]), res_in, nbig * sizeof(double), 0, {8}, 0},
+        };
+        b2nd_exec_sink snk = {sizeof(snk), ME_FLOAT64, 8, 1, {(int64_t)nbig}, &sink_ctx, test_cb_write};
+        b2nd_exec_callback_report crep;
+        assert(b2nd_exec_execute_sources(bs, srcs, rviews, 2, (me_mut_buffer){0}, &snk,
+                                         0, 128 * 8, 128 * 8, &crep, &serr) == ME_SUCCESS);
+        assert(src_ctx.expected_next == nbig);
+        assert(sink_ctx.expected_offset == nbig);
+        assert(crep.index_buffer_bytes == 128 * sizeof(size_t));
+        assert(crep.execution.gather_bytes == 128 * 8);
+        assert(crep.output_buffer_bytes == 128 * 8);
+        assert(crep.read_items == nbig && crep.max_read_items == 128);
+        assert(crep.write_items == nbig && crep.max_write_items == 128);
+        assert(fabs(sink_ctx.accum - expected_sum) < 1e-9);
+
+        /* Preflight failures never fire any callback. */
+        test_cb_source_ctx p_src = {0, 0, 0, false, 1.0};
+        test_cb_sink_ctx p_sink = {0, 0, 0, 0.0};
+        b2nd_exec_source psrcs[2] = {
+            {sizeof(psrcs[0]), ME_FLOAT64, 8, 1, {(int64_t)nbig}, &p_src, test_cb_read},
+            srcs[1],
+        };
+        b2nd_exec_sink psnk = {sizeof(psnk), ME_FLOAT64, 8, 1, {(int64_t)nbig}, &p_sink, test_cb_write};
+        assert(b2nd_exec_execute_sources(bs, psrcs, rviews, 2, (me_mut_buffer){0}, &psnk,
+                                         0, 128 * 8, 64, &crep, &serr) == ME_ERR_INVALID_ARG);
+        assert(p_src.calls == 0 && p_sink.calls == 0);
+        psrcs[0].shape[0] = 10;
+        assert(b2nd_exec_execute_sources(bs, psrcs, rviews, 2, (me_mut_buffer){0}, &psnk,
+                                         0, 128 * 8, 128 * 8, &crep, &serr) == ME_ERR_INVALID_ARG);
+        assert(p_src.calls == 0 && p_sink.calls == 0);
+#ifdef STORAGE_FAULT_TEST
+        psrcs[0].shape[0] = (int64_t)nbig;
+        for (size_t failure = 1; failure <= 3; failure++) {
+            allocations = 0;
+            allocation_fail_at = failure;
+            assert(b2nd_exec_execute_sources(bs, psrcs, rviews, 2, (me_mut_buffer){0}, &psnk,
+                                             0, 128 * 8, 128 * 8, &crep, &serr) == ME_ERR_OOM);
+            assert(p_src.calls == 0 && p_sink.calls == 0);
+        }
+        allocation_fail_at = 0;
+#endif
+
+        /* Mid-stream source failure and sink failure stop immediately with zero replay. */
+        test_cb_source_ctx f_src = {0, 3, 0, false, 1.0};
+        test_cb_sink_ctx f_sink = {0, 0, 0, 0.0};
+        psrcs[0].shape[0] = (int64_t)nbig;
+        psrcs[0].context = &f_src;
+        psnk.context = &f_sink;
+        assert(b2nd_exec_execute_sources(bs, psrcs, rviews, 2, (me_mut_buffer){0}, &psnk,
+                                         0, 128 * 8, 128 * 8, &crep, &serr) == ME_ERR_EVAL);
+        assert(f_src.calls == 3 && f_sink.calls == 2);
+
+        test_cb_source_ctx s_src = {0, 0, 0, false, 1.0};
+        test_cb_sink_ctx s_sink = {0, 2, 0, 0.0};
+        psrcs[0].context = &s_src;
+        psnk.context = &s_sink;
+        assert(b2nd_exec_execute_sources(bs, psrcs, rviews, 2, (me_mut_buffer){0}, &psnk,
+                                         0, 128 * 8, 128 * 8, &crep, &serr) == ME_ERR_EVAL);
+        assert(s_src.calls == 2 && s_sink.calls == 2);
+        free(res_in);
+        b2nd_exec_schedule_free(bs);
+
+        /* Mixed N-D broadcast + partial-axis reduction + empty domain zero callbacks. */
+        b2nd_exec_node rn[4] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT),
+            make_node(2, B2ND_EXEC_ADD), make_node(3, B2ND_EXEC_SUM)};
+        rn[0].dtype = ME_FLOAT64; rn[0].itemsize = 8;
+        rn[1].slot = 1; rn[1].dtype = ME_FLOAT64; rn[1].itemsize = 8;
+        rn[2].nargs = 2; rn[2].args[1] = 1;
+        rn[3].nargs = 1; rn[3].args[0] = 2;
+        rn[3].has_axes = true; rn[3].naxes = 1; rn[3].axes[0] = 0;
+        b2nd_exec_descriptor rd = {sizeof(rd), rn, 4, 2, 3};
+        b2nd_exec_plan *rp = NULL;
+        assert(b2nd_exec_prepare(&rd, NULL, &rp, &serr) == ME_SUCCESS);
+        b2nd_exec_input_meta rm[2] = {{ME_FLOAT64, 8, 2, {5, 7}}, {ME_FLOAT64, 8, 1, {7}}};
+        b2nd_exec_schedule *rs = NULL;
+        assert(b2nd_exec_specialize(rs ? NULL : rp, rm, 2, 3, 64, &rs, &serr) == ME_SUCCESS);
+        double row_b[7] = {1, 2, 3, 4, 5, 6, 7};
+        double r_out[7] = {0};
+        test_cb_source_ctx nd_ctx = {0, 0, 0, false, 1.0};
+        b2nd_exec_source nsrcs[2] = {
+            {sizeof(nsrcs[0]), ME_FLOAT64, 8, 2, {5, 7}, &nd_ctx, test_cb_read},
+            {sizeof(nsrcs[1]), ME_FLOAT64, 8, 1, {7}, NULL, NULL},
+        };
+        b2nd_exec_view nviews[2] = {{0}, {sizeof(nviews[1]), row_b, sizeof(row_b), 0, {8}, 0}};
+        assert(b2nd_exec_execute_sources(rs, nsrcs, nviews, 2, (me_mut_buffer){r_out, sizeof(r_out)},
+                                         NULL, 0, 64, 64, &crep, &serr) == ME_SUCCESS);
+        for (size_t c = 0; c < 7; c++) {
+            double want = 0.0;
+            for (size_t r = 0; r < 5; r++) want += (double)((r * 7 + c) % 97) + row_b[c];
+            assert(fabs(r_out[c] - want) < 1e-12);
+        }
+        b2nd_exec_schedule_free(rs);
+        b2nd_exec_plan_free(rp);
+
+        /* Empty domain executes zero source/sink callbacks. */
+        b2nd_exec_input_meta em[2] = {{ME_FLOAT64, 8, 1, {0}}, {ME_FLOAT64, 8, 1, {0}}};
+        assert(b2nd_exec_specialize(sp, em, 2, 4, 64, &rs, &serr) == ME_SUCCESS);
+        test_cb_source_ctx e_src = {0, 0, 0, false, 1.0};
+        test_cb_sink_ctx e_sink = {0, 0, 0, 0.0};
+        b2nd_exec_source esrcs[2] = {
+            {sizeof(esrcs[0]), ME_FLOAT64, 8, 1, {0}, &e_src, test_cb_read},
+            {sizeof(esrcs[1]), ME_FLOAT64, 8, 1, {0}, &e_src, test_cb_read},
+        };
+        b2nd_exec_sink esnk = {sizeof(esnk), ME_FLOAT64, 8, 1, {0}, &e_sink, test_cb_write};
+        assert(b2nd_exec_execute_sources(rs, esrcs, NULL, 2, (me_mut_buffer){0}, &esnk,
+                                         0, 64, 64, &crep, &serr) == ME_SUCCESS);
+        assert(e_src.calls == 0 && e_sink.calls == 0);
+        b2nd_exec_schedule_free(rs);
+        b2nd_exec_plan_free(sp);
+    }
+
+    {
+        /* M6 Part 2: Logical partitions, block_scalar, 2-D context, 0-D, generator, rechunk invariance. */
+        double pdata[35];
+        for (size_t i = 0; i < 35; i++) pdata[i] = (double)(i + 1);
+        const int32_t c1[2] = {3, 4}, b1[2] = {2, 3};
+        const int32_t c2[2] = {1, 2}, b2[2] = {1, 1};
+        blosc2_cparams pcp = BLOSC2_CPARAMS_DEFAULTS;
+        pcp.typesize = sizeof(double);
+        blosc2_storage pst1 = {.cparams = &pcp};
+        b2nd_context_t *pc1 = b2nd_create_ctx(&pst1, 2, shape, c1, b1, "=f8", 0, NULL, 0);
+        b2nd_context_t *pc2 = b2nd_create_ctx(&pst1, 2, shape, c2, b2, "=f8", 0, NULL, 0);
+        b2nd_array_t *pa1 = NULL, *pa2 = NULL;
+        assert(b2nd_from_cbuffer(pc1, &pa1, pdata, sizeof(pdata)) == 0);
+        assert(b2nd_from_cbuffer(pc2, &pa2, pdata, sizeof(pdata)) == 0);
+        b2nd_free_ctx(pc1); b2nd_free_ctx(pc2);
+
+        me_input_spec pspec = {"x", ME_FLOAT64, sizeof(double)};
+        me_signature bsig = ME_SIGNATURE_INITIALIZER;
+        bsig.inputs = &pspec; bsig.ninputs = 1;
+        bsig.output_dtype = ME_FLOAT64;
+        bsig.cardinality = ME_BLOCK_SCALAR;
+        me_prepare_options ppol = ME_PREPARE_OPTIONS_INITIALIZER;
+        me_kernel *bk = NULL;
+        me_error perr = {0};
+        assert(me_prepare_menudet("0.1", "def k(x):\n    return block_sum(x)\n",
+                                  &bsig, &ppol, &bk, &perr) == ME_SUCCESS);
+
+        /* Block-scalar kernel cannot be a whole-array root reducer or resident schedule. */
+        b2nd_exec_plan *bad_bp = NULL;
+        assert(b2nd_exec_prepare_borrowed_kernel(bk, ME_REDUCTION_SUM, NULL, &bad_bp, &perr) == ME_ERR_UNSUPPORTED);
+        b2nd_exec_plan *bp = NULL;
+        assert(b2nd_exec_prepare_borrowed_kernel(bk, ME_REDUCTION_NONE, NULL, &bp, &perr) == ME_SUCCESS);
+        b2nd_exec_input_meta pm = {ME_FLOAT64, sizeof(double), 2, {5, 7}};
+        b2nd_exec_schedule *bad_rs = NULL;
+        assert(b2nd_exec_specialize(bp, &pm, 1, 8, 64, &bad_rs, &perr) == ME_ERR_UNSUPPORTED);
+
+        b2nd_exec_partition_spec ppart = {sizeof(ppart), 2, {5, 7}, {2, 3}, false, {0}, {0}};
+        b2nd_exec_schedule *ps = NULL;
+        assert(b2nd_exec_specialize_partitions(bp, &pm, 1, &ppart, 64, &ps, &perr) == ME_SUCCESS);
+        b2nd_exec_schedule_info ps_info = {0};
+        assert(b2nd_exec_describe_schedule(ps, &ps_info) == ME_SUCCESS);
+        assert(ps_info.output_ndim == 2 && ps_info.output_shape[0] == 3 && ps_info.output_shape[1] == 3);
+
+        double pout1[9] = {0}, pout2[9] = {0};
+        const b2nd_array_t *arr1[1] = {pa1}, *arr2[1] = {pa2};
+        b2nd_exec_storage_report prep1 = {0}, prep2 = {0};
+        assert(b2nd_exec_execute_partitions(ps, arr1, NULL, NULL, 1, (me_mut_buffer){pout1, sizeof(pout1)},
+                                            0, 1 << 20, 64, &prep1, &perr) == ME_SUCCESS);
+        assert(b2nd_exec_execute_partitions(ps, arr2, NULL, NULL, 1, (me_mut_buffer){pout2, sizeof(pout2)},
+                                            0, 1 << 20, 64, &prep2, &perr) == ME_SUCCESS);
+        assert(prep1.evaluated_groups == 9 && prep1.max_group_items == 6);
+        assert(!memcmp(pout1, pout2, sizeof(pout1)));
+        for (size_t gr = 0; gr < 3; gr++) {
+            for (size_t gc = 0; gc < 3; gc++) {
+                double want = 0.0;
+                for (size_t r = gr * 2; r < (gr * 2 + 2 < 5 ? gr * 2 + 2 : 5); r++) {
+                    for (size_t c = gc * 3; c < (gc * 3 + 3 < 7 ? gc * 3 + 3 : 7); c++) {
+                        want += pdata[r * 7 + c];
+                    }
+                }
+                assert(pout1[gr * 3 + gc] == want);
+            }
+        }
+        b2nd_exec_schedule_free(ps);
+
+        /* Elementwise 2-D context partial selection reads only intersecting groups. */
+        me_signature csig = ME_SIGNATURE_INITIALIZER;
+        csig.inputs = &pspec; csig.ninputs = 1;
+        csig.output_dtype = ME_FLOAT64;
+        csig.cardinality = ME_ELEMENTWISE;
+        csig.context_ndim = 2;
+        me_kernel *ck = NULL;
+        assert(me_prepare_menudet("0.1", "def k(x):\n    return x + block_sum(x) + _flat_idx\n",
+                                  &csig, &ppol, &ck, &perr) == ME_SUCCESS);
+        b2nd_exec_plan *cp2 = NULL;
+        assert(b2nd_exec_prepare_borrowed_kernel(ck, ME_REDUCTION_NONE, NULL, &cp2, &perr) == ME_SUCCESS);
+        b2nd_exec_partition_spec bad_ctx_part = {sizeof(bad_ctx_part), 1, {35}, {7}, false, {0}, {0}};
+        assert(b2nd_exec_specialize_partitions(cp2, &pm, 1, &bad_ctx_part, 64, &ps, &perr) == ME_ERR_INVALID_ARG);
+        b2nd_exec_partition_spec sub_part = {sizeof(sub_part), 2, {5, 7}, {2, 3}, true, {2, 3}, {5, 6}};
+        assert(b2nd_exec_specialize_partitions(cp2, &pm, 1, &sub_part, 64, &ps, &perr) == ME_SUCCESS);
+        double sub_out1[9] = {0}, sub_out2[9] = {0};
+        assert(b2nd_exec_execute_partitions(ps, arr1, NULL, NULL, 1, (me_mut_buffer){sub_out1, sizeof(sub_out1)},
+                                            0, 1 << 20, 64, &prep1, &perr) == ME_SUCCESS);
+        assert(b2nd_exec_execute_partitions(ps, arr2, NULL, NULL, 1, (me_mut_buffer){sub_out2, sizeof(sub_out2)},
+                                            0, 1 << 20, 64, &prep2, &perr) == ME_SUCCESS);
+        assert(prep1.evaluated_groups == 2);
+        assert(!memcmp(sub_out1, sub_out2, sizeof(sub_out1)));
+#ifdef STORAGE_FAULT_TEST
+        for (size_t failure = 1; failure <= 3; failure++) {
+            allocations = 0;
+            allocation_fail_at = failure;
+            assert(b2nd_exec_execute_partitions(ps, arr1, NULL, NULL, 1,
+                                                (me_mut_buffer){sub_out1, sizeof(sub_out1)},
+                                                0, 1 << 20, 64, &prep1, &perr) == ME_ERR_OOM);
+        }
+        allocation_fail_at = 0;
+#endif
+        for (size_t r = 2; r < 5; r++) {
+            size_t gr = (r / 2) * 2;
+            size_t gr_end = gr + 2 < 5 ? gr + 2 : 5;
+            double bsum = 0.0;
+            for (size_t rr = gr; rr < gr_end; rr++) {
+                for (size_t cc = 3; cc < 6; cc++) bsum += pdata[rr * 7 + cc];
+            }
+            for (size_t c = 3; c < 6; c++) {
+                double want = pdata[r * 7 + c] + bsum + (double)(r * 7 + c);
+                assert(sub_out1[(r - 2) * 3 + (c - 3)] == want);
+            }
+        }
+        b2nd_exec_schedule_free(ps);
+        b2nd_exec_plan_free(cp2);
+        me_kernel_free(ck);
+
+        /* 0-D scalar domain and 0-input generator kernel. */
+        b2nd_exec_partition_spec p0d = {sizeof(p0d), 0, {0}, {0}, false, {0}, {0}};
+        b2nd_exec_input_meta pm0d = {ME_FLOAT64, sizeof(double), 0, {0}};
+        assert(b2nd_exec_specialize_partitions(bp, &pm0d, 1, &p0d, 64, &ps, &perr) == ME_SUCCESS);
+        double v0 = 42.5, out0 = 0.0;
+        b2nd_exec_view view0 = {sizeof(view0), &v0, sizeof(v0), 0, {0}, 0};
+        assert(b2nd_exec_execute_partitions(ps, NULL, &view0, NULL, 1, (me_mut_buffer){&out0, sizeof(out0)},
+                                            0, 0, 64, &prep1, &perr) == ME_SUCCESS);
+        assert(out0 == 42.5 && prep1.evaluated_groups == 1);
+        b2nd_exec_schedule_free(ps);
+        b2nd_exec_plan_free(bp);
+        me_kernel_free(bk);
+
+        me_signature gsig = ME_SIGNATURE_INITIALIZER;
+        gsig.output_dtype = ME_INT64;
+        gsig.cardinality = ME_ELEMENTWISE;
+        gsig.context_ndim = 1;
+        me_kernel *gk = NULL;
+        assert(me_prepare_menudet("0.1", "def k():\n    return _flat_idx + 10\n",
+                                  &gsig, &ppol, &gk, &perr) == ME_SUCCESS);
+        b2nd_exec_plan *gp = NULL;
+        assert(b2nd_exec_prepare_borrowed_kernel(gk, ME_REDUCTION_NONE, NULL, &gp, &perr) == ME_SUCCESS);
+        b2nd_exec_partition_spec gpart = {sizeof(gpart), 1, {5}, {2}, false, {0}, {0}};
+        assert(b2nd_exec_specialize_partitions(gp, NULL, 0, &gpart, 64, &ps, &perr) == ME_SUCCESS);
+        int64_t gout[5] = {0};
+        assert(b2nd_exec_execute_partitions(ps, NULL, NULL, NULL, 0, (me_mut_buffer){gout, sizeof(gout)},
+                                            0, 0, 64, &prep1, &perr) == ME_SUCCESS);
+        for (int64_t i = 0; i < 5; i++) assert(gout[i] == i + 10);
+        b2nd_exec_schedule_free(ps);
+        b2nd_exec_plan_free(gp);
+        me_kernel_free(gk);
+
+        b2nd_free(pa1); b2nd_free(pa2);
     }
 
     blosc2_destroy();

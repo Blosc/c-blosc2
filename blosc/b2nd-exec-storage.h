@@ -12,7 +12,51 @@ typedef struct {
     size_t decoded_bytes;
     size_t cache_hits; /* Logical item lookups served by the current chunk cache. */
     size_t read_spans; /* Attempted logical span reads, including a failing span. */
+    size_t evaluated_groups;
+    size_t max_group_items;
 } b2nd_exec_storage_report;
+
+typedef me_status (*b2nd_exec_source_read_fn)(void *context, const size_t *indices,
+                                              size_t count, me_mut_buffer dst,
+                                              me_error *error);
+
+typedef struct {
+    size_t struct_size;
+    me_dtype dtype;
+    size_t itemsize;
+    size_t ndim;
+    int64_t shape[B2ND_EXEC_MAX_RANK];
+    void *context;
+    b2nd_exec_source_read_fn read; /* NULL selects resident views[slot]. */
+} b2nd_exec_source;
+
+typedef me_status (*b2nd_exec_sink_write_fn)(void *context, size_t offset_items,
+                                              size_t count, me_buffer src,
+                                              me_error *error);
+
+typedef struct {
+    size_t struct_size;
+    me_dtype dtype;
+    size_t itemsize;
+    size_t ndim;
+    int64_t shape[B2ND_EXEC_MAX_RANK];
+    void *context;
+    b2nd_exec_sink_write_fn write;
+} b2nd_exec_sink;
+
+typedef struct {
+    b2nd_exec_report execution;
+    size_t read_calls;
+    size_t read_items;
+    size_t max_read_items;
+    size_t read_bytes;
+    size_t write_calls;
+    size_t write_items;
+    size_t max_write_items;
+    size_t written_bytes;
+    size_t index_buffer_bytes;
+    size_t output_buffer_bytes;
+} b2nd_exec_callback_report;
 
 /* In-memory or frame-backed native numeric chunked arrays (with right-aligned N-D
  * broadcasting and optional mixed resident views when `arrays[i]` is NULL and
@@ -44,4 +88,32 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
                                      size_t max_decode_bytes, size_t max_gather_bytes,
                                      const b2nd_exec_jobs *jobs,
                                      b2nd_exec_storage_report *report, me_error *error);
+/* Execute a schedule over synchronous metadata-only source and/or sink span
+ * callbacks mixed with resident views. Validates all metadata and bounded
+ * workspaces before the first callback; never mutates output budgets past
+ * max_gather_bytes or max_output_bytes. */
+me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
+                                    const b2nd_exec_source *sources,
+                                    const b2nd_exec_view *views, size_t ninputs,
+                                    me_mut_buffer output,
+                                    const b2nd_exec_sink *sink,
+                                    unsigned raise_mask,
+                                    size_t max_gather_bytes,
+                                    size_t max_output_bytes,
+                                    b2nd_exec_callback_report *report,
+                                    me_error *error);
+/* Execute a specialized logical-partition schedule over compressed arrays,
+ * resident views, and/or generic source callbacks without substituting physical
+ * storage blocks for logical groups. */
+me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
+                                       const b2nd_array_t *const *arrays,
+                                       const b2nd_exec_view *views,
+                                       const b2nd_exec_source *sources,
+                                       size_t ninputs,
+                                       me_mut_buffer output,
+                                       unsigned raise_mask,
+                                       size_t max_decode_bytes,
+                                       size_t max_gather_bytes,
+                                       b2nd_exec_storage_report *report,
+                                       me_error *error);
 #endif

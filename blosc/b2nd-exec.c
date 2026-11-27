@@ -13,6 +13,7 @@
 
 struct b2nd_exec_plan {
     me_kernel *kernel;
+    bool owns_kernel;
     me_kernel *initial_kernel;
     uint64_t initial_value;
     b2nd_exec_op root_op;
@@ -33,6 +34,7 @@ struct b2nd_exec_schedule {
     bool reduced_axis[B2ND_EXEC_MAX_RANK];
     bool suffix_reduction;
     size_t max_mapped_bytes;
+    b2nd_exec_partition_layout partition;
 };
 
 static me_status exec_error(me_error *error, me_status status, const char *message) {
@@ -310,11 +312,58 @@ static bool emit_map(char *source, size_t capacity, size_t *used,
 
 void b2nd_exec_plan_free(b2nd_exec_plan *plan) {
     if (plan) {
-        me_kernel_free(plan->kernel);
+        if (plan->owns_kernel) {
+            me_kernel_free(plan->kernel);
+        }
         me_kernel_free(plan->initial_kernel);
         free(plan->nodes);
         free(plan);
     }
+}
+
+static me_status exec_setup_reduction(b2nd_exec_plan *plan, bool has_axes, size_t naxes,
+                                      const int *axes, bool keepdims, bool has_initial,
+                                      me_dtype initial_dtype, me_capture_category initial_category,
+                                      const void *initial_scalar, size_t initial_size,
+                                      me_error *error) {
+    if (naxes > B2ND_EXEC_MAX_RANK) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid reduction axes count");
+    }
+    plan->info.has_axes = has_axes;
+    plan->info.naxes = naxes;
+    if (naxes && axes) {
+        memcpy(plan->info.axes, axes, naxes * sizeof(int));
+    }
+    plan->info.keepdims = keepdims;
+    plan->info.has_initial = has_initial;
+    if (!has_initial) {
+        return ME_SUCCESS;
+    }
+    size_t iw = numeric_width(initial_dtype);
+    if (!iw || initial_size != iw || !initial_scalar ||
+        (initial_category != ME_CAPTURE_TYPED && initial_category != ME_CAPTURE_WEAK) ||
+        (initial_dtype == ME_BOOL && *(const uint8_t *)initial_scalar > 1)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Malformed execution reduction initial scalar");
+    }
+    if (initial_dtype == plan->info.dtype) {
+        if (!load_scalar_u64(plan->info.dtype, initial_scalar, &plan->initial_value)) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Invalid reduction initial scalar");
+        }
+        return ME_SUCCESS;
+    }
+    me_capture init_capture = {{"initial", initial_dtype, initial_size},
+                               initial_scalar, initial_category};
+    me_signature init_sig = ME_SIGNATURE_INITIALIZER;
+    init_sig.captures = &init_capture;
+    init_sig.ncaptures = 1;
+    init_sig.output_dtype = plan->info.dtype;
+    init_sig.cardinality = ME_ELEMENTWISE;
+    init_sig.casting = ME_CAST_UNSAFE;
+    me_prepare_options init_policy = ME_PREPARE_OPTIONS_INITIALIZER;
+    init_policy.execution = ME_EXEC_INTERPRET;
+    return me_prepare_menudet(
+        "0.2", "# me:fp=strict\ndef convert(initial):\n    return initial\n",
+        &init_sig, &init_policy, &plan->initial_kernel, error);
 }
 
 me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_options *options,
@@ -453,40 +502,14 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         }
         result_info(&plan->info, plan->root_op, &info);
         plan->info.partitionable &= me_kernel_is_partitionable(plan->kernel);
+        plan->owns_kernel = true;
     }
     if (status == ME_SUCCESS && plan->info.reduction) {
         const b2nd_exec_node *root_node = &d->nodes[d->root];
-        plan->info.has_axes = root_node->has_axes;
-        plan->info.naxes = root_node->naxes;
-        if (root_node->naxes) {
-            memcpy(plan->info.axes, root_node->axes, root_node->naxes * sizeof(int));
-        }
-        plan->info.keepdims = root_node->keepdims;
-        plan->info.has_initial = root_node->has_initial;
-        if (root_node->has_initial) {
-            if (root_node->initial_dtype == plan->info.dtype) {
-                if (!load_scalar_u64(plan->info.dtype, root_node->initial_scalar,
-                                     &plan->initial_value)) {
-                    status = exec_error(error, ME_ERR_INVALID_ARG,
-                                        "Invalid reduction initial scalar");
-                }
-            } else {
-                me_capture init_capture = {
-                    {"initial", root_node->initial_dtype, root_node->initial_size},
-                    root_node->initial_scalar, root_node->initial_category};
-                me_signature init_sig = ME_SIGNATURE_INITIALIZER;
-                init_sig.captures = &init_capture;
-                init_sig.ncaptures = 1;
-                init_sig.output_dtype = plan->info.dtype;
-                init_sig.cardinality = ME_ELEMENTWISE;
-                init_sig.casting = ME_CAST_UNSAFE;
-                me_prepare_options init_policy = ME_PREPARE_OPTIONS_INITIALIZER;
-                init_policy.execution = ME_EXEC_INTERPRET;
-                status = me_prepare_menudet(
-                    "0.2", "# me:fp=strict\ndef convert(initial):\n    return initial\n",
-                    &init_sig, &init_policy, &plan->initial_kernel, error);
-            }
-        }
+        status = exec_setup_reduction(plan, root_node->has_axes, root_node->naxes, root_node->axes,
+                                      root_node->keepdims, root_node->has_initial,
+                                      root_node->initial_dtype, root_node->initial_category,
+                                      root_node->initial_scalar, root_node->initial_size, error);
     }
     if (status != ME_SUCCESS) {
         b2nd_exec_plan_free(plan);
@@ -543,7 +566,79 @@ me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer
         plan->inputs[i].itemsize = input.itemsize;
     }
     plan->kernel = *kernel;
+    plan->owns_kernel = true;
     *kernel = NULL;
+    plan->info.plan_metadata_bytes = sizeof(*plan);
+    *out = plan;
+    return ME_SUCCESS;
+}
+
+me_status b2nd_exec_prepare_borrowed_kernel(const me_kernel *kernel, me_reduction_kind reducer,
+                                           const b2nd_exec_reduce_opts *opts,
+                                           b2nd_exec_plan **out, me_error *error) {
+    if (out) *out = NULL;
+    if (error) *error = (me_error){0};
+    if (!kernel || !out) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed execution kernel");
+    }
+    if (opts && opts->struct_size != sizeof(*opts)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid reduction options descriptor");
+    }
+    me_kernel_info info = ME_KERNEL_INFO_INITIALIZER;
+    size_t count = 0;
+    if (me_describe(kernel, &info) != ME_SUCCESS ||
+        me_describe_input_count(kernel, &count) != ME_SUCCESS ||
+        count > B2ND_EXEC_MAX_INPUTS || !info.output_itemsize) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed kernel metadata");
+    }
+    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL ||
+        (reducer != ME_REDUCTION_NONE &&
+         (info.cardinality != ME_ELEMENTWISE || info.context_ndim ||
+          !numeric_width(info.output_dtype)))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Borrowed kernel cannot feed this reducer");
+    }
+    if (reducer == ME_REDUCTION_NONE && opts && (opts->has_axes || opts->naxes || opts->keepdims || opts->has_initial)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Unexpected reduction options on non-reduction plan");
+    }
+    if ((reducer == ME_REDUCTION_ANY || reducer == ME_REDUCTION_ALL) && opts && opts->has_initial) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Boolean reductions do not accept initial values");
+    }
+    b2nd_exec_plan *plan = calloc(1, sizeof(*plan));
+    if (!plan) {
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate borrowed execution plan");
+    }
+    plan->root_op = B2ND_EXEC_INPUT;
+    plan->info.ninputs = count;
+    plan->info.reducer = reducer;
+    plan->info.reduction = reducer != ME_REDUCTION_NONE;
+    plan->info.partitionable = reducer != ME_REDUCTION_SUM && reducer != ME_REDUCTION_PROD &&
+        me_kernel_is_partitionable(kernel);
+    result_info(&plan->info, B2ND_EXEC_INPUT, &info);
+    if (reducer == ME_REDUCTION_NONE) {
+        plan->info.dtype = info.output_dtype;
+        plan->info.itemsize = info.output_itemsize;
+    }
+    for (size_t i = 0; i < count; i++) {
+        me_input_spec input;
+        if (me_describe_input(kernel, i, &input) != ME_SUCCESS) {
+            free(plan);
+            return exec_error(error, ME_ERR_INVALID_ARG, "Cannot describe borrowed kernel input");
+        }
+        plan->inputs[i].dtype = input.dtype;
+        plan->inputs[i].itemsize = input.itemsize;
+    }
+    plan->kernel = (me_kernel *)kernel;
+    plan->owns_kernel = false;
+    if (plan->info.reduction && opts) {
+        me_status st = exec_setup_reduction(plan, opts->has_axes, opts->naxes, opts->axes,
+                                            opts->keepdims, opts->has_initial, opts->initial_dtype,
+                                            opts->initial_category, opts->initial_scalar,
+                                            opts->initial_size, error);
+        if (st != ME_SUCCESS) {
+            b2nd_exec_plan_free(plan);
+            return st;
+        }
+    }
     plan->info.plan_metadata_bytes = sizeof(*plan);
     *out = plan;
     return ME_SUCCESS;
@@ -764,6 +859,130 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
                               b2nd_exec_schedule **out, me_error *error) {
     return b2nd_exec_specialize_ex(plan, inputs, ninputs, tile_items, max_mapped_bytes,
                                    false, out, error);
+}
+
+me_status b2nd_exec_specialize_partitions(const b2nd_exec_plan *plan,
+                                          const b2nd_exec_input_meta *inputs,
+                                          size_t ninputs,
+                                          const b2nd_exec_partition_spec *spec,
+                                          size_t max_group_bytes,
+                                          b2nd_exec_schedule **out, me_error *error) {
+    if (out) *out = NULL;
+    if (error) *error = (me_error){0};
+    if (!out || !plan || !spec || spec->struct_size != sizeof(*spec) ||
+        ninputs != plan->info.ninputs || (ninputs && !inputs) ||
+        spec->ndim > B2ND_EXEC_MAX_RANK) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid logical partition specialization");
+    }
+    if (plan->info.reduction) {
+        return exec_error(error, ME_ERR_UNSUPPORTED,
+                          "Block partition schedules do not admit whole-array reducers");
+    }
+    if (plan->info.context_ndim && plan->info.context_ndim != (int)spec->ndim) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Context rank disagrees with logical domain");
+    }
+    size_t domain_items = 1, part_items = 1, max_group_items = 1;
+    int64_t grid[B2ND_EXEC_MAX_RANK] = {0};
+    int64_t full_out[B2ND_EXEC_MAX_RANK] = {0};
+    int64_t sel_start[B2ND_EXEC_MAX_RANK] = {0};
+    int64_t sel_stop[B2ND_EXEC_MAX_RANK] = {0};
+    int64_t out_shape[B2ND_EXEC_MAX_RANK] = {0};
+    bool scalar_blocks = plan->info.cardinality == ME_BLOCK_SCALAR;
+    for (size_t a = 0; a < spec->ndim; a++) {
+        int64_t dom = spec->domain[a];
+        int64_t part = spec->partitions[a];
+        if (dom < 0 || part <= 0) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Invalid partition domain or extent");
+        }
+        if (part > INT_MAX || (part_items && (uint64_t)part > (uint64_t)INT_MAX / part_items)) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Logical partition exceeds lane limit");
+        }
+        part_items *= (size_t)part;
+        if (dom && domain_items > SIZE_MAX / (uint64_t)dom) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Partition domain size overflow");
+        }
+        domain_items *= (size_t)dom;
+        int64_t edge = dom < part ? dom : part;
+        max_group_items *= (size_t)edge;
+        grid[a] = dom ? (dom - 1) / part + 1 : 0;
+        full_out[a] = scalar_blocks ? grid[a] : dom;
+        if (spec->has_selection) {
+            if (spec->sel_start[a] < 0 || spec->sel_start[a] > spec->sel_stop[a] ||
+                spec->sel_stop[a] > full_out[a]) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Partition selection out of range");
+            }
+            sel_start[a] = spec->sel_start[a];
+            sel_stop[a] = spec->sel_stop[a];
+        } else {
+            sel_start[a] = 0;
+            sel_stop[a] = full_out[a];
+        }
+        out_shape[a] = sel_stop[a] - sel_start[a];
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        if (inputs[i].dtype != plan->inputs[i].dtype ||
+            inputs[i].itemsize != plan->inputs[i].itemsize ||
+            inputs[i].ndim > spec->ndim) {
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Partition input dtype or rank mismatch");
+        }
+        size_t shift = spec->ndim - inputs[i].ndim;
+        size_t in_items = 1;
+        for (size_t a = 0; a < inputs[i].ndim; a++) {
+            int64_t ext = inputs[i].shape[a];
+            if (ext < 0 || (ext != 1 && ext != spec->domain[shift + a]) ||
+                (ext && in_items > SIZE_MAX / (uint64_t)ext)) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Incompatible partition broadcast shape");
+            }
+            in_items *= (size_t)ext;
+        }
+        if (in_items > SIZE_MAX / inputs[i].itemsize) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Partition input byte size overflow");
+        }
+    }
+    size_t output_items = 1;
+    for (size_t a = 0; a < spec->ndim; a++) {
+        if (out_shape[a] && output_items > SIZE_MAX / (uint64_t)out_shape[a]) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Partition output size overflow");
+        }
+        output_items *= (size_t)out_shape[a];
+    }
+    if (output_items > SIZE_MAX / plan->info.itemsize) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Partition output byte size overflow");
+    }
+    size_t group_out_items = !output_items ? 0 : (scalar_blocks ? 1 : max_group_items);
+    if (group_out_items > SIZE_MAX / plan->info.itemsize) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Partition group buffer overflow");
+    }
+    size_t group_out_bytes = group_out_items * plan->info.itemsize;
+    if (group_out_bytes > max_group_bytes) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Partition group buffer budget exceeded");
+    }
+    b2nd_exec_schedule *schedule = calloc(1, sizeof(*schedule));
+    if (!schedule) {
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate partition schedule");
+    }
+    schedule->plan = plan;
+    schedule->info = (b2nd_exec_schedule_info){
+        domain_items, max_group_items ? max_group_items : 1, group_out_bytes, 0,
+        output_items, sizeof(*schedule), spec->ndim, {0}, 0, spec->ndim, {0}, 0, 0, false};
+    if (spec->ndim) {
+        memcpy(schedule->info.shape, spec->domain, spec->ndim * sizeof(int64_t));
+        memcpy(schedule->info.output_shape, out_shape, spec->ndim * sizeof(int64_t));
+    }
+    if (ninputs) {
+        memcpy(schedule->inputs, inputs, ninputs * sizeof(*inputs));
+    }
+    schedule->partition.is_partition_schedule = true;
+    schedule->partition.ndim = spec->ndim;
+    if (spec->ndim) {
+        memcpy(schedule->partition.domain, spec->domain, spec->ndim * sizeof(int64_t));
+        memcpy(schedule->partition.partitions, spec->partitions, spec->ndim * sizeof(int64_t));
+        memcpy(schedule->partition.grid, grid, spec->ndim * sizeof(int64_t));
+        memcpy(schedule->partition.sel_start, sel_start, spec->ndim * sizeof(int64_t));
+        memcpy(schedule->partition.sel_stop, sel_stop, spec->ndim * sizeof(int64_t));
+    }
+    *out = schedule;
+    return ME_SUCCESS;
 }
 
 me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule, b2nd_exec_schedule_info *out) {
@@ -1526,6 +1745,10 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
                                     bool *out_scatter, size_t *out_work_items,
                                     size_t *out_tasks, me_error *error) {
     const b2nd_exec_plan *plan = schedule->plan;
+    if (schedule->partition.is_partition_schedule) {
+        return exec_error(error, ME_ERR_INVALID_ARG,
+                          "Partition schedules require partition execution");
+    }
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
     size_t output_items = schedule->info.output_items;
@@ -1909,6 +2132,15 @@ const me_kernel *b2nd_exec_schedule_kernel(const b2nd_exec_schedule *schedule,
     return schedule->plan->kernel;
 }
 
+me_status b2nd_exec_schedule_partitions(const b2nd_exec_schedule *schedule,
+                                        b2nd_exec_partition_layout *out) {
+    if (!schedule || !out) {
+        return ME_ERR_INVALID_ARG;
+    }
+    *out = schedule->partition;
+    return ME_SUCCESS;
+}
+
 me_status b2nd_exec_validate_view(const b2nd_exec_schedule *schedule, size_t slot,
                                    const b2nd_exec_view *view, me_error *error) {
     if (!schedule || !schedule->plan || slot >= schedule->plan->info.ninputs) {
@@ -1917,7 +2149,29 @@ me_status b2nd_exec_validate_view(const b2nd_exec_schedule *schedule, size_t slo
     if (!view_valid(view, &schedule->inputs[slot])) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
     }
+    if (!view_native(view) && !numeric_width(schedule->inputs[slot].dtype)) {
+        return exec_error(error, ME_ERR_UNSUPPORTED,
+                          "Non-native byte order is unsupported for non-real dtypes");
+    }
     return ME_SUCCESS;
+}
+
+bool b2nd_exec_view_is_direct(const b2nd_exec_schedule *schedule, size_t slot,
+                              const b2nd_exec_view *view) {
+    if (!schedule || !schedule->plan || slot >= schedule->plan->info.ninputs || !view) {
+        return false;
+    }
+    const b2nd_exec_input_meta *m = &schedule->inputs[slot];
+    return schedule->suffix_reduction && schedule->matches_shape[slot] &&
+        view_native(view) && view_contiguous(view, m) &&
+        (!schedule->info.nitems ||
+         ((uintptr_t)view->base + view->offset) % m->itemsize == 0);
+}
+
+void b2nd_exec_gather_span(const b2nd_exec_schedule *schedule, size_t slot,
+                           const b2nd_exec_view *view, size_t group,
+                           size_t pos, size_t count, unsigned char *dst) {
+    view_gather_tile(schedule, slot, view, group, pos, count, dst);
 }
 
 void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,

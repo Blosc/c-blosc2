@@ -62,9 +62,30 @@ static bool storage_product(size_t *product, size_t factor) {
 }
 
 static bool storage_dtype_matches(const char *dtype, me_dtype expected, size_t width) {
-    if (!dtype || !dtype[0] || !dtype[1] || !dtype[2] || dtype[3] != '\0') return false;
+    if (!dtype || !dtype[0] || !dtype[1]) return false;
     uint16_t endian = 1;
     char host = *(const unsigned char *)&endian ? '<' : '>';
+    if (expected == ME_STRING) {
+        if (dtype[1] == 'S') {
+            if (dtype[0] != '=' && dtype[0] != '|' && dtype[0] != host) return false;
+        } else if (dtype[1] == 'U') {
+            if (dtype[0] != '=' && dtype[0] != host) return false;
+        } else {
+            return false;
+        }
+        if (!dtype[2]) return false;
+        char *endp = NULL;
+        unsigned long long count = strtoull(dtype + 2, &endp, 10);
+        if (!endp || *endp != '\0') return false;
+        size_t unit = dtype[1] == 'U' ? 4 : 1;
+        return count <= SIZE_MAX / unit && (size_t)count * unit == width;
+    }
+    if (!dtype[2]) return false;
+    if (expected == ME_COMPLEX128) {
+        return (dtype[0] == '=' || dtype[0] == host) &&
+            strcmp(dtype + 1, "c16") == 0 && width == 16;
+    }
+    if (dtype[3] != '\0') return false;
     if (width == 1) {
         if (dtype[0] != '=' && dtype[0] != '|' && dtype[0] != host) return false;
     } else if (dtype[0] != '=' && dtype[0] != host) {
@@ -83,9 +104,17 @@ static bool storage_dtype_matches(const char *dtype, me_dtype expected, size_t w
         case ME_UINT64: suffix = "u8"; break;
         case ME_FLOAT32: suffix = "f4"; break;
         case ME_FLOAT64: suffix = "f8"; break;
+        case ME_COMPLEX64: suffix = width == 8 ? "c8" : NULL; break;
         default: return false;
     }
-    return strcmp(dtype + 1, suffix) == 0;
+    return suffix && strcmp(dtype + 1, suffix) == 0;
+}
+
+static size_t storage_required_align(me_dtype dtype, size_t width) {
+    if (dtype == ME_STRING) return 1;
+    if (dtype == ME_COMPLEX64) return sizeof(float);
+    if (dtype == ME_COMPLEX128) return sizeof(double);
+    return width ? width : 1;
 }
 
 static me_status storage_validate_chunks(const storage_input *state,
@@ -116,7 +145,7 @@ static me_status storage_validate_chunks(const storage_input *state,
             if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage chunk metadata");
         }
-        if (chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width ||
+        if ((width <= 255 && chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width) ||
             (chunk[BLOSC2_CHUNK_FLAGS] >> 5) > BLOSC_ZSTD_LIB) {
             if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk codec");
@@ -142,8 +171,9 @@ static me_status storage_validate(storage_input *state, const b2nd_exec_input_me
                                   me_error *error) {
     const b2nd_array_t *a = state->array;
     size_t width = meta->itemsize;
-    if (!a || !a->sc || a->ndim < 1 || a->ndim > B2ND_EXEC_MAX_RANK ||
-        (size_t)a->ndim != meta->ndim || !width || width > 8 ||
+    if (!a || !a->sc || a->ndim < 0 || a->ndim > B2ND_EXEC_MAX_RANK ||
+        (size_t)a->ndim != meta->ndim || !width ||
+        (width > 8 && meta->dtype != ME_COMPLEX128 && meta->dtype != ME_STRING) ||
         a->dtype_format != DTYPE_NUMPY_FORMAT ||
         !storage_dtype_matches(a->dtype, meta->dtype, width) ||
         a->sc->typesize != (int32_t)width ||
@@ -546,9 +576,6 @@ static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_
                                          unsigned char *dst, me_error *error) {
     const b2nd_array_t *a = cache->array;
     size_t ndim = (size_t)a->ndim;
-    size_t shift = dom_ndim - ndim;
-    size_t d_last = dom_ndim - 1;
-    size_t a_last = ndim - 1;
     size_t width = cache->itemsize;
     size_t total = 1;
     for (size_t d = 0; d < dom_ndim; d++) {
@@ -556,6 +583,39 @@ static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_
     }
     cache->read_spans++;
     if (!total) return ME_SUCCESS;
+    if (!ndim || !dom_ndim) {
+        if (cache->cached_chunk[0] != 0 || cache->cached_block[0] != 0) {
+            const uint8_t *encoded = NULL;
+            bool needs_free = false;
+            int fetch_rc = storage_fetch_chunk(a, cache->frame_mutex, 0, &encoded, &needs_free);
+            int32_t nbytes = 0, cbytes = 0, blocksize = 0;
+            int got = -1;
+            if (fetch_rc >= 0 && encoded &&
+                blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
+                got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes, 0,
+                                         (int)cache->block_items, cache->blocks[0],
+                                         (int32_t)cache->block_bytes);
+            }
+            if (needs_free) free((void *)encoded);
+            if (got != (int)cache->block_bytes) {
+                return storage_error(error, ME_ERR_EVAL, "Storage block decode failed");
+            }
+            cache->cached_chunk[0] = 0;
+            cache->cached_block[0] = 0;
+            cache->decodes++;
+            cache->decoded_bytes += cache->block_bytes;
+            if (total > 1) cache->cache_hits += total - 1;
+        } else {
+            cache->cache_hits += total;
+        }
+        for (size_t k = 0; k < total; k++) {
+            memcpy(dst + k * width, cache->blocks[0], width);
+        }
+        return ME_SUCCESS;
+    }
+    size_t shift = dom_ndim - ndim;
+    size_t d_last = dom_ndim - 1;
+    size_t a_last = ndim - 1;
     bool last_bcast = (d_last < shift) || (a->shape[a_last] == 1);
     size_t local_c[B2ND_EXEC_MAX_RANK] = {0};
     size_t lane = 0;
@@ -1285,5 +1345,838 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
     if (status == ME_SUCCESS && (report->execution.fp.flags & raise_mask)) {
         return storage_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
     }
+    return status;
+}
+
+typedef struct {
+    b2nd_exec_source source;
+    size_t *shared_idx_buf;
+    size_t itemsize, dom_ndim, reduction_lanes;
+    int64_t dom_shape[B2ND_EXEC_MAX_RANK];
+    size_t eff_stride[B2ND_EXEC_MAX_RANK];
+    bool is_reduction, fast_linear, reduced_axis[B2ND_EXEC_MAX_RANK];
+    size_t read_calls, read_items, max_read_items, read_bytes;
+} source_callback_state;
+
+static void source_state_init(source_callback_state *state, const b2nd_exec_source *src,
+                              const b2nd_exec_schedule *schedule, size_t slot,
+                              const b2nd_exec_plan_info *plan_info,
+                              const b2nd_exec_schedule_info *sched_info,
+                              size_t *idx_buf) {
+    memset(state, 0, sizeof(*state));
+    state->source = *src;
+    state->shared_idx_buf = idx_buf;
+    state->itemsize = src->itemsize;
+    state->dom_ndim = sched_info->ndim;
+    state->reduction_lanes = sched_info->reduction_lanes;
+    state->is_reduction = plan_info->reduction;
+    memcpy(state->dom_shape, sched_info->shape, sizeof(state->dom_shape));
+    bool matches = false, suffix = false;
+    b2nd_exec_schedule_layout(schedule, slot, &matches, &suffix, state->reduced_axis);
+    state->fast_linear = matches && suffix;
+    if (!state->fast_linear && src->ndim > 0) {
+        size_t in_strides[B2ND_EXEC_MAX_RANK] = {0};
+        size_t stride = 1;
+        for (size_t a = src->ndim; a-- > 0;) {
+            in_strides[a] = src->shape[a] == 1 ? 0 : stride;
+            stride *= (size_t)src->shape[a];
+        }
+        size_t shift = state->dom_ndim - src->ndim;
+        for (size_t d = shift; d < state->dom_ndim; d++) {
+            state->eff_stride[d] = in_strides[d - shift];
+        }
+    }
+}
+
+static me_status source_read_trampoline(void *context, size_t group, size_t pos, size_t count,
+                                        me_mut_buffer output, me_error *error) {
+    source_callback_state *state = context;
+    if (output.capacity < count * state->itemsize) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid source callback buffer");
+    }
+    if (!count) return ME_SUCCESS;
+    size_t *idx = state->shared_idx_buf;
+    if (state->fast_linear) {
+        size_t start = state->is_reduction ? group * state->reduction_lanes + pos : pos;
+        for (size_t lane = 0; lane < count; lane++) {
+            idx[lane] = start + lane;
+        }
+    } else {
+        size_t coords[B2ND_EXEC_MAX_RANK] = {0};
+        size_t g_rem = group, l_rem = pos;
+        for (size_t d = state->dom_ndim; d-- > 0;) {
+            size_t *dim_idx = (state->is_reduction && !state->reduced_axis[d]) ? &g_rem : &l_rem;
+            coords[d] = *dim_idx % (size_t)state->dom_shape[d];
+            *dim_idx /= (size_t)state->dom_shape[d];
+        }
+        for (size_t lane = 0; lane < count; lane++) {
+            size_t flat = 0;
+            for (size_t d = 0; d < state->dom_ndim; d++) {
+                flat += coords[d] * state->eff_stride[d];
+            }
+            idx[lane] = flat;
+            if (lane + 1 < count) {
+                for (size_t d = state->dom_ndim; d-- > 0;) {
+                    if (state->is_reduction && !state->reduced_axis[d]) continue;
+                    if (++coords[d] < (size_t)state->dom_shape[d]) break;
+                    coords[d] = 0;
+                }
+            }
+        }
+    }
+    state->read_calls++;
+    me_status st = state->source.read(state->source.context, idx, count, output, error);
+    if (st != ME_SUCCESS) return st;
+    state->read_items += count;
+    if (count > state->max_read_items) state->max_read_items = count;
+    state->read_bytes += count * state->itemsize;
+    return ME_SUCCESS;
+}
+
+static me_status source_stream_map(const b2nd_exec_schedule *schedule,
+                                   const me_kernel *kernel,
+                                   const b2nd_exec_plan_info *plan_info,
+                                   const b2nd_exec_schedule_info *sched_info,
+                                   uint32_t direct_slot,
+                                   const b2nd_exec_view *bound_views,
+                                   source_callback_state *src_states,
+                                   const bool *is_cb, size_t ninputs,
+                                   const b2nd_exec_sink *sink,
+                                   unsigned raise_mask, size_t max_gather_bytes,
+                                   size_t max_output_bytes, size_t *idx_buf,
+                                   size_t index_buffer_bytes,
+                                   b2nd_exec_callback_report *report, me_error *error) {
+    size_t nitems = sched_info->nitems;
+    size_t tile_items = sched_info->tile_items;
+    size_t out_width = plan_info->itemsize;
+    report->index_buffer_bytes = index_buffer_bytes;
+    if (!nitems) {
+        if (raise_mask) {
+            me_fp_scope scope;
+            me_fp_status fp = {0};
+            me_status st = me_fp_scope_begin(&scope, &fp, error);
+            if (st != ME_SUCCESS) return st;
+            me_status end_st = me_fp_scope_end(&scope, NULL);
+            report->execution.fp.supported = fp.supported;
+            if (end_st != ME_SUCCESS) return end_st;
+            if (!fp.supported) {
+                return storage_error(error, ME_ERR_UNSUPPORTED,
+                                     "Floating exception reporting is unavailable");
+            }
+        }
+        return ME_SUCCESS;
+    }
+
+    bool needed[B2ND_EXEC_MAX_INPUTS] = {0};
+    bool direct[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t gather_bytes = 0;
+    for (size_t i = 0; i < ninputs; i++) {
+        needed[i] = !plan_info->identity || i == direct_slot;
+        if (!needed[i]) continue;
+        if (!is_cb[i] && b2nd_exec_view_is_direct(schedule, i, &bound_views[i])) {
+            direct[i] = true;
+            continue;
+        }
+        size_t slot_bytes = tile_items * src_states[i].source.itemsize;
+        if (gather_bytes > SIZE_MAX - slot_bytes) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Source gather buffer overflow");
+        }
+        gather_offsets[i] = gather_bytes;
+        gather_bytes += slot_bytes;
+    }
+    if (gather_bytes > max_gather_bytes) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer budget exceeded");
+    }
+
+    size_t out_tile_items = tile_items < nitems ? tile_items : nitems;
+    size_t out_buf_bytes = plan_info->identity ? 0 : out_tile_items * out_width;
+    if (out_buf_bytes > max_output_bytes) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Callback output buffer budget exceeded");
+    }
+
+    unsigned char *gather_buf = gather_bytes ? malloc(gather_bytes) : NULL;
+    unsigned char *out_buf = out_buf_bytes ? malloc(out_buf_bytes) : NULL;
+    if ((gather_bytes && !gather_buf) || (out_buf_bytes && !out_buf)) {
+        free(gather_buf);
+        free(out_buf);
+        return storage_error(error, ME_ERR_OOM, "Cannot allocate streaming source buffers");
+    }
+    report->execution.gather_bytes = gather_bytes;
+    report->execution.mapped_bytes = sched_info->mapped_bytes;
+    report->execution.worker_bytes = gather_bytes + sched_info->mapped_bytes;
+    report->execution.tasks = 1;
+    report->output_buffer_bytes = out_buf_bytes;
+
+    bool scoped = !plan_info->identity || raise_mask != 0;
+    me_fp_scope scope;
+    me_fp_status fp = {0};
+    me_status status = ME_SUCCESS;
+    if (scoped) {
+        status = me_fp_scope_begin(&scope, &fp, error);
+        if (status == ME_SUCCESS && raise_mask && !fp.supported) {
+            me_fp_scope_end(&scope, NULL);
+            free(gather_buf);
+            free(out_buf);
+            return storage_error(error, ME_ERR_UNSUPPORTED,
+                                 "Floating exception reporting is unavailable");
+        }
+    }
+
+    me_buffer spans[B2ND_EXEC_MAX_INPUTS] = {0};
+    unsigned char *in_ptrs[B2ND_EXEC_MAX_INPUTS] = {0};
+    for (size_t i = 0; i < ninputs; i++) {
+        if (needed[i] && !direct[i]) {
+            in_ptrs[i] = gather_buf + gather_offsets[i];
+        }
+    }
+    for (size_t pos = 0; status == ME_SUCCESS && pos < nitems;) {
+        size_t count = nitems - pos < tile_items ? nitems - pos : tile_items;
+        for (size_t i = 0; status == ME_SUCCESS && i < ninputs; i++) {
+            if (!needed[i]) {
+                spans[i] = (me_buffer){NULL, 0};
+                continue;
+            }
+            size_t in_w = src_states[i].source.itemsize;
+            if (direct[i]) {
+                const unsigned char *ptr =
+                    (const unsigned char *)bound_views[i].base + bound_views[i].offset + pos * in_w;
+                spans[i] = (me_buffer){ptr, count * in_w};
+            } else if (is_cb[i]) {
+                me_mut_buffer dst = {in_ptrs[i], count * in_w};
+                status = source_read_trampoline(&src_states[i], 0, pos, count, dst, error);
+                if (status != ME_SUCCESS) break;
+                report->execution.gathered_bytes += dst.capacity;
+                spans[i] = (me_buffer){in_ptrs[i], dst.capacity};
+            } else {
+                b2nd_exec_gather_span(schedule, i, &bound_views[i], 0, pos, count, in_ptrs[i]);
+                report->execution.gathered_bytes += count * in_w;
+                spans[i] = (me_buffer){in_ptrs[i], count * in_w};
+            }
+        }
+        if (status != ME_SUCCESS) break;
+        const void *write_ptr = NULL;
+        if (plan_info->identity) {
+            write_ptr = spans[direct_slot].data;
+            report->execution.direct_tiles++;
+        } else {
+            me_block block = ME_BLOCK_INITIALIZER;
+            block.nitems = count;
+            me_fp_status tile_fp = {0};
+            me_run_options run_opts = ME_RUN_OPTIONS_INITIALIZER;
+            run_opts.fp_status = &tile_fp;
+            me_execution_backend backend = ME_BACKEND_NONE;
+            status = me_eval_block_backend(kernel, spans, ninputs,
+                                           (me_mut_buffer){out_buf, count * out_width},
+                                           &block, &run_opts, &backend, error);
+            report->execution.interpreter_calls += backend == ME_BACKEND_INTERPRETER;
+            report->execution.jit_calls += backend == ME_BACKEND_JIT;
+            fp.flags |= tile_fp.flags;
+            if (status != ME_SUCCESS) break;
+            report->execution.map_calls++;
+            write_ptr = out_buf;
+        }
+        report->execution.tiles++;
+        report->write_calls++;
+        status = sink->write(sink->context, pos, count,
+                             (me_buffer){write_ptr, count * out_width}, error);
+        if (status != ME_SUCCESS) break;
+        report->write_items += count;
+        if (count > report->max_write_items) report->max_write_items = count;
+        report->written_bytes += count * out_width;
+        pos += count;
+    }
+
+    if (scoped && status != ME_ERR_UNSUPPORTED) {
+        me_status end_st = me_fp_scope_end(&scope, status == ME_SUCCESS ? error : NULL);
+        report->execution.fp.flags |= fp.flags;
+        report->execution.fp.supported = fp.supported;
+        if (status == ME_SUCCESS) status = end_st;
+    }
+    if (status == ME_SUCCESS && (report->execution.fp.flags & raise_mask)) {
+        status = storage_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
+    }
+    free(gather_buf);
+    free(out_buf);
+    (void)idx_buf;
+    return status;
+}
+
+me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
+                                    const b2nd_exec_source *sources,
+                                    const b2nd_exec_view *views, size_t ninputs,
+                                    me_mut_buffer output,
+                                    const b2nd_exec_sink *sink,
+                                    unsigned raise_mask,
+                                    size_t max_gather_bytes,
+                                    size_t max_output_bytes,
+                                    b2nd_exec_callback_report *report,
+                                    me_error *error) {
+    if (error) *error = (me_error){0};
+    b2nd_exec_callback_report local_rep = {0};
+    if (report) *report = local_rep;
+    if (!schedule || !sources || !ninputs || ninputs > B2ND_EXEC_MAX_INPUTS ||
+        (raise_mask & ~15u)) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid source callback execution bindings");
+    }
+    if (sink && output.data) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Specify either resident output or sink, not both");
+    }
+    b2nd_exec_plan_info plan_info = {0};
+    b2nd_exec_schedule_info sched_info = {0};
+    uint32_t direct_slot = 0;
+    const me_kernel *kernel = b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, &direct_slot);
+    if (!kernel || ninputs != plan_info.ninputs) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Mismatched source callback input count");
+    }
+    if (sink) {
+        if (sink->struct_size != sizeof(*sink) || !sink->write ||
+            sink->dtype != plan_info.dtype || sink->itemsize != plan_info.itemsize ||
+            sink->ndim != sched_info.output_ndim) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Invalid execution sink binding");
+        }
+        for (size_t d = 0; d < sink->ndim; d++) {
+            if (sink->shape[d] != sched_info.output_shape[d]) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Execution sink shape mismatch");
+            }
+        }
+    }
+
+    bool is_cb[B2ND_EXEC_MAX_INPUTS] = {0};
+    bool has_cb = false;
+    b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS] = {0};
+    source_callback_state src_states[B2ND_EXEC_MAX_INPUTS];
+    for (size_t i = 0; i < ninputs; i++) {
+        if (sources[i].struct_size != sizeof(sources[i])) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Invalid execution source descriptor");
+        }
+        b2nd_exec_input_meta in_meta = {0};
+        me_status st = b2nd_exec_schedule_input(schedule, i, &in_meta);
+        if (st != ME_SUCCESS) {
+            return storage_error(error, st, "Invalid execution source slot");
+        }
+        if (sources[i].dtype != in_meta.dtype || sources[i].itemsize != in_meta.itemsize ||
+            sources[i].ndim != in_meta.ndim) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Execution source dtype or rank mismatch");
+        }
+        for (size_t d = 0; d < in_meta.ndim; d++) {
+            if (sources[i].shape[d] != in_meta.shape[d]) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Execution source shape mismatch");
+            }
+        }
+        if (sources[i].read) {
+            is_cb[i] = true;
+            has_cb = true;
+        } else {
+            if (!views) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Missing resident view for non-callback source");
+            }
+            st = b2nd_exec_validate_view(schedule, i, &views[i], error);
+            if (st != ME_SUCCESS) return st;
+            bound_views[i] = views[i];
+        }
+    }
+
+    size_t idx_bytes = (has_cb && sched_info.nitems && sched_info.tile_items)
+        ? sched_info.tile_items * sizeof(size_t) : 0;
+    size_t *idx_buf = idx_bytes ? malloc(idx_bytes) : NULL;
+    if (idx_bytes && !idx_buf) {
+        return storage_error(error, ME_ERR_OOM, "Cannot allocate callback index buffer");
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        source_state_init(&src_states[i], &sources[i], schedule, i, &plan_info, &sched_info, idx_buf);
+    }
+
+    me_status status = ME_SUCCESS;
+    if (sink && !plan_info.reduction) {
+        status = source_stream_map(schedule, kernel, &plan_info, &sched_info, direct_slot,
+                                   bound_views, src_states, is_cb, ninputs, sink, raise_mask,
+                                   max_gather_bytes, max_output_bytes, idx_buf, idx_bytes,
+                                   &local_rep, error);
+    } else {
+        b2nd_exec_reader readers[B2ND_EXEC_MAX_INPUTS] = {0};
+        for (size_t i = 0; i < ninputs; i++) {
+            if (is_cb[i]) {
+                readers[i] = (b2nd_exec_reader){&src_states[i], source_read_trampoline};
+            }
+        }
+        local_rep.index_buffer_bytes = idx_bytes;
+        if (!sink) {
+            size_t dummy_tasks = 1;
+            status = b2nd_exec_plan_readers(schedule, bound_views, is_cb, ninputs, output,
+                                            max_gather_bytes, NULL, &dummy_tasks, error);
+            if (status == ME_SUCCESS) {
+                status = b2nd_exec_execute_readers(schedule, bound_views, readers, ninputs,
+                                                   output, raise_mask, max_gather_bytes,
+                                                   &local_rep.execution, error);
+            }
+        } else {
+            size_t out_buf_bytes = sched_info.output_items * plan_info.itemsize;
+            if (out_buf_bytes > max_output_bytes) {
+                free(idx_buf);
+                return storage_error(error, ME_ERR_INVALID_ARG,
+                                     "Callback reduction output buffer budget exceeded");
+            }
+            unsigned char *red_buf = out_buf_bytes ? malloc(out_buf_bytes) : NULL;
+            if (out_buf_bytes && !red_buf) {
+                free(idx_buf);
+                return storage_error(error, ME_ERR_OOM, "Cannot allocate callback reduction output");
+            }
+            local_rep.output_buffer_bytes = out_buf_bytes;
+            me_mut_buffer red_out = {red_buf, out_buf_bytes};
+            size_t dummy_tasks = 1;
+            status = b2nd_exec_plan_readers(schedule, bound_views, is_cb, ninputs, red_out,
+                                            max_gather_bytes, NULL, &dummy_tasks, error);
+            if (status == ME_SUCCESS) {
+                status = b2nd_exec_execute_readers(schedule, bound_views, readers, ninputs,
+                                                   red_out, raise_mask, max_gather_bytes,
+                                                   &local_rep.execution, error);
+            }
+            size_t chunk_items = sched_info.tile_items ? sched_info.tile_items : 1;
+            for (size_t pos = 0; status == ME_SUCCESS && pos < sched_info.output_items;) {
+                size_t count = sched_info.output_items - pos < chunk_items
+                    ? sched_info.output_items - pos : chunk_items;
+                local_rep.write_calls++;
+                status = sink->write(sink->context, pos, count,
+                                     (me_buffer){red_buf + pos * plan_info.itemsize,
+                                                 count * plan_info.itemsize},
+                                     error);
+                if (status != ME_SUCCESS) break;
+                local_rep.write_items += count;
+                if (count > local_rep.max_write_items) local_rep.max_write_items = count;
+                local_rep.written_bytes += count * plan_info.itemsize;
+                pos += count;
+            }
+            free(red_buf);
+        }
+    }
+
+    for (size_t i = 0; i < ninputs; i++) {
+        if (!is_cb[i]) continue;
+        local_rep.read_calls += src_states[i].read_calls;
+        local_rep.read_items += src_states[i].read_items;
+        if (src_states[i].max_read_items > local_rep.max_read_items) {
+            local_rep.max_read_items = src_states[i].max_read_items;
+        }
+        local_rep.read_bytes += src_states[i].read_bytes;
+    }
+    free(idx_buf);
+    if (report) *report = local_rep;
+    return status;
+}
+
+static me_status partition_read_source_box(const b2nd_exec_source *src, size_t dom_ndim,
+                                           const size_t *origin, const size_t *extent,
+                                           size_t total, size_t *idx_buf,
+                                           unsigned char *dst, me_error *error) {
+    if (!total) return ME_SUCCESS;
+    size_t eff_stride[B2ND_EXEC_MAX_RANK] = {0};
+    if (src->ndim > 0) {
+        size_t in_strides[B2ND_EXEC_MAX_RANK] = {0};
+        size_t stride = 1;
+        for (size_t a = src->ndim; a-- > 0;) {
+            in_strides[a] = src->shape[a] == 1 ? 0 : stride;
+            stride *= (size_t)src->shape[a];
+        }
+        size_t shift = dom_ndim - src->ndim;
+        for (size_t d = shift; d < dom_ndim; d++) {
+            eff_stride[d] = in_strides[d - shift];
+        }
+    }
+    size_t local_c[B2ND_EXEC_MAX_RANK] = {0};
+    for (size_t lane = 0; lane < total; lane++) {
+        size_t flat = 0;
+        for (size_t d = 0; d < dom_ndim; d++) {
+            flat += (origin[d] + local_c[d]) * eff_stride[d];
+        }
+        idx_buf[lane] = flat;
+        if (lane + 1 < total) {
+            for (size_t d = dom_ndim; d-- > 0;) {
+                if (++local_c[d] < extent[d]) break;
+                local_c[d] = 0;
+            }
+        }
+    }
+    return src->read(src->context, idx_buf, total,
+                     (me_mut_buffer){dst, total * src->itemsize}, error);
+}
+
+static void partition_commit_elementwise(const b2nd_exec_partition_layout *part,
+                                         const size_t *origin, const size_t *extent,
+                                         const unsigned char *group_buf,
+                                         unsigned char *output_base, size_t itemsize) {
+    if (part->ndim == 0) {
+        memcpy(output_base, group_buf, itemsize);
+        return;
+    }
+    size_t ndim = part->ndim;
+    size_t out_strides[B2ND_EXEC_MAX_RANK] = {0};
+    size_t grp_strides[B2ND_EXEC_MAX_RANK] = {0};
+    size_t o_stride = 1, g_stride = 1;
+    for (size_t d = ndim; d-- > 0;) {
+        out_strides[d] = o_stride;
+        grp_strides[d] = g_stride;
+        o_stride *= (size_t)(part->sel_stop[d] - part->sel_start[d]);
+        g_stride *= extent[d];
+    }
+    size_t i_start[B2ND_EXEC_MAX_RANK] = {0};
+    size_t i_len[B2ND_EXEC_MAX_RANK] = {0};
+    size_t outer_rows = 1;
+    for (size_t d = 0; d < ndim; d++) {
+        size_t s0 = (size_t)part->sel_start[d] > origin[d] ? (size_t)part->sel_start[d] : origin[d];
+        size_t o1 = origin[d] + extent[d];
+        size_t s1 = (size_t)part->sel_stop[d] < o1 ? (size_t)part->sel_stop[d] : o1;
+        i_start[d] = s0;
+        i_len[d] = s1 - s0;
+        if (d + 1 < ndim) outer_rows *= i_len[d];
+    }
+    size_t d_last = ndim - 1;
+    size_t run_bytes = i_len[d_last] * itemsize;
+    size_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    for (size_t row = 0; row < outer_rows; row++) {
+        size_t o_off = (i_start[d_last] - (size_t)part->sel_start[d_last]) * out_strides[d_last];
+        size_t g_off = (i_start[d_last] - origin[d_last]) * grp_strides[d_last];
+        for (size_t d = 0; d < d_last; d++) {
+            size_t c = i_start[d] + coords[d];
+            o_off += (c - (size_t)part->sel_start[d]) * out_strides[d];
+            g_off += (c - origin[d]) * grp_strides[d];
+        }
+        memcpy(output_base + o_off * itemsize, group_buf + g_off * itemsize, run_bytes);
+        if (row + 1 < outer_rows) {
+            for (size_t d = d_last; d-- > 0;) {
+                if (++coords[d] < i_len[d]) break;
+                coords[d] = 0;
+            }
+        }
+    }
+}
+
+me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
+                                       const b2nd_array_t *const *arrays,
+                                       const b2nd_exec_view *views,
+                                       const b2nd_exec_source *sources,
+                                       size_t ninputs,
+                                       me_mut_buffer output,
+                                       unsigned raise_mask,
+                                       size_t max_decode_bytes,
+                                       size_t max_gather_bytes,
+                                       b2nd_exec_storage_report *report,
+                                       me_error *error) {
+    if (error) *error = (me_error){0};
+    if (report) *report = (b2nd_exec_storage_report){0};
+    if (!schedule || ninputs > B2ND_EXEC_MAX_INPUTS || (raise_mask & ~15u)) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid partition execution arguments");
+    }
+    b2nd_exec_partition_layout part = {0};
+    if (b2nd_exec_schedule_partitions(schedule, &part) != ME_SUCCESS ||
+        !part.is_partition_schedule) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Schedule is not a partition schedule");
+    }
+    b2nd_exec_plan_info plan_info = {0};
+    b2nd_exec_schedule_info sched_info = {0};
+    uint32_t direct_slot = 0;
+    const me_kernel *kernel = b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, &direct_slot);
+    (void)direct_slot;
+    if (!kernel || ninputs != plan_info.ninputs) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Mismatched partition input count");
+    }
+    size_t out_width = plan_info.itemsize;
+    size_t output_items = sched_info.output_items;
+    size_t output_bytes = output_items * out_width;
+    size_t out_align = storage_required_align(plan_info.dtype, out_width);
+    if (output.capacity > UINTPTR_MAX - (uintptr_t)output.data ||
+        output.capacity < output_bytes ||
+        (output_bytes && (!output.data || (uintptr_t)output.data % out_align != 0))) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid partition output extent or alignment");
+    }
+
+    typedef enum { KIND_VIEW = 0, KIND_ARRAY = 1, KIND_SOURCE = 2 } part_in_kind;
+    part_in_kind kinds[B2ND_EXEC_MAX_INPUTS] = {0};
+    storage_input base_arrays[B2ND_EXEC_MAX_INPUTS];
+    b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS] = {0};
+    b2nd_exec_source bound_srcs[B2ND_EXEC_MAX_INPUTS] = {0};
+    b2nd_exec_input_meta in_metas[B2ND_EXEC_MAX_INPUTS] = {0};
+    bool has_source = false;
+    size_t per_group_gather = 0;
+    size_t base_decode = 0;
+    size_t max_group_items = sched_info.tile_items;
+    for (size_t i = 0; i < ninputs; i++) {
+        me_status st = b2nd_exec_schedule_input(schedule, i, &in_metas[i]);
+        if (st != ME_SUCCESS) return storage_error(error, st, "Invalid partition input slot");
+        bool is_arr = arrays && arrays[i] != NULL;
+        bool is_src = sources && sources[i].read != NULL;
+        if (is_arr && is_src) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Ambiguous partition input binding");
+        }
+        if (is_arr) {
+            kinds[i] = KIND_ARRAY;
+            memset(&base_arrays[i], 0, sizeof(base_arrays[i]));
+            base_arrays[i].array = arrays[i];
+            st = storage_validate(&base_arrays[i], &in_metas[i], error);
+            if (st != ME_SUCCESS) return st;
+            st = storage_validate_chunks(&base_arrays[i], &output, error);
+            if (st != ME_SUCCESS) return st;
+            size_t bbytes = base_arrays[i].block_items * in_metas[i].itemsize;
+            if (base_arrays[i].items && bbytes > max_decode_bytes - base_decode) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Storage decode buffer budget exceeded");
+            }
+            if (base_arrays[i].items) base_decode += bbytes;
+        } else if (is_src) {
+            kinds[i] = KIND_SOURCE;
+            has_source = true;
+            if (sources[i].struct_size != sizeof(sources[i]) ||
+                sources[i].dtype != in_metas[i].dtype ||
+                sources[i].itemsize != in_metas[i].itemsize ||
+                sources[i].ndim != in_metas[i].ndim) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Partition source metadata mismatch");
+            }
+            for (size_t d = 0; d < in_metas[i].ndim; d++) {
+                if (sources[i].shape[d] != in_metas[i].shape[d]) {
+                    return storage_error(error, ME_ERR_INVALID_ARG, "Partition source shape mismatch");
+                }
+            }
+            bound_srcs[i] = sources[i];
+        } else if (views) {
+            kinds[i] = KIND_VIEW;
+            st = b2nd_exec_validate_view(schedule, i, &views[i], error);
+            if (st != ME_SUCCESS) return st;
+            if (views[i].capacity && output_bytes && output.capacity &&
+                (uintptr_t)views[i].base < (uintptr_t)output.data + output.capacity &&
+                (uintptr_t)output.data < (uintptr_t)views[i].base + views[i].capacity) {
+                return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased partition output is unsupported");
+            }
+            bound_views[i] = views[i];
+        } else {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Missing partition input binding");
+        }
+        if (output_items) {
+            size_t in_bytes = max_group_items * in_metas[i].itemsize;
+            if (per_group_gather > SIZE_MAX - in_bytes) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Partition gather size overflow");
+            }
+            per_group_gather += in_bytes;
+        }
+    }
+    if (per_group_gather > max_gather_bytes) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Partition gather buffer budget exceeded");
+    }
+
+    if (!output_items) {
+        if (raise_mask) {
+            me_fp_scope scope;
+            me_fp_status fp = {0};
+            me_status st = me_fp_scope_begin(&scope, &fp, error);
+            if (st != ME_SUCCESS) return st;
+            me_status end_st = me_fp_scope_end(&scope, NULL);
+            if (report) report->execution.fp.supported = fp.supported;
+            if (end_st != ME_SUCCESS) return end_st;
+            if (!fp.supported) {
+                return storage_error(error, ME_ERR_UNSUPPORTED,
+                                     "Floating exception reporting is unavailable");
+            }
+        }
+        if (report) report->execution.tasks = 1;
+        return ME_SUCCESS;
+    }
+
+    size_t cache_slots[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t extra_budget = max_decode_bytes - base_decode;
+    for (size_t i = 0; i < ninputs; i++) {
+        if (kinds[i] == KIND_ARRAY && base_arrays[i].items) cache_slots[i] = 1;
+    }
+    for (size_t pass = 1; pass < STORAGE_BLOCK_CACHE_SLOTS; pass++) {
+        bool grew = false;
+        for (size_t i = 0; i < ninputs; i++) {
+            if (!cache_slots[i]) continue;
+            size_t bbytes = base_arrays[i].block_items * in_metas[i].itemsize;
+            size_t blocks_per_chunk = bbytes && base_arrays[i].bytes ? base_arrays[i].bytes / bbytes : 1;
+            size_t total_blocks = (size_t)arrays[i]->sc->nchunks * blocks_per_chunk;
+            if (cache_slots[i] >= total_blocks) continue;
+            if (bbytes <= extra_budget) {
+                cache_slots[i]++;
+                extra_budget -= bbytes;
+                grew = true;
+            }
+        }
+        if (!grew) break;
+    }
+
+    storage_block_cache bcaches[B2ND_EXEC_MAX_INPUTS];
+    memset(bcaches, 0, sizeof(bcaches));
+    unsigned char *in_bufs[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t *idx_buf = NULL;
+    unsigned char *out_buf = NULL;
+    b2nd_exec_storage_report local_rep = {0};
+    local_rep.execution.tasks = 1;
+    local_rep.execution.gather_bytes = per_group_gather;
+    local_rep.execution.mapped_bytes = sched_info.mapped_bytes;
+    local_rep.execution.worker_bytes = per_group_gather + sched_info.mapped_bytes;
+    me_status status = ME_SUCCESS;
+
+    if (has_source && max_group_items) {
+        idx_buf = malloc(max_group_items * sizeof(size_t));
+        if (!idx_buf) status = storage_error(error, ME_ERR_OOM, "Cannot allocate partition index buffer");
+    }
+    if (status == ME_SUCCESS && sched_info.mapped_bytes) {
+        out_buf = malloc(sched_info.mapped_bytes);
+        if (!out_buf) status = storage_error(error, ME_ERR_OOM, "Cannot allocate partition output buffer");
+    }
+    for (size_t i = 0; status == ME_SUCCESS && i < ninputs; i++) {
+        size_t in_bytes = max_group_items * in_metas[i].itemsize;
+        in_bufs[i] = in_bytes ? malloc(in_bytes) : NULL;
+        if (in_bytes && !in_bufs[i]) {
+            status = storage_error(error, ME_ERR_OOM, "Cannot allocate partition gather buffer");
+            break;
+        }
+        if (kinds[i] == KIND_ARRAY && cache_slots[i]) {
+            storage_block_cache *bc = &bcaches[i];
+            bc->array = base_arrays[i].array;
+            bc->itemsize = in_metas[i].itemsize;
+            bc->block_items = base_arrays[i].block_items;
+            bc->block_bytes = base_arrays[i].block_items * in_metas[i].itemsize;
+            bc->nslots = cache_slots[i];
+            memcpy(bc->chunk_grid, base_arrays[i].chunk_grid, sizeof(bc->chunk_grid));
+            memcpy(bc->block_grid, base_arrays[i].block_grid, sizeof(bc->block_grid));
+            blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+            dp.nthreads = 1;
+            bc->dctx = blosc2_create_dctx(dp);
+            if (!bc->dctx) {
+                status = storage_error(error, ME_ERR_OOM, "Cannot allocate partition decode context");
+                break;
+            }
+            for (size_t s = 0; s < bc->nslots; s++) {
+                bc->cached_chunk[s] = -1;
+                bc->cached_block[s] = -1;
+                bc->blocks[s] = bc->block_bytes ? malloc(bc->block_bytes) : NULL;
+                if (bc->block_bytes && !bc->blocks[s]) {
+                    status = storage_error(error, ME_ERR_OOM, "Cannot allocate partition block slot");
+                    break;
+                }
+                local_rep.decode_bytes += bc->block_bytes;
+            }
+        }
+    }
+
+    size_t g_start[B2ND_EXEC_MAX_RANK] = {0};
+    size_t g_stop[B2ND_EXEC_MAX_RANK] = {0};
+    size_t ngroups = 1;
+    bool scalar_blocks = plan_info.cardinality == ME_BLOCK_SCALAR;
+    for (size_t d = 0; d < part.ndim; d++) {
+        if (scalar_blocks) {
+            g_start[d] = (size_t)part.sel_start[d];
+            g_stop[d] = (size_t)part.sel_stop[d];
+        } else {
+            size_t p = (size_t)part.partitions[d];
+            g_start[d] = (size_t)part.sel_start[d] / p;
+            g_stop[d] = ((size_t)part.sel_stop[d] + p - 1) / p;
+        }
+        ngroups *= g_stop[d] - g_start[d];
+    }
+
+    bool scoped = (plan_info.dtype != ME_STRING) || raise_mask != 0;
+    me_fp_scope scope;
+    me_fp_status fp = {0};
+    if (status == ME_SUCCESS && scoped) {
+        status = me_fp_scope_begin(&scope, &fp, error);
+        if (status == ME_SUCCESS && raise_mask && !fp.supported) {
+            me_fp_scope_end(&scope, NULL);
+            status = storage_error(error, ME_ERR_UNSUPPORTED,
+                                   "Floating exception reporting is unavailable");
+            scoped = false;
+        }
+    }
+
+    size_t g_coord[B2ND_EXEC_MAX_RANK];
+    memcpy(g_coord, g_start, sizeof(g_coord));
+    me_buffer spans[B2ND_EXEC_MAX_INPUTS] = {0};
+    for (size_t g_idx = 0; status == ME_SUCCESS && g_idx < ngroups; g_idx++) {
+        size_t origin[B2ND_EXEC_MAX_RANK] = {0}, extent[B2ND_EXEC_MAX_RANK] = {0};
+        int64_t origin_i64[B2ND_EXEC_MAX_RANK] = {0}, extent_i64[B2ND_EXEC_MAX_RANK] = {0};
+        size_t group_items = 1;
+        for (size_t d = 0; d < part.ndim; d++) {
+            size_t o = g_coord[d] * (size_t)part.partitions[d];
+            size_t rem = (size_t)part.domain[d] - o;
+            size_t ext = (size_t)part.partitions[d] < rem ? (size_t)part.partitions[d] : rem;
+            origin[d] = o;
+            extent[d] = ext;
+            origin_i64[d] = (int64_t)o;
+            extent_i64[d] = (int64_t)ext;
+            group_items *= ext;
+        }
+        for (size_t i = 0; status == ME_SUCCESS && i < ninputs; i++) {
+            size_t bytes = group_items * in_metas[i].itemsize;
+            if (kinds[i] == KIND_ARRAY) {
+                status = storage_read_box_cached(&bcaches[i], part.ndim, origin, extent,
+                                                 in_bufs[i], error);
+            } else if (kinds[i] == KIND_SOURCE) {
+                status = partition_read_source_box(&bound_srcs[i], part.ndim, origin, extent,
+                                                   group_items, idx_buf, in_bufs[i], error);
+            } else {
+                b2nd_exec_gather_box(schedule, i, &bound_views[i], origin, extent, in_bufs[i]);
+            }
+            if (status != ME_SUCCESS) break;
+            local_rep.execution.gathered_bytes += bytes;
+            spans[i] = (me_buffer){in_bufs[i], bytes};
+        }
+        if (status != ME_SUCCESS) break;
+        me_block block = ME_BLOCK_INITIALIZER;
+        block.nitems = group_items;
+        if (plan_info.context_ndim > 0) {
+            block.ndim = (int)part.ndim;
+            block.logical_shape = part.domain;
+            block.origin = origin_i64;
+            block.extent = extent_i64;
+        }
+        size_t group_out_items = scalar_blocks ? 1 : group_items;
+        size_t group_out_bytes = group_out_items * out_width;
+        me_fp_status tile_fp = {0};
+        me_run_options run_opts = ME_RUN_OPTIONS_INITIALIZER;
+        run_opts.fp_status = &tile_fp;
+        me_execution_backend backend = ME_BACKEND_NONE;
+        status = me_eval_block_backend(kernel, spans, ninputs,
+                                       (me_mut_buffer){out_buf, group_out_bytes},
+                                       &block, &run_opts, &backend, error);
+        local_rep.execution.interpreter_calls += backend == ME_BACKEND_INTERPRETER;
+        local_rep.execution.jit_calls += backend == ME_BACKEND_JIT;
+        fp.flags |= tile_fp.flags;
+        if (status != ME_SUCCESS) break;
+        local_rep.execution.tiles++;
+        local_rep.execution.map_calls++;
+        local_rep.evaluated_groups++;
+        if (group_items > local_rep.max_group_items) local_rep.max_group_items = group_items;
+        if (scalar_blocks) {
+            memcpy((unsigned char *)output.data + g_idx * out_width, out_buf, out_width);
+        } else {
+            partition_commit_elementwise(&part, origin, extent, out_buf, output.data, out_width);
+        }
+        if (g_idx + 1 < ngroups) {
+            for (size_t d = part.ndim; d-- > 0;) {
+                if (++g_coord[d] < g_stop[d]) break;
+                g_coord[d] = g_start[d];
+            }
+        }
+    }
+
+    if (scoped && status != ME_ERR_UNSUPPORTED) {
+        me_status end_st = me_fp_scope_end(&scope, status == ME_SUCCESS ? error : NULL);
+        local_rep.execution.fp.flags |= fp.flags;
+        local_rep.execution.fp.supported = fp.supported;
+        if (status == ME_SUCCESS) status = end_st;
+    }
+    if (status == ME_SUCCESS && (local_rep.execution.fp.flags & raise_mask)) {
+        status = storage_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        local_rep.decodes += bcaches[i].decodes;
+        local_rep.decoded_bytes += bcaches[i].decoded_bytes;
+        local_rep.cache_hits += bcaches[i].cache_hits;
+        local_rep.read_spans += bcaches[i].read_spans;
+        if (bcaches[i].dctx) blosc2_free_ctx(bcaches[i].dctx);
+        for (size_t s = 0; s < STORAGE_BLOCK_CACHE_SLOTS; s++) free(bcaches[i].blocks[s]);
+        free(in_bufs[i]);
+    }
+    free(out_buf);
+    free(idx_buf);
+    if (report) *report = local_rep;
     return status;
 }
