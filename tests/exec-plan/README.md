@@ -14,7 +14,7 @@ Input values, callbacks and outputs are not part of preparation/specialization.
 The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
-The serial executor binds native aligned contiguous buffers in slot order.
+The executor binds native aligned contiguous buffers in slot order.
 Same-shape metadata includes rank-zero scalars and ranked empty map domains;
 empty minimum remains an error. No broadcasting or strided gathering is implied.
 Default whole-domain sum/product/min/max use shared core primitives and
@@ -49,3 +49,11 @@ also links this fixture against the actual C-Blosc2 static library.
 `faults.c` injects failures in planner-owned allocations; core/compiler
 allocation coverage stays in miniexpr. Sanitizers can be enabled with the
 normal CMake compiler/linker flags.
+Hosts may request partitioned jobs through `b2nd_exec_jobs`. C-Blosc2 owns the
+partition boundaries, the aggregate mapped-scratch budget and the ordered
+combination; hosts only supply a count. Ordered sums/products reject
+partitioning so strict serial leaves cannot be redefined. Order-independent
+reductions, identity reductions and disjoint map tiles partition. Partials
+combine by logical task ID, never completion order, and every started thread is
+joined before return, including on a start failure. Windows currently uses the
+serial path only.

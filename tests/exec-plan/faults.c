@@ -66,7 +66,7 @@ int main(void) {
     allocations = 0;
     fail_at = 1;
     assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){output, sizeof(output)},
-        0, &report, &error) == ME_ERR_OOM);
+        0, NULL, &report, &error) == ME_ERR_OOM);
     assert(!report.tiles && ((unsigned char *)output)[0] == 0x55);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);

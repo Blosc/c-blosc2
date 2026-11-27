@@ -4,6 +4,7 @@
 #include <fenv.h>
 #include <float.h>
 #include <limits.h>
+#include <stdlib.h>
 #include <string.h>
 
 static b2nd_exec_node node(uint32_t id, b2nd_exec_op op) {
@@ -106,17 +107,17 @@ int main(void) {
     me_buffer buffers[2] = {{x, sizeof(x)}, {y, sizeof(y)}};
     b2nd_exec_report report;
     assert(b2nd_exec_execute(schedule, buffers, 2, (me_mut_buffer){&result, 8}, 0,
-        &report, &error) == ME_SUCCESS);
+        NULL, &report, &error) == ME_SUCCESS);
     assert(result == 5 && report.tiles == 3 && report.map_calls == 3 && report.mapped_bytes == 64);
     assert(!report.fp.flags);
     result = 99;
     buffers[1].capacity--;
     assert(b2nd_exec_execute(schedule, buffers, 2, (me_mut_buffer){&result, 8}, 0,
-        &report, &error) == ME_ERR_INVALID_ARG);
+        NULL, &report, &error) == ME_ERR_INVALID_ARG);
     assert(result == 99 && !report.tiles);
     buffers[1].capacity++;
     assert(b2nd_exec_execute(schedule, buffers, 2, (me_mut_buffer){x, sizeof(x)}, 0,
-        &report, &error) == ME_ERR_UNSUPPORTED);
+        NULL, &report, &error) == ME_ERR_UNSUPPORTED);
     assert(x[0] == 100 && !report.tiles);
     b2nd_exec_schedule_free(schedule);
     assert(b2nd_exec_specialize(plan, metadata, 2, 8, 63, &schedule, &error) == ME_ERR_INVALID_ARG);
@@ -178,7 +179,7 @@ int main(void) {
     metadata[0] = metadata[1];
     assert(b2nd_exec_specialize(plan, metadata, 2, 8, 64, &schedule, &error) == ME_SUCCESS);
     assert(b2nd_exec_execute(schedule, buffers, 2, (me_mut_buffer){&result, 8}, 0,
-        &report, &error) == ME_SUCCESS);
+        NULL, &report, &error) == ME_SUCCESS);
     assert(result == 5);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
@@ -213,7 +214,7 @@ int main(void) {
         double f64[] = {7, -2, 5}, out64 = 0;
         me_buffer input = {kind == 0 ? (void *)i16 : kind == 1 ? (void *)f32 : (void *)f64, 3 * width};
         me_mut_buffer output = {kind == 0 ? (void *)&out16 : kind == 1 ? (void *)&out32 : (void *)&out64, width};
-        assert(b2nd_exec_execute(schedule, &input, 1, output, 0, &report, &error) == ME_SUCCESS);
+        assert(b2nd_exec_execute(schedule, &input, 1, output, 0, NULL, &report, &error) == ME_SUCCESS);
         assert(kind == 0 ? out16 == -6 : kind == 1 ? out32 == -6 : out64 == -6);
         assert(report.tiles == 2 && report.mapped_bytes == 2 * width);
         if (kind == 1) {
@@ -223,14 +224,14 @@ int main(void) {
             feclearexcept(FE_ALL_EXCEPT);
             feraiseexcept(FE_DIVBYZERO);
             assert(b2nd_exec_execute(schedule, &input, 1, output, ME_FP_OVERFLOW,
-                &report, &error) == ME_ERR_EVAL);
+                NULL, &report, &error) == ME_ERR_EVAL);
             assert(out32 == 11 && (report.fp.flags & ME_FP_OVERFLOW));
             assert(report.tiles == 2 && report.map_calls == 2);
             assert(fetestexcept(FE_ALL_EXCEPT) == FE_DIVBYZERO);
             feclearexcept(FE_ALL_EXCEPT);
 #else
             assert(b2nd_exec_execute(schedule, &input, 1, output, ME_FP_OVERFLOW,
-                &report, &error) == ME_ERR_UNSUPPORTED);
+                NULL, &report, &error) == ME_ERR_UNSUPPORTED);
             assert(out32 == 11 && !report.tiles && !report.fp.supported);
 #endif
         }
@@ -251,7 +252,7 @@ int main(void) {
             assert(b2nd_exec_specialize(plan, &meta, 1, 2, 16, &schedule, &error) == ME_SUCCESS);
             uint64_t scalar = 0;
             assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
-                0, &report, &error) == ME_SUCCESS);
+                0, NULL, &report, &error) == ME_SUCCESS);
             assert(scalar_value(info.dtype, scalar) == expected[r]);
             assert(report.mapped_bytes == 2 * width);
             b2nd_exec_schedule_free(schedule);
@@ -260,7 +261,7 @@ int main(void) {
                 assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
                 me_buffer empty = {NULL, 0};
                 assert(b2nd_exec_execute(schedule, &empty, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
-                    0, &report, &error) == ME_SUCCESS);
+                    0, NULL, &report, &error) == ME_SUCCESS);
                 assert(scalar_value(info.dtype, scalar) == (r == 0 ? 0 : 1));
                 assert(!report.tiles && !report.map_calls);
                 b2nd_exec_schedule_free(schedule);
@@ -272,7 +273,7 @@ int main(void) {
             assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.identity);
             assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
             assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
-                0, &report, &error) == ME_SUCCESS);
+                0, NULL, &report, &error) == ME_SUCCESS);
             assert(scalar_value(info.dtype, scalar) == (r == 0 ? 10 : r == 1 ? -70 : 7));
             assert(!report.map_calls && !report.mapped_bytes && report.direct_tiles == 2);
             b2nd_exec_schedule_free(schedule);
@@ -289,12 +290,112 @@ int main(void) {
         output = (me_mut_buffer){
             kind == 0 ? (void *)map16 : kind == 1 ? (void *)map32 : (void *)map64, 3 * width};
         f32[2] = 5;
-        assert(b2nd_exec_execute(schedule, &input, 1, output, 0, &report, &error) == ME_SUCCESS);
+        assert(b2nd_exec_execute(schedule, &input, 1, output, 0, NULL, &report, &error) == ME_SUCCESS);
         assert(kind == 0 ? map16[2] == 15 : kind == 1 ? map32[2] == 15 : map64[2] == 15);
         assert(report.map_calls == 2);
         assert(report.mapped_bytes == 0);
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
+    }
+    /* Partitioned jobs: ordered combine, per-job FP scope, bounded scratch. */
+    {
+        b2nd_exec_node part[3];
+        part[0] = node(0, B2ND_EXEC_INPUT);
+        part[0].dtype = ME_INT64;
+        part[0].itemsize = 8;
+        part[1] = node(1, B2ND_EXEC_MIN);
+        part[1].nargs = 1;
+        part[1].args[0] = 0;
+        b2nd_exec_descriptor jobs_descriptor = {sizeof(jobs_descriptor), part, 2, 1, 1};
+        assert(b2nd_exec_prepare(&jobs_descriptor, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta jobs_meta = {ME_INT64, 8, 1, {1000}};
+        assert(b2nd_exec_specialize(plan, &jobs_meta, 1, 16, 0, &schedule, &error) == ME_SUCCESS);
+        int64_t *many = malloc(1000 * sizeof(*many));
+        assert(many);
+        for (size_t i = 0; i < 1000; i++) {
+            many[i] = 100000 - (int64_t)i;
+        }
+        many[511] = -7;
+        me_buffer many_buffer = {many, 1000 * sizeof(*many)};
+        b2nd_exec_jobs jobs = {sizeof(jobs), 1, 0};
+        int64_t parallel_result = 0;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(parallel_result == -7 && report.tasks == 1);
+        jobs.workers = 4;
+        parallel_result = 0;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(parallel_result == -7 && report.tasks == 4);
+        assert(report.tiles == 63 && report.direct_tiles == 63 && report.map_calls == 0);
+        /* Same result for every admitted worker count. */
+        for (size_t workers = 1; workers <= 7; workers++) {
+            jobs.workers = workers;
+            parallel_result = 0;
+            assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+                0, &jobs, &report, &error) == ME_SUCCESS);
+            assert(parallel_result == -7);
+            assert(report.tasks == workers);
+        }
+        /* A truncated input must fail before any job starts. */
+        many_buffer.capacity--;
+        jobs.workers = 4;
+        parallel_result = 99;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(parallel_result == 99 && !report.tasks);
+        many_buffer.capacity++;
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Ordered sums keep serial leaves: partitioning is rejected, not reordered. */
+        part[1].op = B2ND_EXEC_SUM;
+        assert(b2nd_exec_prepare(&jobs_descriptor, NULL, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(plan, &jobs_meta, 1, 16, 0, &schedule, &error) == ME_SUCCESS);
+        jobs.workers = 2;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_ERR_UNSUPPORTED);
+        jobs.workers = 1;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_SUCCESS);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Mapped reductions need one tile per job, charged to an aggregate budget. */
+        part[0] = node(0, B2ND_EXEC_INPUT);
+        part[0].dtype = ME_INT64;
+        part[0].itemsize = 8;
+        part[1] = node(1, B2ND_EXEC_CAPTURE);
+        part[1].dtype = ME_INT64;
+        part[1].itemsize = part[1].scalar_size = 8;
+        part[1].category = ME_CAPTURE_WEAK;
+        scale = 2;
+        memcpy(part[1].scalar, &scale, 8);
+        part[2] = node(3, B2ND_EXEC_MAX);
+        part[2].nargs = 1;
+        part[2].args[0] = 2;
+        b2nd_exec_node mapped_nodes[4] = {part[0], part[1],
+            node(2, B2ND_EXEC_ADD), part[2]};
+        mapped_nodes[2].nargs = 2;
+        mapped_nodes[2].args[0] = 0;
+        mapped_nodes[2].args[1] = 1;
+        b2nd_exec_descriptor mapped_descriptor = {sizeof(mapped_descriptor), mapped_nodes, 4, 1, 3};
+        assert(b2nd_exec_prepare(&mapped_descriptor, NULL, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(plan, &jobs_meta, 1, 16, 1024, &schedule, &error) == ME_SUCCESS);
+        jobs.workers = 4;
+        jobs.max_worker_scratch = 127; /* 4 * 128 bytes needed. */
+        parallel_result = 0;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(parallel_result == 0 && !report.tasks);
+        jobs.max_worker_scratch = 512;
+        assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
+            0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(parallel_result == 100002);
+        assert(report.tasks == 4 && report.worker_bytes == 512 && report.map_calls == 63);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+        free(many);
     }
     /* Authored formula kernels share the executor; no Menudet substitution. */
     me_input_spec slot = {"x", ME_INT64, 8};
@@ -319,14 +420,14 @@ int main(void) {
     int64_t direct_input[] = {7, -2, 5}, direct_output[3];
     me_buffer direct_buffer = {direct_input, sizeof(direct_input)};
     assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
-        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &report, &error) == ME_SUCCESS);
+        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
     assert(direct_output[0] == 14 && direct_output[1] == -4 && direct_output[2] == 10);
     assert(report.map_calls == 2 && !report.mapped_bytes);
     b2nd_exec_schedule_free(schedule);
     direct_meta.ndim = 0;
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
     assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
-        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &report, &error) == ME_SUCCESS);
+        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
     assert(report.tiles == 1 && direct_output[0] == 14);
     b2nd_exec_schedule_free(schedule);
     direct_meta.ndim = 2;
@@ -335,7 +436,7 @@ int main(void) {
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
     me_buffer empty = {NULL, 0};
     assert(b2nd_exec_execute(schedule, &empty, 1,
-        (me_mut_buffer){NULL, 0}, 0, &report, &error) == ME_SUCCESS);
+        (me_mut_buffer){NULL, 0}, 0, NULL, &report, &error) == ME_SUCCESS);
     assert(!report.tiles && !report.map_calls);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);

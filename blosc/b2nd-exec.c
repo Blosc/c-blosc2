@@ -453,10 +453,156 @@ static bool valid_extent(const void *data, size_t capacity, size_t bytes, size_t
         (data && (uintptr_t)data % alignment == 0 && (uintptr_t)data <= UINTPTR_MAX - bytes));
 }
 
+typedef struct {
+    const b2nd_exec_schedule *schedule;
+    const me_buffer *inputs;
+    size_t ninputs;
+    me_mut_buffer output;
+    unsigned raise_mask;
+    unsigned char *mapped; /* This job's tile, already bounded by the caller. */
+    size_t tile;           /* Global first tile index. */
+    size_t end;            /* Global past-last tile index. */
+    uint64_t partial;
+    size_t tiles, map_calls, direct_tiles;
+    me_fp_status fp;
+    bool fp_seen;
+    bool fp_scoped;
+    me_status status;
+    me_error error;
+} exec_job;
+
+static void exec_reduce(exec_job *job, const void *values, size_t count) {
+    const b2nd_exec_plan *plan = job->schedule->plan;
+    if (plan->info.reducer == ME_REDUCTION_SUM) {
+        if (!me_sum_span(plan->info.map_dtype, values, count, job->partial, false, &job->partial)) {
+            job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+        }
+    } else if (plan->info.reducer == ME_REDUCTION_PROD) {
+        if (!me_prod_span(plan->info.map_dtype, values, count, job->partial, false, &job->partial)) {
+            job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+        }
+    } else if (!me_extrema_span(plan->info.map_dtype, values, count, job->partial, job->tiles != 0,
+                                plan->info.reducer == ME_REDUCTION_MIN, &job->partial)) {
+        job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+    }
+}
+
+/* Traverse this job's logical tile range. Each job owns its mapped tile and FP
+ * scope, so jobs may run on different host threads. Counters stay per job and
+ * are combined in task order afterwards. */
+static void exec_run(exec_job *job) {
+    const b2nd_exec_plan *plan = job->schedule->plan;
+    size_t items = job->schedule->info.nitems;
+    size_t width = plan->info.itemsize;
+    size_t map_width = plan->info.map_itemsize;
+    size_t tile_items = job->schedule->info.tile_items;
+    bool floating = plan->info.reduction &&
+        (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
+    bool scoped = floating || job->raise_mask != 0;
+    job->fp_scoped = scoped;
+    me_fp_scope scope;
+    me_fp_status reducer_fp = {0};
+    if (scoped) {
+        job->status = me_fp_scope_begin(&scope, &reducer_fp, &job->error);
+        if (job->status != ME_SUCCESS) {
+            return;
+        }
+        if (job->raise_mask && !reducer_fp.supported) {
+            me_fp_scope_end(&scope, NULL);
+            job->status = exec_error(&job->error, ME_ERR_UNSUPPORTED,
+                                     "Floating exception reporting is unavailable");
+            return;
+        }
+    }
+    uint32_t direct_slot = plan->direct_slot;
+    for (size_t t = job->tile; t < job->end && job->status == ME_SUCCESS; t++) {
+        size_t pos = t * tile_items;
+        size_t count = items - pos < tile_items ? items - pos : tile_items;
+        const void *values;
+        if (plan->info.identity) {
+            values = (const unsigned char *)job->inputs[direct_slot].data + pos * map_width;
+            job->direct_tiles++;
+        } else {
+            me_buffer spans[B2ND_EXEC_MAX_INPUTS];
+            for (size_t i = 0; i < job->ninputs; i++) {
+                size_t input_width = job->schedule->inputs[i].itemsize;
+                spans[i] = (me_buffer){
+                    (const unsigned char *)job->inputs[i].data + pos * input_width,
+                    count * input_width};
+            }
+            me_block block = ME_BLOCK_INITIALIZER;
+            block.nitems = count;
+            me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
+            me_fp_status fp = {0};
+            options.fp_status = &fp;
+            /* The graph adapter checks the union after traversal, including
+             * reducer flags. A raise mask must not truncate later tiles. */
+            options.raise_mask = 0;
+            void *target = plan->info.reduction ? job->mapped :
+                (unsigned char *)job->output.data + pos * width;
+            job->status = me_eval_block(plan->kernel, spans, job->ninputs,
+                (me_mut_buffer){target, count * map_width}, &block, &options, &job->error);
+            job->fp.flags |= fp.flags;
+            job->fp.supported = job->fp_seen ? job->fp.supported && fp.supported : fp.supported;
+            job->fp_seen = true;
+            if (job->status != ME_SUCCESS) {
+                break;
+            }
+            job->map_calls++;
+            values = target;
+        }
+        if (plan->info.reduction) {
+            exec_reduce(job, values, count);
+        } else if (plan->info.identity) {
+            memcpy((unsigned char *)job->output.data + pos * width, values, count * width);
+        }
+        job->tiles++;
+    }
+    if (scoped) {
+        me_status restored = me_fp_scope_end(&scope, job->status == ME_SUCCESS ? &job->error : NULL);
+        job->fp.flags |= reducer_fp.flags;
+        job->fp.supported = job->fp_seen ? job->fp.supported && reducer_fp.supported :
+            reducer_fp.supported;
+        if (job->status == ME_SUCCESS) {
+            job->status = restored;
+        }
+    }
+}
+
+#if !defined(_WIN32)
+#include <pthread.h>
+typedef struct {
+    exec_job *job;
+    pthread_t thread;
+} exec_thread;
+static void *exec_thread_main(void *argument) {
+    exec_run(((exec_thread *)argument)->job);
+    return NULL;
+}
+#endif
+
+/* Ordered combination: partials are merged by logical task ID, never by
+ * completion order. Only order-independent reducers are partitioned. */
+static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t ntasks) {
+    bool seen = false;
+    for (size_t i = 0; i < ntasks; i++) {
+        report->tiles += jobs[i].tiles;
+        report->map_calls += jobs[i].map_calls;
+        report->direct_tiles += jobs[i].direct_tiles;
+        report->fp.flags |= jobs[i].fp.flags;
+        if (jobs[i].fp_seen || jobs[i].fp_scoped) {
+            report->fp.supported = seen ? report->fp.supported && jobs[i].fp.supported :
+                jobs[i].fp.supported;
+            seen = true;
+        }
+    }
+}
+
 me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
                             const me_buffer *inputs, size_t ninputs,
                             me_mut_buffer output, unsigned raise_mask,
-                            b2nd_exec_report *report, me_error *error) {
+                            const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                            me_error *error) {
     if (report) {
         *report = (b2nd_exec_report){0};
     }
@@ -464,13 +610,13 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
         *error = (me_error){0};
     }
     if (!schedule || !inputs || !report || ninputs != schedule->plan->info.ninputs ||
-        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW))) {
+        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
+        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
     }
     const b2nd_exec_plan *plan = schedule->plan;
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
-    size_t map_width = plan->info.map_itemsize;
     size_t output_bytes = schedule->info.output_items * width;
     if (!valid_extent(output.data, output.capacity, output_bytes, width)) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent or alignment");
@@ -486,106 +632,133 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
             return exec_error(error, ME_ERR_UNSUPPORTED, "Aliased execution output is not yet supported");
         }
     }
-    void *mapped = schedule->info.mapped_bytes ? malloc(schedule->info.mapped_bytes) : NULL;
-    if (schedule->info.mapped_bytes && !mapped) {
-        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution mapped tile");
+    size_t tiles = schedule->info.tile_items ?
+        (items + schedule->info.tile_items - 1) / schedule->info.tile_items : 0;
+    size_t ntasks = jobs ? jobs->workers : 1;
+    if (ntasks > tiles) {
+        ntasks = tiles ? tiles : 1;
     }
-    report->mapped_bytes = schedule->info.mapped_bytes;
-    uint32_t direct_slot = plan->direct_slot;
-    uint64_t best = 0;
+    if (ntasks > 1 && (plan->info.reducer == ME_REDUCTION_SUM ||
+                       plan->info.reducer == ME_REDUCTION_PROD)) {
+        /* Partitioning would redefine strict serial leaves/combine order. */
+        return exec_error(error, ME_ERR_UNSUPPORTED,
+                          "Ordered reductions require serial execution");
+    }
+    size_t per_job = schedule->info.mapped_bytes;
+    if (ntasks > 1 && per_job) {
+        /* Cap the job count to the aggregate budget; a budget that cannot hold
+         * even one job is a rejected request, not a silent serial fallback. */
+        size_t fit = jobs->max_worker_scratch / per_job;
+        if (!fit) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Aggregate worker scratch budget exceeded");
+        }
+        if (ntasks > fit) {
+            ntasks = fit;
+        }
+    }
+    size_t worker_bytes = per_job ? per_job * ntasks : 0;
+    unsigned char *mapped = worker_bytes ? malloc(worker_bytes) : NULL;
+    exec_job *parts = calloc(ntasks, sizeof(*parts));
+#if !defined(_WIN32)
+    exec_thread *threads = ntasks > 1 ? calloc(ntasks, sizeof(*threads)) : NULL;
+    if (ntasks > 1 && !threads) {
+        free(mapped);
+        free(parts);
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
+    }
+#endif
+    if (!parts || (worker_bytes && !mapped)) {
+        free(mapped);
+        free(parts);
+#if !defined(_WIN32)
+        free(threads);
+#endif
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
+    }
+    uint64_t identity = 0;
     if (plan->info.reducer == ME_REDUCTION_SUM || plan->info.reducer == ME_REDUCTION_PROD) {
-        me_reduce_identity(plan->info.reducer, plan->info.dtype, &best);
+        me_reduce_identity(plan->info.reducer, plan->info.dtype, &identity);
+    }
+    size_t per_task = tiles / ntasks, extra = tiles % ntasks, cursor = 0;
+    for (size_t i = 0; i < ntasks; i++) {
+        size_t count = per_task + (i < extra ? 1 : 0);
+        parts[i] = (exec_job){
+            schedule, inputs, ninputs, output, raise_mask,
+            mapped ? mapped + i * per_job : NULL, cursor, cursor + count,
+            identity, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}};
+        cursor += count;
     }
     me_status status = ME_SUCCESS;
-    /* Only floating reduction arithmetic needs a host FP scope. Integer
-     * identity reductions deliberately avoid probing floating-point status. */
-    bool floating = plan->info.reduction &&
-        (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
-    bool scoped = floating || raise_mask != 0;
-    me_fp_scope scope;
-    me_fp_status reducer_fp = {0};
-    if (scoped) {
-        status = me_fp_scope_begin(&scope, &reducer_fp, error);
-        if (status != ME_SUCCESS) {
-            free(mapped);
-            return status;
-        }
-        if (raise_mask && !reducer_fp.supported) {
-            me_fp_scope_end(&scope, NULL);
-            free(mapped);
-            return exec_error(error, ME_ERR_UNSUPPORTED, "Floating exception reporting is unavailable");
-        }
-    }
-    bool fp_seen = false;
-    for (size_t pos = 0; pos < items;) {
-        size_t count = items - pos < schedule->info.tile_items ?
-            items - pos : schedule->info.tile_items;
-        const void *values;
-        if (plan->info.identity) {
-            values = (const unsigned char *)inputs[direct_slot].data + pos * map_width;
-            report->direct_tiles++;
-        } else {
-            me_buffer spans[B2ND_EXEC_MAX_INPUTS];
-            for (size_t i = 0; i < ninputs; i++) {
-                size_t input_width = schedule->inputs[i].itemsize;
-                spans[i] = (me_buffer){
-                    (const unsigned char *)inputs[i].data + pos * input_width, count * input_width};
-            }
-            me_block block = ME_BLOCK_INITIALIZER;
-            block.nitems = count;
-            me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
-            me_fp_status fp = {0};
-            options.fp_status = &fp;
-            /* The graph adapter checks the union after traversal, including
-             * reducer flags. A raise mask must not truncate later tiles. */
-            options.raise_mask = 0;
-            void *target = plan->info.reduction ? mapped :
-                (unsigned char *)output.data + pos * width;
-            status = me_eval_block(plan->kernel, spans, ninputs,
-                (me_mut_buffer){target, count * map_width}, &block, &options, error);
-            report->fp.flags |= fp.flags;
-            report->fp.supported = fp_seen ? report->fp.supported && fp.supported : fp.supported;
-            fp_seen = true;
-            if (status != ME_SUCCESS) {
+#if !defined(_WIN32)
+    if (ntasks > 1) {
+        size_t started = 0;
+        for (; started < ntasks; started++) {
+            threads[started].job = &parts[started];
+            if (pthread_create(&threads[started].thread, NULL, exec_thread_main,
+                               &threads[started]) != 0) {
                 break;
             }
-            report->map_calls++;
-            values = target;
         }
-        if (plan->info.reduction) {
-            bool success;
-            if (plan->info.reducer == ME_REDUCTION_SUM) {
-                success = me_sum_span(plan->info.map_dtype, values, count, best, false, &best);
-            } else if (plan->info.reducer == ME_REDUCTION_PROD) {
-                success = me_prod_span(plan->info.map_dtype, values, count, best, false, &best);
-            } else {
-                success = me_extrema_span(plan->info.map_dtype, values, count, best, pos != 0,
-                    plan->info.reducer == ME_REDUCTION_MIN, &best);
+        if (started != ntasks) {
+            /* Join every started task before returning; no retry/replay. */
+            for (size_t i = 0; i < started; i++) {
+                pthread_join(threads[i].thread, NULL);
             }
-            if (!success) {
-                status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
-                break;
+            free(threads);
+            free(mapped);
+            free(parts);
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Cannot start all execution jobs");
+        }
+        for (size_t i = 0; i < ntasks; i++) {
+            pthread_join(threads[i].thread, NULL);
+        }
+        free(threads);
+    } else
+#endif
+    {
+        exec_run(&parts[0]);
+    }
+    exec_combine(report, parts, ntasks);
+    report->tasks = ntasks;
+    report->worker_bytes = worker_bytes;
+    report->mapped_bytes = schedule->info.mapped_bytes;
+    for (size_t i = 0; i < ntasks; i++) {
+        if (parts[i].status != ME_SUCCESS) {
+            if (status == ME_SUCCESS) {
+                if (error) {
+                    *error = parts[i].error;
+                }
+                status = parts[i].status;
             }
-        } else if (plan->info.identity) {
-            memcpy((unsigned char *)output.data + pos * width, values, count * width);
-        }
-        report->tiles++;
-        pos += count;
-    }
-    if (scoped) {
-        me_status restored = me_fp_scope_end(&scope, status == ME_SUCCESS ? error : NULL);
-        report->fp.flags |= reducer_fp.flags;
-        report->fp.supported = fp_seen ? report->fp.supported && reducer_fp.supported : reducer_fp.supported;
-        if (status == ME_SUCCESS) {
-            status = restored;
         }
     }
-    free(mapped);
     if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
         status = exec_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
     }
     if (status == ME_SUCCESS && plan->info.reduction) {
-        memcpy(output.data, &best, width);
+        uint64_t result = identity;
+        bool initialized = false;
+        for (size_t i = 0; i < ntasks; i++) {
+            if (!parts[i].tiles) {
+                continue; /* An empty domain contributes no value, not an identity. */
+            }
+            /* Same combine primitive as the serial accumulator. */
+            exec_job merge = parts[i];
+            merge.partial = result;
+            merge.tiles = initialized ? 1 : 0;
+            exec_reduce(&merge, &parts[i].partial, 1);
+            result = merge.partial;
+            if (merge.status != ME_SUCCESS) {
+                status = exec_error(error, ME_ERR_EVAL, "Execution reduction combination failed");
+                break;
+            }
+            initialized = true;
+        }
+        if (status == ME_SUCCESS) {
+            memcpy(output.data, &result, width);
+        }
     }
+    free(mapped);
+    free(parts);
     return status;
 }

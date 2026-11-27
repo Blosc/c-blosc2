@@ -111,7 +111,21 @@ typedef struct {
     size_t direct_tiles;
     size_t mapped_bytes;
     me_fp_status fp;
+    size_t tasks;        /* Started jobs, including a serial fallback. */
+    size_t worker_bytes; /* Aggregate mapped tiles actually held this call. */
 } b2nd_exec_report;
+
+/* Invocation-local job request. Hosts request at most `workers` jobs; the
+ * executor decides how many are safe. Aggregate mapped scratch across those
+ * jobs must stay within `max_worker_scratch`; the job count is capped to fit.
+ * A request the contract cannot honour (ordered reducer, budget below one
+ * job) is rejected before any task starts, never silently serialized or
+ * replayed. */
+typedef struct {
+    size_t struct_size;
+    size_t workers;
+    size_t max_worker_scratch;
+} b2nd_exec_jobs;
 
 /* Prepare copies all retained descriptor data and owns its kernel. Metadata
  * specialization reads no input values. Schedules BORROW plans: destroy every
@@ -142,6 +156,7 @@ me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule,
 me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
                             const me_buffer *inputs, size_t ninputs,
                             me_mut_buffer output, unsigned raise_mask,
+                            const b2nd_exec_jobs *jobs,
                             b2nd_exec_report *report, me_error *error);
 void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule);
 void b2nd_exec_plan_free(b2nd_exec_plan *plan);
