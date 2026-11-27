@@ -353,7 +353,7 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
         return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
     }
     size_t items = 1;
-    if (!inputs[0].ndim || inputs[0].ndim > B2ND_EXEC_MAX_RANK) {
+    if (inputs[0].ndim > B2ND_EXEC_MAX_RANK) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution rank");
     }
     for (size_t axis = 0; axis < inputs[0].ndim; axis++) {
@@ -381,6 +381,9 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution output byte size overflow");
     }
     size_t lanes = items < tile_items ? items : tile_items;
+    if (!plan->info.identity && lanes > INT_MAX) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Execution tile exceeds the core lane limit");
+    }
     size_t mapped = plan->info.identity || !plan->info.reduction ? 0 : lanes * plan->info.itemsize;
     if (mapped > max_mapped_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");

@@ -15,6 +15,8 @@ The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
 The serial executor binds native aligned contiguous buffers in slot order.
+Same-shape metadata includes rank-zero scalars and ranked empty map domains;
+empty minimum remains an error. No broadcasting or strided gathering is implied.
 Computed maps feeding a reducer use one bounded mapped tile; disjoint pure maps
 evaluate directly into the destination with zero mapped scratch. Proven identity maps read their
 declared input slot directly without a kernel call. Minimum results publish
