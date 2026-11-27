@@ -421,19 +421,21 @@ me_status b2nd_exec_staged_describe(const b2nd_exec_staged_schedule *schedule,
     return ME_SUCCESS;
 }
 
-me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *schedule,
-                                          const b2nd_exec_source *sources,
-                                          const b2nd_exec_view *views, size_t ninputs,
-                                          me_mut_buffer output, unsigned raise_mask,
-                                          size_t max_gather_bytes,
-                                          b2nd_exec_staged_report *report,
-                                          me_error *error) {
+me_status b2nd_exec_staged_execute_sources_into(const b2nd_exec_staged_schedule *schedule,
+                                               const b2nd_exec_source *sources,
+                                               const b2nd_exec_view *views, size_t ninputs,
+                                               const b2nd_exec_output_view *output,
+                                               unsigned raise_mask,
+                                               size_t max_gather_bytes,
+                                               b2nd_exec_staged_report *report,
+                                               me_error *error) {
     b2nd_exec_staged_report local = {0};
     local.failed_stage = SIZE_MAX;
     local.failed_node = UINT32_MAX;
     if (report) *report = local;
     if (error) *error = (me_error){0};
-    if (!schedule || (!sources && ninputs) || ninputs != schedule->plan->ninputs || (raise_mask & ~15u)) {
+    if (!schedule || (!sources && ninputs) || ninputs != schedule->plan->ninputs ||
+        !output || output->struct_size != sizeof(*output) || (raise_mask & ~15u)) {
         return stage_error(error, ME_ERR_INVALID_ARG, "Invalid staged execution bindings");
     }
     const b2nd_exec_staged_plan *plan = schedule->plan;
@@ -445,7 +447,7 @@ me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *sche
             return stage_error(error, ME_ERR_UNSUPPORTED, "Reader-backed masked stages are not admitted");
         }
     }
-    if (output.capacity > UINTPTR_MAX - (uintptr_t)output.data) {
+    if (output->capacity > UINTPTR_MAX - (uintptr_t)output->base) {
         return stage_error(error, ME_ERR_INVALID_ARG, "Staged output extent overflow");
     }
     for (size_t i = 0; views && i < ninputs; i++) {
@@ -454,8 +456,8 @@ me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *sche
             return stage_error(error, ME_ERR_INVALID_ARG, "Staged operand extent overflow");
         }
         uintptr_t begin = (uintptr_t)views[i].base, end = begin + views[i].capacity;
-        uintptr_t out_begin = (uintptr_t)output.data, out_end = out_begin + output.capacity;
-        if (views[i].capacity && output.capacity && schedule->stages[final].output_bytes &&
+        uintptr_t out_begin = (uintptr_t)output->base, out_end = out_begin + output->capacity;
+        if (views[i].capacity && output->capacity && schedule->stages[final].output_bytes &&
             out_begin < end && begin < out_end) {
             return stage_error(error, ME_ERR_UNSUPPORTED, "Staged output overlaps resident operand");
         }
@@ -523,9 +525,14 @@ me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *sche
         }
         size_t tasks = 1;
         if (status == ME_SUCCESS) {
-            status = b2nd_exec_plan_stage_readers(schedule->children[s], child_views + offsets[s],
-                readers, plan->counts[s], s == final ? output : (me_mut_buffer){NULL, results[s].capacity},
-                max_gather_bytes, NULL, &tasks, error, planned, s != final);
+            if (s == final) {
+                status = b2nd_exec_plan_stage_readers_into(schedule->children[s], child_views + offsets[s],
+                    readers, plan->counts[s], output, max_gather_bytes, NULL, &tasks, error, planned, false);
+            } else {
+                status = b2nd_exec_plan_stage_readers(schedule->children[s], child_views + offsets[s],
+                    readers, plan->counts[s], (me_mut_buffer){NULL, results[s].capacity},
+                    max_gather_bytes, NULL, &tasks, error, planned, true);
+            }
         }
         if (status != ME_SUCCESS) {
             local.failed_stage = s;
@@ -553,10 +560,16 @@ me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *sche
             if (source >= 0) child_views[offsets[s] + i] = results[source];
         }
         local.entered_stages++;
-        status = b2nd_exec_execute_sources(schedule->children[s], child_sources + offsets[s],
-            child_views + offsets[s], plan->counts[s],
-            s == final ? output : (me_mut_buffer){(void *)results[s].base, results[s].capacity},
-            NULL, raise_mask, max_gather_bytes, 0, &local.stages[s], error);
+        if (s == final) {
+            status = b2nd_exec_execute_sources_into(schedule->children[s], child_sources + offsets[s],
+                child_views + offsets[s], plan->counts[s], output, raise_mask, max_gather_bytes,
+                &local.stages[s], error);
+        } else {
+            status = b2nd_exec_execute_sources(schedule->children[s], child_sources + offsets[s],
+                child_views + offsets[s], plan->counts[s],
+                (me_mut_buffer){(void *)results[s].base, results[s].capacity},
+                NULL, raise_mask, max_gather_bytes, 0, &local.stages[s], error);
+        }
         local.fp.flags |= local.stages[s].execution.fp.flags;
         if (local.stages[s].execution.fp_observed) {
             local.fp.supported = fp_seen ? local.fp.supported && local.stages[s].execution.fp.supported :
@@ -581,4 +594,28 @@ me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *sche
     local.live_intermediate_bytes = 0;
     if (report) *report = local;
     return status;
+}
+
+me_status b2nd_exec_staged_execute_sources(const b2nd_exec_staged_schedule *schedule,
+                                          const b2nd_exec_source *sources,
+                                          const b2nd_exec_view *views, size_t ninputs,
+                                          me_mut_buffer output, unsigned raise_mask,
+                                          size_t max_gather_bytes,
+                                          b2nd_exec_staged_report *report,
+                                          me_error *error) {
+    if (!schedule) {
+        if (report) {
+            *report = (b2nd_exec_staged_report){.failed_stage = SIZE_MAX, .failed_node = UINT32_MAX};
+        }
+        return stage_error(error, ME_ERR_INVALID_ARG, "Invalid staged execution bindings");
+    }
+    size_t final = schedule->plan->nstages - 1;
+    b2nd_exec_output_view out_view = {sizeof(out_view), output.data, output.capacity, 0, {0}};
+    size_t stride = schedule->stages[final].plan.itemsize;
+    for (size_t d = schedule->stages[final].schedule.output_ndim; d-- > 0;) {
+        out_view.strides[d] = (int64_t)stride;
+        stride *= (size_t)schedule->stages[final].schedule.output_shape[d];
+    }
+    return b2nd_exec_staged_execute_sources_into(schedule, sources, views, ninputs, &out_view,
+                                                 raise_mask, max_gather_bytes, report, error);
 }

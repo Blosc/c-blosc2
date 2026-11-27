@@ -1080,5 +1080,46 @@ int main(int argc, char **argv) {
     b2nd_exec_plan_free(plan);
     b2nd_exec_plan_free(NULL);
     b2nd_exec_schedule_free(NULL);
+
+    /* Explicit reduction dtype accumulator casts (valid and incompatible). */
+    b2nd_exec_node rnodes[2] = {
+        {.struct_size = sizeof(b2nd_exec_node), .id = 0, .op = B2ND_EXEC_INPUT,
+         .dtype = ME_INT64, .itemsize = 8},
+        {.struct_size = sizeof(b2nd_exec_node), .id = 1, .op = B2ND_EXEC_SUM,
+         .dtype = ME_INT8, .nargs = 1, .itemsize = 1},
+    };
+    b2nd_exec_descriptor rd = {sizeof(rd), rnodes, 2, 1, 1};
+    assert(b2nd_exec_prepare(&rd, NULL, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.dtype == ME_INT8 && info.itemsize == 1);
+    b2nd_exec_input_meta rm = {ME_INT64, 8, 1, {3}};
+    assert(b2nd_exec_specialize(plan, &rm, 1, 2, 64, &schedule, &error) == ME_SUCCESS);
+    int64_t rvals[3] = {120, 120, 120};
+    me_buffer rbuf = {rvals, sizeof(rvals)};
+    int8_t rout = 0;
+    assert(b2nd_exec_execute(schedule, &rbuf, 1, (me_mut_buffer){&rout, 1}, 0, NULL, &report, &error) == ME_SUCCESS);
+    assert(rout == (int8_t)(int64_t)360);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
+
+    rnodes[0].dtype = ME_FLOAT64; rnodes[0].itemsize = 8;
+    rnodes[1].op = B2ND_EXEC_PROD; rnodes[1].dtype = ME_FLOAT32; rnodes[1].itemsize = 4;
+    rnodes[1].has_initial = true; rnodes[1].initial_dtype = ME_INT64;
+    rnodes[1].initial_category = ME_CAPTURE_TYPED; rnodes[1].initial_size = 8;
+    int64_t init3 = 3; memcpy(rnodes[1].initial_scalar, &init3, sizeof(init3));
+    assert(b2nd_exec_prepare(&rd, NULL, &plan, &error) == ME_SUCCESS);
+    b2nd_exec_input_meta rm_f64 = {ME_FLOAT64, 8, 1, {3}};
+    assert(b2nd_exec_specialize(plan, &rm_f64, 1, 2, 64, &schedule, &error) == ME_SUCCESS);
+    double pfvals[3] = {12.0, 12.0, 12.0};
+    me_buffer pbuf = {pfvals, sizeof(pfvals)};
+    float pfout = 0.0f;
+    assert(b2nd_exec_execute(schedule, &pbuf, 1, (me_mut_buffer){&pfout, sizeof(pfout)}, 0, NULL, &report, &error) == ME_SUCCESS);
+    assert(pfout == 5184.0f);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
+
+    rnodes[1].has_initial = false; rnodes[1].initial_dtype = ME_AUTO; rnodes[1].initial_size = 0;
+    rnodes[1].op = B2ND_EXEC_SUM; rnodes[1].dtype = ME_INT64; rnodes[1].itemsize = 8;
+    assert(b2nd_exec_prepare(&rd, NULL, &plan, &error) == ME_ERR_SIGNATURE);
+    assert(!plan);
     return 0;
 }

@@ -223,13 +223,15 @@ static me_status storage_validate(storage_input *state, const b2nd_exec_input_me
     size_t items = 1, chunks = 1, physical = 1, block_items = 1, chunk_items = 1;
     for (int i = 0; i < a->ndim; i++) {
         if (a->shape[i] < 0 || (uint64_t)a->shape[i] > SIZE_MAX || a->shape[i] != meta->shape[i] ||
-            a->chunkshape[i] <= 0 || a->blockshape[i] <= 0) {
+            (a->shape[i] ? (a->chunkshape[i] <= 0 || a->blockshape[i] <= 0) :
+                           (a->chunkshape[i] < 0 || a->blockshape[i] < 0 ||
+                            (a->chunkshape[i] == 0) != (a->blockshape[i] == 0)))) {
             return storage_error(error, ME_ERR_INVALID_ARG, "Storage shape does not match the schedule");
         }
         size_t shape = (size_t)a->shape[i], chunk = (size_t)a->chunkshape[i];
         size_t block = (size_t)a->blockshape[i];
-        state->chunk_grid[i] = shape / chunk + (shape % chunk != 0);
-        state->block_grid[i] = chunk / block + (chunk % block != 0);
+        state->chunk_grid[i] = chunk ? (shape / chunk + (shape % chunk != 0)) : 0;
+        state->block_grid[i] = block ? (chunk / block + (chunk % block != 0)) : 0;
         if (!storage_product(&items, shape) ||
             !storage_product(&chunks, state->chunk_grid[i]) ||
             !storage_product(&physical, state->block_grid[i]) ||
@@ -1041,15 +1043,17 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
     bool has_padding = false;
     for (int d = 0; d < output->ndim; d++) {
         if (output->shape[d] < 0 || output->shape[d] != sched_info.output_shape[d] ||
-            output->chunkshape[d] <= 0 || output->blockshape[d] <= 0) {
+            (output->shape[d] ? (output->chunkshape[d] <= 0 || output->blockshape[d] <= 0) :
+                                (output->chunkshape[d] < 0 || output->blockshape[d] < 0 ||
+                                 (output->chunkshape[d] == 0) != (output->blockshape[d] == 0)))) {
             return storage_error(error, ME_ERR_INVALID_ARG, "Sink shape does not match schedule");
         }
         size_t s = (size_t)output->shape[d];
         size_t c = (size_t)output->chunkshape[d];
         size_t b = (size_t)output->blockshape[d];
-        if ((s % c) != 0 || (c % b) != 0) has_padding = true;
-        out_chunk_grid[d] = s / c + (s % c != 0);
-        out_block_grid[d] = c / b + (c % b != 0);
+        if (c && b && ((s % c) != 0 || (c % b) != 0)) has_padding = true;
+        out_chunk_grid[d] = c ? (s / c + (s % c != 0)) : 0;
+        out_block_grid[d] = b ? (c / b + (c % b != 0)) : 0;
         if (!storage_product(&out_items, s) ||
             !storage_product(&out_chunks, out_chunk_grid[d]) ||
             !storage_product(&out_physical, out_block_grid[d]) ||
@@ -1673,16 +1677,17 @@ static me_status source_stream_map(const b2nd_exec_schedule *schedule,
     return status;
 }
 
-me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
-                                    const b2nd_exec_source *sources,
-                                    const b2nd_exec_view *views, size_t ninputs,
-                                    me_mut_buffer output,
-                                    const b2nd_exec_sink *sink,
-                                    unsigned raise_mask,
-                                    size_t max_gather_bytes,
-                                    size_t max_output_bytes,
-                                    b2nd_exec_callback_report *report,
-                                    me_error *error) {
+static me_status exec_execute_sources_impl(const b2nd_exec_schedule *schedule,
+                                           const b2nd_exec_source *sources,
+                                           const b2nd_exec_view *views, size_t ninputs,
+                                           me_mut_buffer output,
+                                           const b2nd_exec_output_view *output_view,
+                                           const b2nd_exec_sink *sink,
+                                           unsigned raise_mask,
+                                           size_t max_gather_bytes,
+                                           size_t max_output_bytes,
+                                           b2nd_exec_callback_report *report,
+                                           me_error *error) {
     if (error) *error = (me_error){0};
     b2nd_exec_callback_report local_rep = {0};
     if (report) *report = local_rep;
@@ -1690,7 +1695,7 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
         (raise_mask & ~15u)) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Invalid source callback execution bindings");
     }
-    if (sink && output.data) {
+    if (sink && (output.data || output_view)) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Specify either resident output or sink, not both");
     }
     b2nd_exec_plan_info plan_info = {0};
@@ -1775,7 +1780,16 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
             }
         }
         local_rep.index_buffer_bytes = idx_bytes;
-        if (!sink) {
+        if (!sink && output_view) {
+            size_t dummy_tasks = 1;
+            status = b2nd_exec_plan_stage_readers_into(schedule, bound_views, is_cb, ninputs, output_view,
+                                                       max_gather_bytes, NULL, &dummy_tasks, error, NULL, false);
+            if (status == ME_SUCCESS) {
+                status = b2nd_exec_execute_readers_into(schedule, bound_views, readers, ninputs,
+                                                        output_view, raise_mask, max_gather_bytes,
+                                                        &local_rep.execution, error);
+            }
+        } else if (!sink) {
             size_t dummy_tasks = 1;
             status = b2nd_exec_plan_readers(schedule, bound_views, is_cb, ninputs, output,
                                             max_gather_bytes, NULL, &dummy_tasks, error);
@@ -1837,6 +1851,37 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
     free(idx_buf);
     if (report) *report = local_rep;
     return status;
+}
+
+me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
+                                    const b2nd_exec_source *sources,
+                                    const b2nd_exec_view *views, size_t ninputs,
+                                    me_mut_buffer output,
+                                    const b2nd_exec_sink *sink,
+                                    unsigned raise_mask,
+                                    size_t max_gather_bytes,
+                                    size_t max_output_bytes,
+                                    b2nd_exec_callback_report *report,
+                                    me_error *error) {
+    return exec_execute_sources_impl(schedule, sources, views, ninputs, output, NULL, sink,
+                                     raise_mask, max_gather_bytes, max_output_bytes, report, error);
+}
+
+me_status b2nd_exec_execute_sources_into(const b2nd_exec_schedule *schedule,
+                                         const b2nd_exec_source *sources,
+                                         const b2nd_exec_view *views, size_t ninputs,
+                                         const b2nd_exec_output_view *output,
+                                         unsigned raise_mask,
+                                         size_t max_gather_bytes,
+                                         b2nd_exec_callback_report *report,
+                                         me_error *error) {
+    if (!output) {
+        if (error) *error = (me_error){0};
+        if (report) *report = (b2nd_exec_callback_report){0};
+        return storage_error(error, ME_ERR_INVALID_ARG, "Missing output view");
+    }
+    return exec_execute_sources_impl(schedule, sources, views, ninputs, (me_mut_buffer){0}, output, NULL,
+                                     raise_mask, max_gather_bytes, 0, report, error);
 }
 
 static me_status partition_read_source_box(const b2nd_exec_source *src, size_t dom_ndim,

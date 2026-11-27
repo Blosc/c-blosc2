@@ -105,6 +105,14 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
                                     size_t max_output_bytes,
                                     b2nd_exec_callback_report *report,
                                     me_error *error);
+me_status b2nd_exec_execute_sources_into(const b2nd_exec_schedule *schedule,
+                                         const b2nd_exec_source *sources,
+                                         const b2nd_exec_view *views, size_t ninputs,
+                                         const b2nd_exec_output_view *output,
+                                         unsigned raise_mask,
+                                         size_t max_gather_bytes,
+                                         b2nd_exec_callback_report *report,
+                                         me_error *error);
 /* Execute a specialized logical-partition schedule over compressed arrays,
  * resident views, and/or generic source callbacks without substituting physical
  * storage blocks for logical groups. */

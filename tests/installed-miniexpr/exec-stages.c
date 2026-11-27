@@ -845,6 +845,32 @@ int main(void) {
     nodes[3].op = B2ND_EXEC_ADD; nodes[3].nargs = 2; nodes[3].args[0] = 3;
     assert(b2nd_exec_staged_prepare(&descriptor, NULL, &plan, &error) == ME_ERR_INVALID_ARG);
     assert(!plan);
+
+    /* Non-contiguous / F-order staged output view & non-injective rejection before reads. */
+    b2nd_exec_node fnodes[3] = {
+        stage_node(0, B2ND_EXEC_INPUT),
+        stage_node(1, B2ND_EXEC_SUM),
+        stage_node(2, B2ND_EXEC_SUBTRACT),
+    };
+    fnodes[0].dtype = ME_FLOAT64; fnodes[0].itemsize = 8;
+    fnodes[1].nargs = 1; fnodes[1].axes[0] = 0; fnodes[1].has_axes = true; fnodes[1].naxes = 1;
+    fnodes[2].nargs = 2; fnodes[2].args[1] = 1;
+    b2nd_exec_descriptor fdesc = {sizeof(fdesc), fnodes, 3, 1, 2};
+    assert(b2nd_exec_staged_prepare(&fdesc, NULL, &plan, &error) == ME_SUCCESS);
+    b2nd_exec_input_meta fmeta = {ME_FLOAT64, 8, 2, {2, 3}};
+    assert(b2nd_exec_staged_specialize(plan, &fmeta, 1, 2, 128, 128, &schedule, &error) == ME_SUCCESS);
+    double fin[6] = {1, 2, 3, 4, 5, 6};
+    double fout[6] = {0};
+    sources[0] = (b2nd_exec_source){sizeof(b2nd_exec_source), ME_FLOAT64, 8, 2, {2, 3}, NULL, NULL};
+    views[0] = (b2nd_exec_view){sizeof(views[0]), fin, sizeof(fin), 0, {24, 8}, 0};
+    b2nd_exec_output_view f_out = {sizeof(f_out), fout, sizeof(fout), 0, {8, 16}};
+    assert(b2nd_exec_staged_execute_sources_into(schedule, sources, views, 1, &f_out, 0, 128, &report, &error) == ME_SUCCESS);
+    double expected_f[6] = {-4, -1, -5, -2, -6, -3};
+    for (int i = 0; i < 6; i++) assert(fout[i] == expected_f[i]);
+    b2nd_exec_output_view bad_out = {sizeof(bad_out), fout, sizeof(fout), 0, {0, 8}};
+    assert(b2nd_exec_staged_execute_sources_into(schedule, sources, views, 1, &bad_out, 0, 128, &report, &error) == ME_ERR_INVALID_ARG);
+    b2nd_exec_staged_schedule_free(schedule);
+    b2nd_exec_staged_plan_free(plan);
     puts("Typed reduction-to-map stages passed");
     return 0;
 }

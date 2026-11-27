@@ -37,6 +37,14 @@ me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
                                        const b2nd_exec_jobs *jobs,
                                        size_t *out_tasks, me_error *error,
                                        const bool *planned_inputs, bool planned_output);
+me_status b2nd_exec_plan_stage_readers_into(const b2nd_exec_schedule *schedule,
+                                            const b2nd_exec_view *views,
+                                            const bool *is_reader, size_t ninputs,
+                                            const b2nd_exec_output_view *output,
+                                            size_t max_gather_bytes,
+                                            const b2nd_exec_jobs *jobs,
+                                            size_t *out_tasks, me_error *error,
+                                            const bool *planned_inputs, bool planned_output);
 me_status b2nd_exec_plan_input(const b2nd_exec_plan *plan, size_t slot,
                                b2nd_exec_input_meta *out);
 /* Readers are serial per-task logical C-order spans laid out as
@@ -48,6 +56,12 @@ me_status b2nd_exec_execute_readers(const b2nd_exec_schedule *schedule,
                                    me_mut_buffer output, unsigned raise_mask,
                                    size_t max_gather_bytes, b2nd_exec_report *report,
                                    me_error *error);
+me_status b2nd_exec_execute_readers_into(const b2nd_exec_schedule *schedule,
+                                        const b2nd_exec_view *views,
+                                        const b2nd_exec_reader *readers, size_t ninputs,
+                                        const b2nd_exec_output_view *output,
+                                        unsigned raise_mask, size_t max_gather_bytes,
+                                        b2nd_exec_report *report, me_error *error);
 me_status b2nd_exec_execute_readers_ex(const b2nd_exec_schedule *schedule,
                                       const b2nd_exec_view *views,
                                       const b2nd_exec_reader *readers,
