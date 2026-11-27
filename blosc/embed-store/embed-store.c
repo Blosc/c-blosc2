@@ -11,6 +11,7 @@
 #include "embed-store-private.h"
 #include "string_manipulation.h"
 #include <utils/msgpack.h>
+#include <inttypes.h>
 
 #include <sys/stat.h>
 #include <assert.h>
@@ -122,7 +123,7 @@ static int s_embed_load_local_schunk(blosc2_schunk* origin, b2_es_value_local lo
     }
     int rc = blosc2_schunk_get_slice_buffer(origin, (int64_t)offset, (int64_t)(offset + length), (void*)cframe);
     if (rc != 0) {
-        BLOSC_TRACE_ERROR("Could not retrieve slice buffer with start at %ld and stop at %ld", (int64_t)offset, (int64_t)(offset + length));
+        BLOSC_TRACE_ERROR("Could not retrieve slice buffer with start at %" PRId64 " and stop at %" PRId64 , (int64_t)offset, (int64_t)(offset + length));
         free(cframe);
         return rc;
     }
@@ -169,19 +170,6 @@ static int s_embed_load_value(embed_store* es, b2_es_value* value, blosc2_store_
     return rc;
 }
 
-/*
- * Escribe buffer[0 .. stop-start) en el rango [start, stop) del schunk,
- * extendiéndolo si stop > nbytes actual.
- *
- * Precondiciones (responsabilidad del llamador):
- *   - schunk != NULL, buffer != NULL, schunk->typesize == 1
- *   - 0 <= start <= stop, ya normalizados
- *   - buffer_len >= stop - start
- *   - Sin huecos: start <= schunk->nbytes
- *   - Locking a cargo del llamador
- *
- * Un schunk vacío tiene chunksize == -1: el primer append lo fija.
- */
 static int s_set_slice(blosc2_schunk *schunk, int64_t start, int64_t stop,
                        const void *buffer) {
     assert(schunk != NULL);
@@ -512,7 +500,7 @@ static int s_embed_create_from_schunk(blosc2_schunk* schunk, embed_store** estor
 
 static int s_exists_inode(const char* urlpath) {
     struct stat buf = {0};
-    if (lstat(urlpath, &buf) != 0) {
+    if (stat(urlpath, &buf) != 0) {
         int err = errno;
         if (err == ENOENT) return BLOSC2_ERROR_NOT_FOUND;
         return BLOSC2_ERROR_FAILURE;
@@ -731,7 +719,7 @@ int blosc2_embed_store_get(blosc2_embed_store* estore, const uint8_t* key, blosc
     // Load schunk
     int rc = s_embed_load_value(estore, pval, item);
     if (rc != 0) {
-        BLOSC_TRACE_ERROR("Could not load schunk with key '%s', offset '%ld' and length '%ld'", (const char*)key, pval->f_local.offset, pval->f_local.length);
+        BLOSC_TRACE_ERROR("Could not load schunk with key '%s', offset '%" PRId64 " ' and length '%" PRId64 " '", (const char*)key, pval->f_local.offset, pval->f_local.length);
     }
     return rc;
 }

@@ -49,7 +49,7 @@
 
 static const char s_version_string[] = "version";
 static const size_t s_version_string_length = sizeof(s_version_string) - 1;
-static const size_t s_version_packed_length = s_version_string_length + 3;
+static const size_t s_version_packed_length = sizeof(s_version_string) - 1 + 3;
 static const char s_v1_current_offset[] = "current_offset";
 static const char s_v1_embed_map[] = "embed_map";
 static const char s_v1_offset[] = "offset";
@@ -84,7 +84,7 @@ static int s_serialize_string(const uint8_t* str, uint8_t* packed_buffer, size_t
         *(uint32_t*)(packed_buffer + packed_index) = tb;
         packed_index += 4;
     } else {
-        BLOSC_TRACE_ERROR("String length cannot be serialized in msgpack, too large: %lu", str_length);
+        BLOSC_TRACE_ERROR("String length cannot be serialized in msgpack, too large: %zu", str_length);
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
@@ -317,7 +317,7 @@ static int s_msgpack_serializer_serialize_embed_store_map(msgpack_serializer* se
     size_t serial_index = serial->index;
 
     if (map_length > INT32_MAX) {
-        BLOSC_TRACE_ERROR("The EmbedStore map length %lu, cannot be represented by an unsigned 32 bit integer. msgpack imposes a limitation of 32 bits to the length of the map", map_length);
+        BLOSC_TRACE_ERROR("The EmbedStore map length %zu, cannot be represented by an unsigned 32 bit integer. msgpack imposes a limitation of 32 bits to the length of the map", map_length);
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
@@ -654,7 +654,7 @@ int msgpack_embed_store_deserialize(const uint8_t* packed_buffer, size_t packed_
     }
 
     if (index >= packed_buffer_size) {
-        BLOSC_TRACE_ERROR("The msgpack deserializer exceeded the buffer size, which is %lu bytes long", packed_buffer_size);
+        BLOSC_TRACE_ERROR("The msgpack deserializer exceeded the buffer size, which is %zu bytes long", packed_buffer_size);
         return BLOSC2_ERROR_INVALID_PARAM;
     }
 
@@ -856,7 +856,7 @@ int msgpack_embed_store_deserialize_v1(const uint8_t* packed_buffer, blosc2_embe
 
 int msgpack_validate_and_return_version(const uint8_t* packed, size_t packed_size) {
     if (packed_size != s_version_packed_length) {
-        BLOSC_TRACE_ERROR("msgpack packed buffer length should be of size %lu", s_version_packed_length);
+        BLOSC_TRACE_ERROR("msgpack packed buffer length should be of size %zu", s_version_packed_length);
         return BLOSC2_ERROR_INVALID_PARAM;
     }
     size_t index = 0;
@@ -866,7 +866,7 @@ int msgpack_validate_and_return_version(const uint8_t* packed, size_t packed_siz
     }
     index += 1;
     if ((packed[index] & (uint8_t)STR_FIX_TAG_MASK) != STR_FIX_TAG || (packed[index] & (uint8_t)STR_FIX_LEN_MASK) != s_version_string_length) {
-        BLOSC_TRACE_ERROR("msgpack map tag is incorrect. Ether string tag is not a fixstr or the specified length is different from %lu", s_version_string_length);
+        BLOSC_TRACE_ERROR("msgpack map tag is incorrect. Ether string tag is not a fixstr or the specified length is different from %zu", s_version_string_length);
         return BLOSC2_ERROR_INVALID_PARAM;
     }
     index += 1;

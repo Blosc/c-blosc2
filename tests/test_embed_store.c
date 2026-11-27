@@ -6,7 +6,6 @@ Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   See LICENSE.txt for details about copyright and rights to use.
 */
 
-#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 

@@ -12,7 +12,6 @@
 
 #include <errno.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 
 int tests_run = 0;
 
@@ -101,23 +100,30 @@ static bool s_exists_inode(const uint8_t* path) {
 }
 
 static int remove_dir_recursive(const uint8_t* path) {
-    const char* dirname = (const char*)path;
-    pid_t pid = fork();
-    if (pid < 0) {
+#ifdef _WIN32
+    const char* format = "rmdir /s /q \"%s\"";
+#else
+    const char* format = "rm -rf -- \"%s\"";
+#endif
+
+    size_t size = strlen((const char*)path) + 32;
+    char* command = malloc(size);
+
+    if (command == NULL) {
         return -1;
     }
 
-    if (pid == 0) {
-        // "--" evita que un nombre que empiece por '-' se interprete como opción
-        execlp("rm", "rm", "-rf", "--", dirname, (char*)NULL);
-        _exit(127);   // solo se llega aquí si exec falla
+    int len = snprintf(command, size, format, (const char*)path);
+
+    if (len < 0 || (size_t)len >= size) {
+        free(command);
+        return -1;
     }
 
-    int status;
-    while (waitpid(pid, &status, 0) < 0) {
-        if (errno != EINTR) return -1;
-    }
-    return (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : -1;
+    int rc = system(command);
+    free(command);
+
+    return rc == 0 ? 0 : -1;
 }
 
 static void s_setup_schunks(void) {

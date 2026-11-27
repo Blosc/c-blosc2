@@ -1,5 +1,5 @@
 /*********************************************************************
- Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
@@ -11,6 +11,7 @@
 #include "filesystem.h"
 
 #include <blosc2.h>
+#include <blosc-private.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -20,30 +21,12 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <libgen.h>
 #include <time.h>
 
 #include <string_manipulation.h>
 #include "blosc-checked.h"
 
 #define MAX_ATTEMPTS 10
-
-#if defined(_WIN32) || defined (__MINGW32__)
-#include <direct.h>
-#include <process.h>
-#include <io.h>
-#define MKDIR(path) _mkdir(path)
-#define STAT(filename, buf) _stat(filename, buf)
-#define GETPID() _getpid()
-#define OPEN(path) _open((path), _O_RDWR | _O_CREAT | _O_EXCL | _O_BINARY | _S_IREAD | _S_IWRITE)
-typedef struct _stat struct stat;
-#else
-#include <unistd.h>
-#define MKDIR(path) mkdir(path, 0700)
-#define STAT(filename, buf) stat(filename, buf)
-#define GETPID() getpid()
-#define OPEN(path) open((path), O_RDWR | O_CREAT | O_EXCL )
-#endif
 
 int fs_mkdir(const char* path) {
     assert(path != NULL);
@@ -123,6 +106,127 @@ static char* blosc2_normalize_dirpath(const char* dir_path) {
     return path;
 }
 
+#if defined(_WIN32) && !defined(__MINGW32__)
+static int s_remove_dir_recursive(const char* dir_path) {
+    const char* path = blosc2_normalize_dirpath(dir_path);
+    if (path == NULL) {
+        if (errno == ENOMEM) {
+            return BLOSC2_ERROR_MEMORY_ALLOC;
+        }
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    size_t path_len = strlen(path);
+
+    // Build search pattern: path + "*"
+    if (path_len > SIZE_MAX - 2) {
+        BLOSC_TRACE_ERROR("File path is too long");
+        free((void*)path);
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    char* search_path = malloc(path_len + 2);
+    if (search_path == NULL) {
+        free((void*)path);
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+
+    snprintf(search_path, path_len + 2, "%s*", path);
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path, &find_data);
+
+    free(search_path);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        BLOSC_TRACE_ERROR("No file or directory found at %s", path);
+        free((void*)path);
+        return BLOSC2_ERROR_NOT_FOUND;
+    }
+
+    int ret = BLOSC2_ERROR_SUCCESS;
+
+    do {
+        const char* name = find_data.cFileName;
+
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+
+        size_t name_len = strlen(name);
+
+        if (path_len > SIZE_MAX - name_len - 1) {
+            BLOSC_TRACE_ERROR("File path is too long");
+            ret = BLOSC2_ERROR_INVALID_PARAM;
+            break;
+        }
+
+        char* fname = malloc(path_len + name_len + 1);
+        if (fname == NULL) {
+            BLOSC_TRACE_ERROR(
+                "Could not allocate memory to remove recursively %s",
+                dir_path
+            );
+            ret = BLOSC2_ERROR_MEMORY_ALLOC;
+            break;
+        }
+
+        snprintf(fname, path_len + name_len + 1, "%s%s", path, name);
+
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            // Recursive descent
+            ret = s_remove_dir_recursive(fname);
+        } else {
+            ret = blosc2_remove_urlpath(fname);
+
+            if (ret < 0) {
+                int err = errno;
+
+                switch (err) {
+                    case ENOENT:
+                        BLOSC_TRACE_ERROR("Could not find route %s", fname);
+                        break;
+                    case EACCES:
+                        BLOSC_TRACE_ERROR(
+                            "Write permission was unexpectedly revoked "
+                            "or is being used by another process at %s",
+                            fname
+                        );
+                        break;
+                    case ENAMETOOLONG:
+                        BLOSC_TRACE_ERROR("Filename %s was too long", fname);
+                        break;
+                    default:
+                        BLOSC_TRACE_ERROR("Could not remove file %s", fname);
+                        break;
+                }
+
+                ret = BLOSC2_ERROR_FAILURE;
+            }
+        }
+
+        free(fname);
+
+        if (ret < 0) {
+            break;
+        }
+
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
+
+    if (ret == BLOSC2_ERROR_SUCCESS) {
+        if (!RemoveDirectoryA(path)) {
+            BLOSC_TRACE_ERROR("Could not remove directory %s", path);
+            ret = BLOSC2_ERROR_FAILURE;
+        }
+    }
+
+    free((void*)path);
+
+    return ret;
+}
+#else
 static int s_remove_dir_recursive(const char* dir_path) {
     const char* path = blosc2_normalize_dirpath(dir_path);
     if (path == NULL) {
@@ -168,7 +272,10 @@ static int s_remove_dir_recursive(const char* dir_path) {
 
             if (S_ISDIR(statbuf.st_mode)) {
                 // Recursive descent
-                s_remove_dir_recursive(fname);
+                int rc = s_remove_dir_recursive(fname);
+                free(fname);
+                fname = NULL;
+                if (rc < 0) break;
             } else {
                 ret = blosc2_remove_urlpath(fname);
                 if (ret < 0) {
@@ -200,8 +307,8 @@ static int s_remove_dir_recursive(const char* dir_path) {
     rmdir(path);
     free((void*)path);
     return BLOSC2_ERROR_SUCCESS;
-
 }
+#endif
 
 int fs_remove_dir_recursive(const char* dir_path) {
     assert(dir_path != NULL);
@@ -278,7 +385,7 @@ int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
                 abort = true;
             } else if (stat((const char*)tmp, &st) != 0) {
                 if (errno == ENOENT) {
-                    mkdir((const char*)tmp, 0700);
+                    MKDIR((const char*)tmp);
                 } else {
                     BLOSC_TRACE_ERROR("Could not create directory");
                     return BLOSC2_ERROR_FILE_OPEN;
@@ -349,7 +456,7 @@ static int my_mkstemp(char* template) {
 
     for (int i = 0; i < MAX_ATTEMPTS; i+=1) {
         s_fill_template(template);
-        int fd = open(template, O_CREAT | O_RDWR | O_EXCL, 0600);
+        int fd = OPEN(template);
         if (fd >= 0) {
             return fd;
         }
@@ -361,7 +468,7 @@ static int my_mkstemp(char* template) {
 }
 
 static int mkdtemp_wrap(char* template) {
-#if  defined(__clang__)
+#if defined(__clang__) || defined(_WIN32) || defined(__MINGW32__)
     return my_mkdtemp(template);
 #elif defined(__GNUC__)
     if (mkdtemp(template) == NULL) {
@@ -383,7 +490,7 @@ static int mkdtemp_wrap(char* template) {
 }
 
 static int mkstemp_wrap(char* template) {
-#if defined(__clang__)
+#if defined(__clang__) || defined(_WIN32)
     return my_mkstemp(template);
 #elif defined(__GNUC__)
     return mkstemp(template);
@@ -409,12 +516,12 @@ int fs_create_tmp_dir(char** ptmpdir_path) {
         return rc;
     }
 
-    char* abs_path = realpath(path, NULL);
-    if (abs_path == NULL) {
-        int err = errno;
-        rmdir(path);
+    char* abs_path = NULL;
+    rc = fs_realpath(path, &abs_path);
+    if (rc < 0) {
+        RMDIR(path);
         free(path);
-        BLOSC_TRACE_ERROR("Could not resolve temporary directory path: %s", strerror(err));
+        BLOSC_TRACE_ERROR("Could not resolve temporary directory path:");
         return BLOSC2_ERROR_FAILURE;
     }
     free(path);
@@ -422,7 +529,24 @@ int fs_create_tmp_dir(char** ptmpdir_path) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
+static int s_set_cloexec(int fd) {
+#if defined(_WIN32)
+    intptr_t os_handle = _get_osfhandle(fd);
+    if (os_handle == -1) {
+        errno = EBADF;
+        return BLOSC2_ERROR_FAILURE;
+    }
+    if (!SetHandleInformation((HANDLE)os_handle, HANDLE_FLAG_INHERIT, 0)) {
+        errno = EINVAL;
+        return BLOSC2_ERROR_FAILURE;
+    }
+    return BLOSC2_ERROR_SUCCESS;
+#else
+    return fcntl(fd, F_SETFD, FD_CLOEXEC);
+#endif
+}
+
+int fs_create_tmp_file(const char* localpath, char** tmp_path) {
     assert(localpath != NULL && tmp_path != NULL);
 
     *tmp_path = NULL;
@@ -438,19 +562,15 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     snprintf(tmpl, tmp_path_size, "%s.XXXXXX", localpath);
-
-#if defined(HAVE_MKOSTEMP) && defined(O_CLOEXEC)
-    int fd = mkostemp(tmpl, O_CLOEXEC);
-#else
     int fd = mkstemp_wrap(tmpl);
-#endif
-
     if (fd < 0) {
         int err = errno;
         free(tmpl);
         switch (err) {
         case ENOSPC:
-        case EDQUOT:
+#if defined(__GNUC__) && !defined(__MINGW32__)
+            case EDQUOT:
+#endif
             BLOSC_TRACE_ERROR("No space left to create temporary file");
             return BLOSC2_ERROR_FILE_WRITE;
         case ENAMETOOLONG:
@@ -463,17 +583,56 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
     }
 
 #if !(defined(HAVE_MKOSTEMP) && defined(O_CLOEXEC))
-    if (fcntl(fd, F_SETFD, FD_CLOEXEC) == -1) {
+    if (s_set_cloexec(fd) == -1) {
         int err = errno;
-        close(fd);
+        CLOSE(fd);
         blosc2_remove_urlpath(tmpl);
         free(tmpl);
         BLOSC_TRACE_ERROR("Could not set FD_CLOEXEC: %s", strerror(err));
+        return BLOSC2_ERROR_FILE_OPEN;
     }
 #endif
 
     *tmp_path = tmpl;
     return fd;
+}
+
+static char* wrap_dirname(char* path) {
+
+#if defined(_WIN32) && !defined(__MINGW32__)
+
+    if (path[0] == '\0') {
+        return ".";
+    }
+    size_t path_len = strlen(path);
+
+    while (path_len > 1 && (path[path_len - 1] == '/' || path[path_len - 1] == '\\')) {
+        path[--path_len] = '\0';
+    }
+
+    char* last_sep = strrchr(path, '/');
+    char* last_backslash = strrchr(path, '\\');
+
+    if (last_backslash != NULL && (last_sep == NULL || last_backslash > last_sep)) {
+        last_sep = last_backslash;
+    }
+
+    if (last_sep == NULL) {
+        return ".";
+    }
+
+    if (last_sep == path) {
+        last_sep[1] = '\0';
+        return path;
+    }
+
+    *last_sep = '\0';
+    return path;
+
+#else
+    return dirname(path);
+#endif
+
 }
 
 int fs_sync_parent_dir(const char* path) {
@@ -488,19 +647,21 @@ int fs_sync_parent_dir(const char* path) {
     }
     memcpy(buf, path, buf_len);
     int dirfd = -1;
-    char* dir_name = dirname(buf); // It is already a directory
+    char* dir_name = wrap_dirname(buf); // It is already a directory
+
     dirfd = open(dir_name, O_RDONLY);
-    if (dirfd < 0 ) {
+    if (dirfd < 0) {
+        BLOSC_TRACE_ERROR("Could not open directory %s", dir_name);
         free(buf);
         return BLOSC2_ERROR_FILE_OPEN;
     }
-
     bool retry_fsync = true;
     int error_code = BLOSC2_ERROR_SUCCESS;
     while (retry_fsync) {
         retry_fsync = false;
-        if (fsync(dirfd) < 0) {
+        if (FSYNC(dirfd) < 0) {
             int err = errno;
+            error_code = BLOSC2_ERROR_FILE_OPEN;
             switch (err) {
             case EINTR:
                 BLOSC_TRACE_ERROR("A signal has interrupted the fsync operation, retrying at file %s ...", path);
@@ -508,16 +669,19 @@ int fs_sync_parent_dir(const char* path) {
                 break;
             case EIO:
                 BLOSC_TRACE_ERROR("Error during synchronization of parent directory of %s", path);
-                error_code = BLOSC2_ERROR_FILE_OPEN;
                 break;
             case ENOSPC:
                 BLOSC_TRACE_ERROR("Disk space was exhausted while syncing %s", path);
-                error_code = BLOSC2_ERROR_FILE_OPEN;
+                break;
+            default:
+                BLOSC_TRACE_ERROR("Could not sync file");
                 break;
             }
+
         }
     }
-    close(dirfd);
+
+    CLOSE(dirfd);
     free(buf);
 
     return error_code;
@@ -530,12 +694,15 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
     int error_code = 0;
     bool tmp_exists = true;
 
-    int fd = blosc2_create_tmp_file(path, (char**)&tmp_file_path);
+    int fd = fs_create_tmp_file(path, &tmp_file_path);
     if (fd < 0) {
         BLOSC_TRACE_ERROR("Could not create temporal file at %s", path);
         error_code = fd;
         goto cleanup;
     }
+
+    CLOSE(fd);
+    fd = -1;
     if (schunk->storage->urlpath != NULL) {
         error_code = blosc2_remove_urlpath(tmp_file_path); // Let blosc2_schunk_to_file create it
         if (error_code < 0) {
@@ -551,10 +718,21 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
         goto cleanup;
     }
 
+    // Reopen file
+#ifdef _WIN32
+    fd = _open(tmp_file_path, _O_RDWR | _O_BINARY);
+#else
+    fd = open(tmp_file_path, O_RDWR);
+#endif
+    if (fd < 0) {
+        BLOSC_TRACE_ERROR("Could not reopen %s", tmp_file_path);
+        goto cleanup;
+    }
+
     bool retry_fsync = true;
     while (retry_fsync) {
         retry_fsync = false;
-        if (fsync(fd) < 0) {
+        if (FSYNC(fd) < 0) {
             int err = errno;
             switch (err) {
             case EINTR:
@@ -573,23 +751,40 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
         }
     }
 
-    if (close(fd) < 0) {
+    if (CLOSE(fd) < 0) {
         fd = -1;
         error_code = BLOSC2_ERROR_FILE_WRITE;
         goto cleanup;
     }
     fd = -1;
 
-    if (rename(tmp_file_path, path) < 0) {
+#ifdef _WIN32
+    if (!MoveFileExA(tmp_file_path, path, MOVEFILE_REPLACE_EXISTING)) {
+        DWORD err = GetLastError();
+
+        BLOSC_TRACE_ERROR(
+            "Could not atomically replace %s with %s. Windows error: %lu",
+            path, tmp_file_path, (unsigned long)err
+        );
+
         error_code = BLOSC2_ERROR_FILE_WRITE;
         goto cleanup;
     }
-    tmp_exists = false;
-    error_code = fs_sync_parent_dir(path);
+#else
+    if (rename(tmp_file_path, path) < 0) {
+        BLOSC_TRACE_ERROR("Could not atomically replace file");
+        error_code = BLOSC2_ERROR_FILE_WRITE;
+        goto cleanup;
+    }
+#endif
 
+    tmp_exists = false;
+#ifndef _WIN32
+    error_code = fs_sync_parent_dir(path);
+#endif
 cleanup:
-    if (fd >= 0) close(fd);
-    if (tmp_exists) blosc2_remove_urlpath(tmp_file_path);
+    if (fd >= 0) CLOSE(fd);
+    if (tmp_exists && tmp_file_path != NULL) blosc2_remove_urlpath(tmp_file_path);
     free((void*)tmp_file_path);
     return error_code;
 }
@@ -597,11 +792,33 @@ cleanup:
 int fs_realpath(const char* path, char** out_path) {
     assert(path != NULL && out_path != NULL);
     *out_path = NULL;
+#if defined(_WIN32)
+    DWORD size = GetFullPathNameA(path, 0, NULL, NULL);
+    if (size == 0) {
+        BLOSC_TRACE_ERROR("Could not get full path name size");
+        return BLOSC2_ERROR_FAILURE;
+    }
 
+    char* real = malloc(size);
+    if (real == NULL) {
+        BLOSC_TRACE_ERROR("Could not allocate path buffer");
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+    DWORD a = GetFullPathNameA(path, size, real, NULL);
+    if (a == 0 || a >= size) {
+        BLOSC_TRACE_ERROR("Could not get full path name");
+        free(real);
+        return BLOSC2_ERROR_FAILURE;
+    }
+
+    *out_path = real;
+    return BLOSC2_ERROR_SUCCESS;
+#else
     char* real = realpath((const char*)path, NULL);
     if (real == NULL) {
         return BLOSC2_ERROR_MEMORY_ALLOC;
     }
     *out_path = real;
     return BLOSC2_ERROR_SUCCESS;
+#endif
 }

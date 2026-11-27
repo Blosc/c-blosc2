@@ -1,5 +1,5 @@
 /*********************************************************************
- Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
   Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
   https://blosc.org
@@ -14,6 +14,7 @@
 #include <utils/key.h>
 #include <utils/string_manipulation.h>
 #include <utils/ziputils.h>
+#include <inttypes.h>
 
 #include <assert.h>
 #include <errno.h>
@@ -217,10 +218,135 @@ static int s_zip_write_all_pairs(const dict_store *ds, zip_archive *za) {
     return rc;
 }
 
-// TODO: This is not platform independent
 // A function call frame does not have ownership of its parameters
-static int s_b2d_fill_pairs_recursive(dict_store* dstore, const char* abs_path){
+static int s_b2d_fill_pairs_recursive(dict_store* dstore, const char* abs_path) {
+#if defined(_WIN32) && !defined(__MINGW32__)
+size_t path_len = strlen(abs_path);
 
+    if (path_len > SIZE_MAX - 3) {
+        return BLOSC2_ERROR_INVALID_PARAM;
+    }
+
+    // Build search pattern: abs_path\*
+    char* search_path = malloc(path_len + 3);
+    if (search_path == NULL) {
+        return BLOSC2_ERROR_MEMORY_ALLOC;
+    }
+
+    snprintf(search_path, path_len + 3, "%s%s*",
+             abs_path,
+             (path_len > 0 && abs_path[path_len - 1] != '/' &&
+              abs_path[path_len - 1] != '\\') ? "\\" : "");
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path, &find_data);
+
+    free(search_path);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        BLOSC_TRACE_ERROR("Could not open directory at %s", abs_path);
+        return BLOSC2_ERROR_FILE_OPEN;
+    }
+
+    int rc = BLOSC2_ERROR_SUCCESS;
+
+    do {
+        const char* filename = find_data.cFileName;
+
+        if (strcmp(filename, ".") == 0 ||
+            strcmp(filename, "..") == 0 ||
+            strcmp(filename, (const char*)b2e_name) == 0) {
+            continue;
+        }
+
+        char* new_abs_path = NULL;
+        rc = fs_path_join(abs_path, filename, &new_abs_path);
+
+        if (rc < 0) {
+            BLOSC_TRACE_ERROR("Could not join paths");
+            break;
+        }
+
+        DWORD attributes = find_data.dwFileAttributes;
+
+        if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+
+            // Do not follow symbolic links or junctions.
+            if (attributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+                free(new_abs_path);
+                continue;
+            }
+
+            rc = s_b2d_fill_pairs_recursive(dstore, new_abs_path);
+            free(new_abs_path);
+
+            if (rc < 0) {
+                break;
+            }
+
+        } else if (!(attributes & FILE_ATTRIBUTE_DEVICE) &&
+                   !(attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+
+            size_t ignore_offset = dstore->urlpath_length;
+
+            if (new_abs_path[ignore_offset] == '/' ||
+                new_abs_path[ignore_offset] == '\\') {
+                ignore_offset += 1;
+            }
+
+            uint8_t* localpath = NULL;
+            rc = string_duplicate(
+                (const uint8_t*)&new_abs_path[ignore_offset],
+                &localpath
+            );
+
+            if (rc < 0) {
+                BLOSC_TRACE_ERROR("Could not duplicate string");
+                free(new_abs_path);
+                break;
+            }
+
+            free(new_abs_path);
+
+            uint8_t* key = NULL;
+            rc = string_remove_extension(localpath, &key);
+
+            if (rc < 0) {
+                BLOSC_TRACE_ERROR("Could not remove extension to localpath");
+                free(localpath);
+                break;
+            }
+
+            b2_ds_value value;
+            value.f_dir.localpath = localpath;
+            value.f_dir.localpath_length = strlen((const char*)localpath);
+
+            bool needs_free = false;
+            rc = hash_map_put(&dstore->map, key, &value, &needs_free);
+
+            if (rc < 0) {
+                BLOSC_TRACE_ERROR("Could not insert element in map");
+                free(localpath);
+                free(key);
+                break;
+            }
+
+            if (needs_free) {
+                free(key);
+            }
+
+        } else {
+            BLOSC_TRACE_ERROR("An unexpected file type was found");
+            free(new_abs_path);
+            rc = BLOSC2_ERROR_FAILURE;
+            break;
+        }
+
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
+    return rc;
+#else
     DIR* dir = opendir(abs_path);
     if (dir == NULL) {
         BLOSC_TRACE_ERROR("Could not open directory at %s", abs_path);
@@ -242,7 +368,7 @@ static int s_b2d_fill_pairs_recursive(dict_store* dstore, const char* abs_path){
             break;
         }
         struct stat st;
-        if (lstat(new_abs_path, &st) < 0) {
+        if (stat(new_abs_path, &st) < 0) {
             BLOSC_TRACE_ERROR("Could not make stat");
             free(new_abs_path);
             rc = BLOSC2_ERROR_FILE_READ;
@@ -298,6 +424,7 @@ static int s_b2d_fill_pairs_recursive(dict_store* dstore, const char* abs_path){
     }
     closedir(dir);
     return rc;
+#endif
 }
 
 static int s_b2d_fill_pairs(dict_store *ds) {
@@ -427,11 +554,11 @@ static int s_open_rdonly_b2d(dict_store **ds, const uint8_t* urlpath) {
     //      - urlpath is not NULL
 
     struct stat st;
-    if (lstat((const char*)urlpath, &st) < 0) {
+    if (stat((const char*)urlpath, &st) < 0) {
         BLOSC_TRACE_ERROR("Could not lstat directory");
         return BLOSC2_ERROR_FILE_OPEN;
     }
-    if (!S_ISDIR(st.st_mode)) {
+    if ((st.st_mode & S_IFMT) != S_IFDIR) {
         BLOSC_TRACE_ERROR("%s should be a directory", (const char*)urlpath);
         return BLOSC2_ERROR_FILE_OPEN;
     }
@@ -481,7 +608,7 @@ static int s_open_wronly_b2z(dict_store **ds, const uint8_t* urlpath) {
 
 static int s_open_wronly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
-    if (mkdir((const char*)urlpath, 0700) != 0) {
+    if (MKDIR((const char*)urlpath) != 0) {
         BLOSC_TRACE_ERROR("Could not create directory at %s", (const char*)urlpath);
         return BLOSC2_ERROR_FILE_OPEN;
     }
@@ -580,7 +707,12 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         }
 
         size_t file_index = ziputils_reader_iter_get_file_index(iter);
-        fs_create_dir_recursive((const char*)full_path);
+        error_code = fs_create_dir_recursive((const char*)full_path);
+        if (error_code < 0) {
+            BLOSC_TRACE_ERROR("Could not create directory recurisvely");
+            free(val.f_dir.localpath);
+            goto cleanup;
+        }
         if (!ziputils_reader_extract_to_file(za, (const uint8_t*)full_path, file_index)) {
             BLOSC_TRACE_ERROR("Could not extract file in archive to file in filesystem");
             free((void*)key);
@@ -631,7 +763,7 @@ static int s_open_rdwr_b2d(dict_store **ds, const uint8_t* urlpath) {
         return BLOSC2_ERROR_FILE_OPEN;
     }
 
-    if (!S_ISDIR(st.st_mode)) {
+    if ((st.st_mode & S_IFMT) != S_IFDIR) {
         BLOSC_TRACE_ERROR("%s is not a directory", (const char*)urlpath);
         return BLOSC2_ERROR_FILE_OPEN;
     }
@@ -752,7 +884,7 @@ static int s_get_b2x(dict_store *ds, b2_ds_value* value, blosc2_store_value* ite
     blosc2_schunk* schunk = blosc2_schunk_open_offset((const char*)path, offset);
     int error_code = BLOSC2_ERROR_SUCCESS;
     if (schunk == NULL) {
-        BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %ld", (const char*)path, offset);
+        BLOSC_TRACE_ERROR("Could not open schunk at file %s with offset %" PRId64 "", (const char*)path, offset);
         error_code = BLOSC2_ERROR_FILE_OPEN;
     } else {
         s_blosc2_store_value_set_local(item, schunk);

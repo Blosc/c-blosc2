@@ -1,16 +1,19 @@
 /*********************************************************************
-Blosc - Blocked Shuffling and Compression Library
+  Blosc - Blocked Shuffling and Compression Library
 
-Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
-https://blosc.org
-License: BSD 3-Clause (see LICENSE.txt)
+  Copyright (c) 2021  Blosc Development Team <blosc@blosc.org>
+  https://blosc.org
+  License: BSD 3-Clause (see LICENSE.txt)
 
-See LICENSE.txt for details about copyright and rights to use.
+  See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 
 #include <blosc2.h>
+#include <blosc-private.h>
 #include <sys/stat.h>
+#if defined(__MINGW32__) || !defined(_WIN32)
 #include <dirent.h>
+#endif
 #include "ziputils.h"
 
 zip_archive* ziputils_archive_new() {
@@ -24,6 +27,89 @@ void ziputils_archive_free( zip_archive* za ) {
 }
 
 static bool add_dir(mz_zip_archive *za, const uint8_t* dir_path, size_t path_offset) {
+#if defined(_WIN32) && !defined(__MINGW32__)
+
+    size_t dir_len = strlen((const char*)dir_path);
+
+    if (dir_len > SIZE_MAX - 3) {
+        return false;
+    }
+
+    // Build search pattern: directory\*
+    char* search_path = malloc(dir_len + 3);
+    if (search_path == NULL) {
+        return false;
+    }
+
+    snprintf(search_path, dir_len + 3, "%s%s*",
+             (const char*)dir_path,
+             (dir_len > 0 && dir_path[dir_len - 1] != '/' &&
+              dir_path[dir_len - 1] != '\\') ? "\\" : "");
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE hFind = FindFirstFileA(search_path, &find_data);
+
+    free(search_path);
+
+    if (hFind == INVALID_HANDLE_VALUE) {
+        return false;
+    }
+
+    bool result = true;
+
+    do {
+        const char* name = find_data.cFileName;
+
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+
+        size_t name_len = strlen(name);
+        bool needs_separator =
+            dir_len > 0 &&
+            dir_path[dir_len - 1] != '/' &&
+            dir_path[dir_len - 1] != '\\';
+
+        if (dir_len > SIZE_MAX - name_len - (needs_separator ? 2 : 1)) {
+            result = false;
+            break;
+        }
+
+        size_t full_len = dir_len + (needs_separator ? 1 : 0) + name_len + 1;
+
+        char* full = malloc(full_len);
+        if (full == NULL) {
+            result = false;
+            break;
+        }
+
+        snprintf(full, full_len, "%s%s%s",
+                 (const char*)dir_path,
+                 needs_separator ? "\\" : "",
+                 name);
+
+        if (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            result = add_dir(za, (const uint8_t*)full, path_offset);
+        } else if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_DEVICE)) {
+            if (!(find_data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+                result = mz_zip_writer_add_file(
+                    za, full + path_offset, full, "", 0, MZ_NO_COMPRESSION
+                );
+            }
+        }
+
+        free(full);
+
+        if (!result) {
+            break;
+        }
+
+    } while (FindNextFileA(hFind, &find_data));
+
+    FindClose(hFind);
+    return result;
+
+#else
     DIR *dir = opendir((const char*)dir_path);
     if (!dir) { return false; }
     struct dirent *e;
@@ -54,6 +140,7 @@ static bool add_dir(mz_zip_archive *za, const uint8_t* dir_path, size_t path_off
     }
     closedir(dir);
     return true;
+#endif
 }
 
 bool ziputils_archive_directory(const uint8_t* dir_path, const uint8_t* dest_path ) {
