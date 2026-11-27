@@ -26,20 +26,23 @@
 #include <string_manipulation.h>
 #include "blosc-checked.h"
 
-#define MY_MKDTEMP_MAX_ATTEMPTS 10
+#define MAX_ATTEMPTS 10
 
 #if defined(_WIN32) || defined (__MINGW32__)
 #include <direct.h>
 #include <process.h>
+#include <io.h>
 #define MKDIR(path) _mkdir(path)
 #define STAT(filename, buf) _stat(filename, buf)
 #define GETPID() _getpid()
+#define OPEN(path) _open((path), _O_RDWR | _O_CREAT | _O_EXCL | _O_BINARY | _S_IREAD | _S_IWRITE)
 typedef struct _stat struct stat;
 #else
 #include <unistd.h>
 #define MKDIR(path) mkdir(path, 0700)
 #define STAT(filename, buf) stat(filename, buf)
 #define GETPID() getpid()
+#define OPEN(path) open((path), O_RDWR | O_CREAT | O_EXCL )
 #endif
 
 int fs_mkdir(const char* path) {
@@ -309,47 +312,51 @@ int fs_create_dir_recursive_check_extension_paths(const char* dir_path) {
     return BLOSC2_ERROR_SUCCESS;
 }
 
-
-// This function is a reimplementation of mkdtemp from POSIX, it is needed in case Clang is defined
-// as a C compiler
-BLOSC_ATTRIBUTE_UNUSED
-static int my_mkdtemp(char* template) {
+static void s_fill_template(char* template) {
     static const char alphabet[] = "abcdefghijklmnopqrstuvwxyz0123456789";
     const size_t nchars = sizeof(alphabet) - 1;
     static unsigned long counter = 0;
 
-    if (template == NULL) {
-        return BLOSC2_ERROR_INVALID_PARAM;
-    }
     size_t len = strlen(template);
-    if (len < 6 || strcmp(template + len - 6, "XXXXXX") != 0) {
-        return BLOSC2_ERROR_INVALID_PARAM;
-    }
+
     char* suffix = template + len - 6;
 
     uint64_t state = (uint64_t)time(NULL)
                    ^ ((uint64_t)GETPID() << 32)
                    ^ (uint64_t)(uintptr_t)template;
 
-    for (int attempt = 0; attempt < MY_MKDTEMP_MAX_ATTEMPTS; attempt++) {
-        for (int i = 0; i < 6; i++) {
-            state = state * 6364136223846793005ULL + 1442695040888963407ULL + counter++;
-            suffix[i] = alphabet[(size_t)((state >> 33) % nchars)];
-        }
+    for (int i = 0; i < 6; i++) {
+        state = state * 6364136223846793005ULL + 1442695040888963407ULL + counter++;
+        suffix[i] = alphabet[(size_t)((state >> 33) % nchars)];
+    }
+}
 
-        errno = 0;
+BLOSC_ATTRIBUTE_UNUSED
+static int my_mkdtemp(char* template) {
+
+    for (int i = 0; i < MAX_ATTEMPTS; i+=1) {
+        s_fill_template(template);
         if (MKDIR(template) == 0) {
             return BLOSC2_ERROR_SUCCESS;
         }
-        if (errno != EEXIST) {
-            /* Fallo real (permisos, ruta inexistente, disco de solo lectura...) */
-            memcpy(suffix, "XXXXXX", 6);
-            return BLOSC2_ERROR_FILE_OPEN;
-        }
-        /* El nombre ya existía: se reintenta con otro sufijo. */
     }
 
-    memcpy(suffix, "XXXXXX", 6);
+    return BLOSC2_ERROR_FILE_OPEN;
+}
+
+BLOSC_ATTRIBUTE_UNUSED
+static int my_mkstemp(char* template) {
+
+    for (int i = 0; i < MAX_ATTEMPTS; i+=1) {
+        s_fill_template(template);
+        int fd = open(template, O_CREAT | O_RDWR | O_EXCL, 0600);
+        if (fd >= 0) {
+            return fd;
+        }
+        int err = errno;
+        if (err != EEXIST) break;
+    }
+
     return BLOSC2_ERROR_FILE_OPEN;
 }
 
@@ -372,6 +379,14 @@ static int mkdtemp_wrap(char* template) {
         }
     }
     return BLOSC2_ERROR_SUCCESS;
+#endif
+}
+
+static int mkstemp_wrap(char* template) {
+#if defined(__clang__)
+    return my_mkstemp(template);
+#elif defined(__GNUC__)
+    return mkstemp(template);
 #endif
 }
 
@@ -427,7 +442,7 @@ int blosc2_create_tmp_file(const char* localpath, char** tmp_path) {
 #if defined(HAVE_MKOSTEMP) && defined(O_CLOEXEC)
     int fd = mkostemp(tmpl, O_CLOEXEC);
 #else
-    int fd = mkstemp(tmpl);
+    int fd = mkstemp_wrap(tmpl);
 #endif
 
     if (fd < 0) {
@@ -473,7 +488,8 @@ int fs_sync_parent_dir(const char* path) {
     }
     memcpy(buf, path, buf_len);
     int dirfd = -1;
-    dirfd = open(dirname(buf), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    char* dir_name = dirname(buf); // It is already a directory
+    dirfd = open(dir_name, O_RDONLY);
     if (dirfd < 0 ) {
         free(buf);
         return BLOSC2_ERROR_FILE_OPEN;
@@ -528,7 +544,6 @@ int fs_atomic_schunk_write(const char* path, blosc2_schunk* schunk) {
             return BLOSC2_ERROR_FILE_REMOVE;
         }
     }
-
 
     if (blosc2_schunk_to_file(schunk, tmp_file_path) < 0) {
         BLOSC_TRACE_ERROR("Could not write schunk to temporal file at %s", tmp_file_path);

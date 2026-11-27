@@ -78,7 +78,7 @@ int tests_run = 0; //  This variable is modified by test_common, it is declared 
 
 
 static int s_open_msgpack(const char* packed_file, uint8_t** out_buffer, size_t* size) {
-    int fd = open(packed_file, O_RDONLY | O_CLOEXEC );
+    int fd = open(packed_file, O_RDONLY );
     if (fd < 0) {
         BLOSC_TRACE_ERROR("Could not open %s", packed_file);
         return BLOSC2_ERROR_FILE_OPEN;

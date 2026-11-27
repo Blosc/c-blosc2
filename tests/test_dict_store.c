@@ -157,9 +157,11 @@ static void s_teardown(void) {
 
 /* Insert every global paths[i] -> b2_schunks[i] pair. Returns 0 or first error. */
 static int s_set_all_schunks(blosc2_dict_store* store) {
+    blosc2_store_value value = {0};
+    value.tag = BLOSC2_STORE_VALUE_SCHUNK;
     for (size_t i = 0; i < SCHUNKS_SIZE; i+=1) {
-        int rc = blosc2_dict_store_set(store, (const uint8_t*)paths[i],
-            &(blosc2_store_value){.tag = BLOSC2_STORE_VALUE_SCHUNK, .schunk = b2_schunks[i]});
+        value.schunk = b2_schunks[i];
+        int rc = blosc2_dict_store_set(store, (const uint8_t*)paths[i], &value);
         if (rc != 0) {
             return rc;
         }

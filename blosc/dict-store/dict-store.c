@@ -501,6 +501,7 @@ static int s_open_wronly_b2d(dict_store **ds, const uint8_t* urlpath) {
 
 
 static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
+    assert(ds != NULL && urlpath != NULL);
 
     bool free_pds = true;
     dict_store *pds = NULL;
@@ -509,6 +510,7 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
     size_t tmpdir_length = 0;
     zip_archive *za = NULL;
     zip_archive_iter *iter = NULL;
+    char* full_path = NULL;
 
     int error_code = BLOSC2_ERROR_SUCCESS;
     error_code = s_dict_store_alloc_urlpath(&pds, urlpath, B2_DS_B2Z, BLOSC2_STORE_OPEN_MODE_RDWR, s_b2_ds_value_free_dir);
@@ -543,7 +545,6 @@ static int s_open_rdwr_b2z(dict_store **ds, const uint8_t* urlpath) {
         goto cleanup;
     }
 
-    char* full_path = NULL;
     while (ziputils_reader_iter_next(iter)) {
         b2_ds_value val = {0};
         uint8_t* key_with_extension = NULL;
