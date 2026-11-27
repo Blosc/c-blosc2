@@ -1277,6 +1277,19 @@ static void *exec_thread_main(void *argument) {
 }
 #endif
 
+static void exec_merge_init_fp(b2nd_exec_report *report, const exec_job *parts, size_t count,
+                               bool init_fp_seen, me_fp_status init_fp) {
+    if (!init_fp_seen) {
+        return;
+    }
+    bool any_fp = false;
+    for (size_t i = 0; i < count; i++) {
+        any_fp |= parts[i].fp_seen || parts[i].fp_scoped;
+    }
+    report->fp.flags |= init_fp.flags;
+    report->fp.supported = any_fp ? (report->fp.supported && init_fp.supported) : init_fp.supported;
+}
+
 /* Ordered combination: partials are merged by logical task ID, never by
  * completion order. Only order-independent reducers are partitioned. */
 static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t ntasks) {
@@ -1498,11 +1511,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
                 pthread_join(threads[i].thread, NULL);
             }
             exec_combine(report, parts, started);
-            if (init_fp_seen) {
-                report->fp.flags |= init_fp.flags;
-                report->fp.supported = report->tiles ?
-                    (report->fp.supported && init_fp.supported) : init_fp.supported;
-            }
+            exec_merge_init_fp(report, parts, started, init_fp_seen, init_fp);
             report->tasks = started;
             report->worker_bytes = worker_bytes;
             report->mapped_bytes = per_job_mapped;
@@ -1523,14 +1532,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
         exec_run(&parts[0]);
     }
     exec_combine(report, parts, ntasks);
-    if (init_fp_seen) {
-        bool any_fp = false;
-        for (size_t i = 0; i < ntasks; i++) {
-            any_fp |= parts[i].fp_seen || parts[i].fp_scoped;
-        }
-        report->fp.flags |= init_fp.flags;
-        report->fp.supported = any_fp ? (report->fp.supported && init_fp.supported) : init_fp.supported;
-    }
+    exec_merge_init_fp(report, parts, ntasks, init_fp_seen, init_fp);
     report->tasks = ntasks;
     report->worker_bytes = worker_bytes;
     report->mapped_bytes = per_job_mapped;
