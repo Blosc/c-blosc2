@@ -1366,28 +1366,22 @@ static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t 
     }
 }
 
-static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
-                                  const b2nd_exec_view *inputs, size_t ninputs,
-                                  const b2nd_exec_output_view *output,
-                                  unsigned raise_mask, size_t max_gather_bytes,
-                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
-                                  me_error *error, const b2nd_exec_reader *readers) {
-    if (report) {
-        *report = (b2nd_exec_report){0};
-    }
-    if (error) {
-        *error = (me_error){0};
-    }
-    if (!schedule || !inputs || !output || !report || ninputs != schedule->plan->info.ninputs ||
-        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
-        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
-    }
+static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
+                                    const b2nd_exec_view *inputs,
+                                    const bool *is_reader, size_t ninputs,
+                                    const b2nd_exec_output_view *output,
+                                    size_t max_gather_bytes,
+                                    const b2nd_exec_jobs *jobs,
+                                    bool direct[B2ND_EXEC_MAX_INPUTS],
+                                    size_t gather_offsets[B2ND_EXEC_MAX_INPUTS],
+                                    size_t *out_gather, size_t *out_mapped,
+                                    bool *out_scatter, size_t *out_work_items,
+                                    size_t *out_tasks, me_error *error) {
     const b2nd_exec_plan *plan = schedule->plan;
-    if (readers && (jobs || (plan->info.reduction &&
+    if (is_reader && plan->info.reduction &&
         (schedule->info.output_items != 1 ||
-         (plan->info.has_axes && plan->info.naxes != schedule->info.ndim))))) {
-        return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require serial whole-domain execution");
+         (plan->info.has_axes && plan->info.naxes != schedule->info.ndim))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require whole-domain execution");
     }
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
@@ -1397,11 +1391,9 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
                       width, output_items)) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent, alignment or strides");
     }
-    bool direct[B2ND_EXEC_MAX_INPUTS] = {0};
-    size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
     size_t per_job_gather = 0;
     for (size_t i = 0; i < ninputs; i++) {
-        if (readers && readers[i].read) {
+        if (is_reader && is_reader[i]) {
             if (!schedule->matches_shape[i]) {
                 return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require same-shape operands");
             }
@@ -1488,6 +1480,60 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
 #ifdef _WIN32
     ntasks = 1;
 #endif
+    *out_gather = per_job_gather;
+    *out_mapped = per_job_mapped;
+    *out_scatter = scatter;
+    *out_work_items = work_items;
+    *out_tasks = ntasks;
+    return ME_SUCCESS;
+}
+
+static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
+                                  const b2nd_exec_view *inputs, size_t ninputs,
+                                  const b2nd_exec_output_view *output,
+                                  unsigned raise_mask, size_t max_gather_bytes,
+                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                  me_error *error, const b2nd_exec_reader *readers,
+                                  size_t reader_stride, size_t reader_tasks) {
+    if (report) {
+        *report = (b2nd_exec_report){0};
+    }
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!schedule || !inputs || !output || !report || ninputs != schedule->plan->info.ninputs ||
+        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
+        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
+    }
+    const b2nd_exec_plan *plan = schedule->plan;
+    bool is_reader_buf[B2ND_EXEC_MAX_INPUTS] = {0};
+    const bool *is_reader = NULL;
+    if (readers) {
+        for (size_t i = 0; i < ninputs; i++) {
+            is_reader_buf[i] = readers[i].read != NULL;
+        }
+        is_reader = is_reader_buf;
+    }
+    bool direct[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t per_job_gather = 0, per_job_mapped = 0, work_items = 0, ntasks = 0;
+    bool scatter = false;
+    me_status bind_status = exec_plan_bindings(
+        schedule, inputs, is_reader, ninputs, output, max_gather_bytes, jobs,
+        direct, gather_offsets, &per_job_gather, &per_job_mapped, &scatter,
+        &work_items, &ntasks, error);
+    if (bind_status != ME_SUCCESS) {
+        return bind_status;
+    }
+    if (readers && ntasks > 1 && (reader_tasks < ntasks || reader_stride < ninputs)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution storage task bindings");
+    }
+    size_t items = schedule->info.nitems;
+    size_t width = plan->info.itemsize;
+    size_t groups = schedule->info.reduction_groups;
+    size_t worker_bytes = (per_job_mapped + per_job_gather) ?
+        (per_job_mapped + per_job_gather) * ntasks : 0;
     uint64_t identity_val = 0;
     if (plan->info.reduction &&
         (plan->info.reducer == ME_REDUCTION_SUM || plan->info.reducer == ME_REDUCTION_PROD ||
@@ -1521,7 +1567,6 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
     }
     size_t mapped_bytes = per_job_mapped ? per_job_mapped * ntasks : 0;
     size_t gather_bytes = per_job_gather ? per_job_gather * ntasks : 0;
-    size_t worker_bytes = per_job_total ? per_job_total * ntasks : 0;
     unsigned char *mapped = mapped_bytes ? malloc(mapped_bytes) : NULL;
     unsigned char *gather = gather_bytes ? malloc(gather_bytes) : NULL;
     exec_job *parts = calloc(ntasks, sizeof(*parts));
@@ -1535,6 +1580,8 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
     size_t per_task = work_items / ntasks, extra = work_items % ntasks, cursor = 0;
     for (size_t i = 0; i < ntasks; i++) {
         size_t count = per_task + (i < extra ? 1 : 0);
+        const b2nd_exec_reader *task_readers = readers ?
+            (readers + (reader_stride ? i * reader_stride : 0)) : NULL;
         parts[i] = (exec_job){
             schedule, inputs, direct, ninputs, output, scatter, raise_mask,
             mapped ? mapped + i * per_job_mapped : NULL, {0},
@@ -1543,7 +1590,7 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
             single_group_acc && (plan->info.has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
             single_group_acc ? initial_val : identity_val,
-            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, readers, false};
+            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, task_readers, false};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {
@@ -1650,7 +1697,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
                                  me_error *error) {
     return exec_execute_into(schedule, inputs, ninputs, output, raise_mask,
-                             max_gather_bytes, jobs, report, error, NULL);
+                             max_gather_bytes, jobs, report, error, NULL, 0, 0);
 }
 
 me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t slot,
@@ -1660,13 +1707,45 @@ me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t sl
     return ME_SUCCESS;
 }
 
-me_status b2nd_exec_execute_readers(const b2nd_exec_schedule *schedule,
-                                   const b2nd_exec_view *views,
-                                   const b2nd_exec_reader *readers, size_t ninputs,
-                                   me_mut_buffer output, unsigned raise_mask,
-                                   size_t max_gather_bytes, b2nd_exec_report *report,
-                                   me_error *error) {
-    if (!schedule || !readers) {
+me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
+                                 const b2nd_exec_view *views,
+                                 const bool *is_reader, size_t ninputs,
+                                 me_mut_buffer output, size_t max_gather_bytes,
+                                 const b2nd_exec_jobs *jobs,
+                                 size_t *out_tasks, me_error *error) {
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!schedule || !views || !is_reader || !out_tasks ||
+        ninputs != schedule->plan->info.ninputs ||
+        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid storage execution bindings");
+    }
+    b2nd_exec_output_view out = {sizeof(out), output.data, output.capacity, 0, {0}};
+    size_t stride = schedule->plan->info.itemsize;
+    for (size_t a = schedule->info.output_ndim; a-- > 0;) {
+        out.strides[a] = (int64_t)stride;
+        stride *= (size_t)schedule->info.output_shape[a];
+    }
+    bool direct[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t gather = 0, mapped = 0, work_items = 0;
+    bool scatter = false;
+    return exec_plan_bindings(schedule, views, is_reader, ninputs, &out,
+                              max_gather_bytes, jobs, direct, gather_offsets,
+                              &gather, &mapped, &scatter, &work_items,
+                              out_tasks, error);
+}
+
+me_status b2nd_exec_execute_readers_ex(const b2nd_exec_schedule *schedule,
+                                      const b2nd_exec_view *views,
+                                      const b2nd_exec_reader *readers,
+                                      size_t reader_stride, size_t reader_tasks,
+                                      size_t ninputs, me_mut_buffer output,
+                                      unsigned raise_mask, size_t max_gather_bytes,
+                                      const b2nd_exec_jobs *jobs,
+                                      b2nd_exec_report *report, me_error *error) {
+    if (!schedule || !views || !readers) {
         if (report) *report = (b2nd_exec_report){0};
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid storage reader bindings");
     }
@@ -1677,7 +1756,19 @@ me_status b2nd_exec_execute_readers(const b2nd_exec_schedule *schedule,
         stride *= (size_t)schedule->info.output_shape[a];
     }
     return exec_execute_into(schedule, views, ninputs, &out, raise_mask,
-                             max_gather_bytes, NULL, report, error, readers);
+                             max_gather_bytes, jobs, report, error,
+                             readers, reader_stride, reader_tasks);
+}
+
+me_status b2nd_exec_execute_readers(const b2nd_exec_schedule *schedule,
+                                   const b2nd_exec_view *views,
+                                   const b2nd_exec_reader *readers, size_t ninputs,
+                                   me_mut_buffer output, unsigned raise_mask,
+                                   size_t max_gather_bytes, b2nd_exec_report *report,
+                                   me_error *error) {
+    return b2nd_exec_execute_readers_ex(schedule, views, readers, ninputs, 1,
+                                        ninputs, output, raise_mask,
+                                        max_gather_bytes, NULL, report, error);
 }
 
 me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,

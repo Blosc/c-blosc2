@@ -164,6 +164,81 @@ int main(void) {
         b2nd_exec_plan_free(plan);
     }
     for (size_t i = 0; i < 2; i++) b2nd_free(arrays[i]);
+
+    {
+        /* Multi-dtype (int16, float32, bool), mixed compressed+resident, and parallel storage. */
+        int16_t s16[35];
+        for (size_t i = 0; i < 35; i++) s16[i] = (int16_t)(i - 5);
+        blosc2_cparams cp16 = BLOSC2_CPARAMS_DEFAULTS;
+        cp16.typesize = 2;
+        blosc2_storage st16 = {.cparams = &cp16};
+        b2nd_context_t *c16 = b2nd_create_ctx(&st16, 2, shape, chunks[0], blocks[0], "=i2", 0, NULL, 0);
+        b2nd_array_t *a16 = NULL;
+        assert(c16 && b2nd_from_cbuffer(c16, &a16, s16, sizeof(s16)) == 0);
+        b2nd_free_ctx(c16);
+
+        b2nd_exec_node n16[2] = {make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_SUM)};
+        n16[0].dtype = ME_INT16; n16[0].itemsize = 2;
+        n16[1].nargs = 1; n16[1].args[0] = 0;
+        b2nd_exec_descriptor d16 = {sizeof(d16), n16, 2, 1, 1};
+        b2nd_exec_plan *p16 = NULL; me_error err16;
+        assert(b2nd_exec_prepare(&d16, NULL, &p16, &err16) == ME_SUCCESS);
+        b2nd_exec_input_meta m16 = {ME_INT16, 2, 2, {5, 7}};
+        b2nd_exec_schedule *sc16 = NULL;
+        assert(b2nd_exec_specialize(p16, &m16, 1, 8, 64, &sc16, &err16) == ME_SUCCESS);
+        int64_t sum16 = 0;
+        b2nd_exec_storage_report r16;
+        const b2nd_array_t *in16[] = {a16};
+        size_t db16 = (size_t)a16->extchunknitems * 2;
+        assert(b2nd_exec_execute_arrays(sc16, in16, 1, (me_mut_buffer){&sum16, sizeof(sum16)},
+            0, db16, 16, &r16, &err16) == ME_SUCCESS);
+        assert(sum16 == 420);
+        b2nd_exec_jobs bad_j = {sizeof(bad_j), 2, 1024};
+        assert(b2nd_exec_execute_arrays_ex(sc16, in16, NULL, 1, (me_mut_buffer){&sum16, sizeof(sum16)},
+            0, db16 * 2, 16, &bad_j, &r16, &err16) == ME_ERR_UNSUPPORTED && !r16.decodes);
+        assert(b2nd_exec_execute_arrays_ex(sc16, in16, NULL, 1, (me_mut_buffer){&sum16, sizeof(sum16)},
+            0, db16, 16, &bad_j, &r16, &err16) == ME_ERR_UNSUPPORTED && !r16.decodes);
+        b2nd_exec_schedule_free(sc16);
+        b2nd_exec_plan_free(p16);
+        b2nd_free(a16);
+
+        float f32[35];
+        for (size_t i = 0; i < 35; i++) f32[i] = (float)(i + 1) * 0.5f;
+        blosc2_cparams cpf = BLOSC2_CPARAMS_DEFAULTS;
+        cpf.typesize = 4;
+        blosc2_storage stf = {.cparams = &cpf};
+        b2nd_context_t *cf = b2nd_create_ctx(&stf, 2, shape, chunks[0], blocks[0], "=f4", 0, NULL, 0);
+        b2nd_array_t *af = NULL;
+        assert(cf && b2nd_from_cbuffer(cf, &af, f32, sizeof(f32)) == 0);
+        b2nd_free_ctx(cf);
+        b2nd_exec_node nf[4] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT),
+            make_node(2, B2ND_EXEC_ADD), make_node(3, B2ND_EXEC_MIN)};
+        nf[0].dtype = ME_FLOAT32; nf[0].itemsize = 4;
+        nf[1].slot = 1; nf[1].dtype = ME_FLOAT32; nf[1].itemsize = 4;
+        nf[2].nargs = 2; nf[2].args[1] = 1;
+        nf[3].nargs = 1; nf[3].args[0] = 2;
+        b2nd_exec_descriptor df = {sizeof(df), nf, 4, 2, 3};
+        b2nd_exec_plan *pf = NULL;
+        assert(b2nd_exec_prepare(&df, NULL, &pf, &err16) == ME_SUCCESS);
+        b2nd_exec_input_meta mf[] = {{ME_FLOAT32, 4, 2, {5, 7}}, {ME_FLOAT32, 4, 2, {5, 7}}};
+        b2nd_exec_schedule *sf = NULL;
+        assert(b2nd_exec_specialize(pf, mf, 2, 8, 64, &sf, &err16) == ME_SUCCESS);
+        const b2nd_array_t *mixed_arr[] = {af, NULL};
+        b2nd_exec_view mixed_views[2] = {
+            {sizeof(b2nd_exec_view), NULL, 0, 0, {0}, 0},
+            {sizeof(b2nd_exec_view), f32, sizeof(f32), 0, {28, 4}, 0}};
+        float min_f32 = 0.0f;
+        b2nd_exec_jobs fj = {sizeof(fj), 3, 256};
+        size_t db_f = (size_t)af->extchunknitems * 4;
+        assert(b2nd_exec_execute_arrays_ex(sf, mixed_arr, mixed_views, 2,
+            (me_mut_buffer){&min_f32, sizeof(min_f32)}, 0, db_f * 2, 64, &fj, &r16, &err16) == ME_SUCCESS);
+        assert(min_f32 == 1.0f && r16.decode_bytes == db_f * 2 && r16.execution.tasks == 2);
+        b2nd_exec_schedule_free(sf);
+        b2nd_exec_plan_free(pf);
+        b2nd_free(af);
+    }
+
     blosc2_destroy();
     return 0;
 }
