@@ -278,7 +278,7 @@ int main(void) {
 
         const b2nd_array_t *in_match[] = {ax, ay_match};
         b2nd_exec_storage_report sr;
-        b2nd_exec_jobs sj = {sizeof(sj), 3, 0};
+        b2nd_exec_jobs sj = {sizeof(sj), 3, 65536};
         size_t match_dec_b = 2 * (size_t)out_match->blocknitems * 8;
         assert(b2nd_exec_execute_to_array(ss, in_match, NULL, 2, out_match, 0,
                                           match_dec_b * 3, 64, &sj, &sr, &serr) == ME_SUCCESS);
@@ -350,6 +350,109 @@ int main(void) {
         assert(!sr.decodes && !sr.execution.tiles);
         b2nd_exec_schedule_free(es); b2nd_free(ae); b2nd_free(oe);
 
+        /* Verify mismatched sink used bounded block cache. */
+        assert(b2nd_exec_execute_to_array(ss, in_mis, NULL, 2, out_mis, 0,
+                                          2 * 4 * 6 * 8 * 3, 2 * 4 * 8, &sj, &sr, &serr) == ME_SUCCESS);
+        assert(sr.decode_bytes <= 2 * 4 * 6 * 8 * sr.execution.tasks);
+
+        /* Compressed N-D broadcasting: (5, 7) + (7,) and (5, 7) + (5, 1). */
+        const int64_t row_s[] = {7}, col_s[] = {5, 1};
+        const int32_t row_c[] = {4}, row_b[] = {3}, col_c[] = {3, 1}, col_b[] = {2, 1};
+        double brow[7], bcol[5];
+        for (size_t i = 0; i < 7; i++) brow[i] = (double)(i + 1) * 10.0;
+        for (size_t i = 0; i < 5; i++) bcol[i] = (double)(i + 1) * 100.0;
+        b2nd_context_t *cr = b2nd_create_ctx(&st64, 1, row_s, row_c, row_b, "=f8", 0, NULL, 0);
+        b2nd_context_t *cc = b2nd_create_ctx(&st64, 2, col_s, col_c, col_b, "=f8", 0, NULL, 0);
+        b2nd_array_t *arow = NULL, *acol = NULL;
+        assert(cr && cc && b2nd_from_cbuffer(cr, &arow, brow, sizeof(brow)) == 0);
+        assert(b2nd_from_cbuffer(cc, &acol, bcol, sizeof(bcol)) == 0);
+        b2nd_free_ctx(cr); b2nd_free_ctx(cc);
+        poison_padding(arow); poison_padding(acol);
+        b2nd_exec_input_meta bm1[] = {{ME_FLOAT64, 8, 2, {5, 7}}, {ME_FLOAT64, 8, 1, {7}}};
+        b2nd_exec_schedule *bs1 = NULL;
+        assert(b2nd_exec_specialize(sp, bm1, 2, 8, 64, &bs1, &serr) == ME_SUCCESS);
+        const b2nd_array_t *in_b1[] = {ax, arow};
+        double res_bcast[35];
+        size_t dec_b1 = (size_t)(ax->extchunknitems + arow->extchunknitems) * 8;
+        assert(b2nd_exec_execute_arrays_ex(bs1, in_b1, NULL, 2, (me_mut_buffer){res_bcast, sizeof(res_bcast)},
+            0, dec_b1 * 3, 2 * 8 * 8, &sj, &sr, &serr) == ME_SUCCESS);
+        for (size_t i = 0; i < 35; i++) assert(res_bcast[i] == x[i] + brow[i % 7]);
+        assert(b2nd_exec_execute_to_array(bs1, in_b1, NULL, 2, out_mis, 0,
+            dec_b1 * 3, 2 * 4 * 8, &sj, &sr, &serr) == ME_SUCCESS);
+        assert(b2nd_to_cbuffer(out_mis, got, sizeof(got)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got[i] == x[i] + brow[i % 7]);
+        b2nd_exec_schedule_free(bs1);
+
+        b2nd_exec_input_meta bm2[] = {{ME_FLOAT64, 8, 2, {5, 7}}, {ME_FLOAT64, 8, 2, {5, 1}}};
+        b2nd_exec_schedule *bs2 = NULL;
+        assert(b2nd_exec_specialize(sp, bm2, 2, 8, 64, &bs2, &serr) == ME_SUCCESS);
+        const b2nd_array_t *in_b2[] = {ax, acol};
+        assert(b2nd_exec_execute_to_array(bs2, in_b2, NULL, 2, out_mis, 0,
+            dec_b1 * 3, 2 * 4 * 8, &sj, &sr, &serr) == ME_SUCCESS);
+        assert(b2nd_to_cbuffer(out_mis, got, sizeof(got)) == 0);
+        for (size_t r = 0; r < 5; r++)
+            for (size_t c_idx = 0; c_idx < 7; c_idx++)
+                assert(got[r * 7 + c_idx] == x[r * 7 + c_idx] + bcol[r]);
+        b2nd_exec_schedule_free(bs2);
+
+        /* Compressed partial-axis reductions compared bitwise with resident views. */
+        b2nd_exec_node pn[2] = {make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_SUM)};
+        pn[0].dtype = ME_FLOAT64; pn[0].itemsize = 8;
+        pn[1].nargs = 1; pn[1].args[0] = 0;
+        pn[1].has_axes = true; pn[1].naxes = 1; pn[1].axes[0] = 0; pn[1].keepdims = false;
+        b2nd_exec_descriptor pd = {sizeof(pd), pn, 2, 1, 1};
+        b2nd_exec_plan *pp0 = NULL;
+        b2nd_exec_schedule *ps0 = NULL;
+        assert(b2nd_exec_prepare(&pd, NULL, &pp0, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(pp0, &sm[0], 1, 4, 64, &ps0, &serr) == ME_SUCCESS);
+        double sum_a0[7], sum_ref[7];
+        b2nd_exec_view vx = {sizeof(vx), x, sizeof(x), 0, {56, 8}, 0};
+        b2nd_exec_report vr;
+        const b2nd_array_t *p_ax = ax;
+        assert(b2nd_exec_execute_views(ps0, &vx, 1, (me_mut_buffer){sum_ref, sizeof(sum_ref)},
+            0, 64, NULL, &vr, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_execute_arrays(ps0, &p_ax, 1, (me_mut_buffer){sum_a0, sizeof(sum_a0)},
+            0, (size_t)ax->extchunknitems * 8, 64, &sr, &serr) == ME_SUCCESS);
+        assert(!memcmp(sum_a0, sum_ref, sizeof(sum_ref)));
+        b2nd_exec_schedule_free(ps0); b2nd_exec_plan_free(pp0);
+
+        pn[1].axes[0] = 1; pn[1].keepdims = true;
+        b2nd_exec_plan *pp1 = NULL;
+        b2nd_exec_schedule *ps1 = NULL;
+        assert(b2nd_exec_prepare(&pd, NULL, &pp1, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(pp1, &sm[0], 1, 4, 64, &ps1, &serr) == ME_SUCCESS);
+        double sum_a1[5], sum_ref1[5];
+        assert(b2nd_exec_execute_views(ps1, &vx, 1, (me_mut_buffer){sum_ref1, sizeof(sum_ref1)},
+            0, 64, NULL, &vr, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_execute_arrays(ps1, &p_ax, 1, (me_mut_buffer){sum_a1, sizeof(sum_a1)},
+            0, (size_t)ax->extchunknitems * 8, 64, &sr, &serr) == ME_SUCCESS);
+        assert(!memcmp(sum_a1, sum_ref1, sizeof(sum_ref1)));
+        b2nd_exec_schedule_free(ps1); b2nd_exec_plan_free(pp1);
+
+        b2nd_exec_node mn[4] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT),
+            make_node(2, B2ND_EXEC_ADD), make_node(3, B2ND_EXEC_MIN)};
+        mn[0].dtype = ME_FLOAT64; mn[0].itemsize = 8;
+        mn[1].slot = 1; mn[1].dtype = ME_FLOAT64; mn[1].itemsize = 8;
+        mn[2].nargs = 2; mn[2].args[1] = 1;
+        mn[3].nargs = 1; mn[3].args[0] = 2;
+        mn[3].has_axes = true; mn[3].naxes = 1; mn[3].axes[0] = 0;
+        b2nd_exec_descriptor md = {sizeof(md), mn, 4, 2, 3};
+        b2nd_exec_plan *mp = NULL;
+        b2nd_exec_schedule *ms = NULL;
+        assert(b2nd_exec_prepare(&md, NULL, &mp, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(mp, sm, 2, 3, 64, &ms, &serr) == ME_SUCCESS);
+        double min_a0[7], min_ref[7];
+        b2nd_exec_view vy = {sizeof(vy), y, sizeof(y), 0, {56, 8}, 0};
+        b2nd_exec_view vxy[2] = {vx, vy};
+        assert(b2nd_exec_execute_views(ms, vxy, 2, (me_mut_buffer){min_ref, sizeof(min_ref)},
+            0, 64, &sj, &vr, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_execute_arrays_ex(ms, in_mis, NULL, 2, (me_mut_buffer){min_a0, sizeof(min_a0)},
+            0, mis_dec_b * 3, 64, &sj, &sr, &serr) == ME_SUCCESS);
+        assert(!memcmp(min_a0, min_ref, sizeof(min_ref)));
+        b2nd_exec_schedule_free(ms); b2nd_exec_plan_free(mp);
+
+        b2nd_free(arow); b2nd_free(acol);
         b2nd_exec_schedule_free(ss); b2nd_exec_plan_free(sp);
         b2nd_free(ax); b2nd_free(ay_match); b2nd_free(ay_mis);
         b2nd_free(out_match); b2nd_free(out_mis);

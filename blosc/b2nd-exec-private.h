@@ -5,12 +5,15 @@
 
 typedef struct {
     void *context;
-    me_status (*read)(void *context, size_t start, size_t count,
+    me_status (*read)(void *context, size_t group, size_t pos, size_t count,
                       me_mut_buffer output, me_error *error);
 } b2nd_exec_reader;
 
 me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t slot,
                                   b2nd_exec_input_meta *out);
+void b2nd_exec_schedule_layout(const b2nd_exec_schedule *schedule, size_t slot,
+                               bool *matches_shape_out, bool *suffix_reduction_out,
+                               bool reduced_axis_out[B2ND_EXEC_MAX_RANK]);
 /* Validate reader/view bindings, budgets and partitionability before allocating
  * per-task storage decode workspaces. Writes the clamped task count to *out_tasks. */
 me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,

@@ -955,7 +955,7 @@ static bool exec_gather_tile(exec_job *job, size_t slot, size_t group,
                              size_t pos, size_t count) {
     if (job->readers && job->readers[slot].read) {
         size_t width = job->schedule->inputs[slot].itemsize;
-        job->status = job->readers[slot].read(job->readers[slot].context, pos, count,
+        job->status = job->readers[slot].read(job->readers[slot].context, group, pos, count,
             (me_mut_buffer){job->gather_slots[slot], count * width}, &job->error);
         return job->status == ME_SUCCESS;
     }
@@ -1378,11 +1378,6 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
                                     bool *out_scatter, size_t *out_work_items,
                                     size_t *out_tasks, me_error *error) {
     const b2nd_exec_plan *plan = schedule->plan;
-    if (is_reader && plan->info.reduction &&
-        (schedule->info.output_items != 1 ||
-         (plan->info.has_axes && plan->info.naxes != schedule->info.ndim))) {
-        return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require whole-domain execution");
-    }
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
     size_t output_items = schedule->info.output_items;
@@ -1393,16 +1388,16 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
     }
     size_t per_job_gather = 0;
     for (size_t i = 0; i < ninputs; i++) {
+        bool needed = !plan->info.identity || i == plan->direct_slot;
         if (is_reader && is_reader[i]) {
-            if (!schedule->matches_shape[i]) {
-                return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require same-shape operands");
+            if (needed && items && schedule->info.tile_items) {
+                size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
+                if (per_job_gather > SIZE_MAX - tile_bytes) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
+                }
+                gather_offsets[i] = per_job_gather;
+                per_job_gather += tile_bytes;
             }
-            size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
-            if (per_job_gather > SIZE_MAX - tile_bytes) {
-                return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
-            }
-            gather_offsets[i] = per_job_gather;
-            per_job_gather += tile_bytes;
             continue;
         }
         if (!view_valid(&inputs[i], &schedule->inputs[i])) {
@@ -1413,7 +1408,6 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
             (uintptr_t)output->base < (uintptr_t)inputs[i].base + inputs[i].capacity) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Aliased execution output is not yet supported");
         }
-        bool needed = !plan->info.identity || i == plan->direct_slot;
         direct[i] = schedule->suffix_reduction && schedule->matches_shape[i] &&
             view_native(&inputs[i]) && view_contiguous(&inputs[i], &schedule->inputs[i]) &&
             (!items || ((uintptr_t)inputs[i].base + inputs[i].offset) % schedule->inputs[i].itemsize == 0);
@@ -1705,6 +1699,21 @@ me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t sl
     if (!schedule || !out || slot >= schedule->plan->info.ninputs) return ME_ERR_INVALID_ARG;
     *out = schedule->inputs[slot];
     return ME_SUCCESS;
+}
+
+void b2nd_exec_schedule_layout(const b2nd_exec_schedule *schedule, size_t slot,
+                               bool *matches_shape_out, bool *suffix_reduction_out,
+                               bool reduced_axis_out[B2ND_EXEC_MAX_RANK]) {
+    if (!schedule) return;
+    if (matches_shape_out) {
+        *matches_shape_out = slot < schedule->plan->info.ninputs ? schedule->matches_shape[slot] : false;
+    }
+    if (suffix_reduction_out) {
+        *suffix_reduction_out = schedule->suffix_reduction;
+    }
+    if (reduced_axis_out) {
+        memcpy(reduced_axis_out, schedule->reduced_axis, sizeof(schedule->reduced_axis));
+    }
 }
 
 const me_kernel *b2nd_exec_schedule_kernel(const b2nd_exec_schedule *schedule,

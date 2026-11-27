@@ -6,12 +6,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define STORAGE_BLOCK_CACHE_SLOTS 4
+
 typedef struct {
     const b2nd_array_t *array;
     blosc2_context *dctx;
     unsigned char *decoded;
     size_t itemsize, bytes, items, block_items;
     size_t chunk_grid[B2ND_EXEC_MAX_RANK], block_grid[B2ND_EXEC_MAX_RANK];
+    size_t dom_ndim, reduction_lanes;
+    int64_t dom_shape[B2ND_EXEC_MAX_RANK];
+    bool is_reduction, reduced_axis[B2ND_EXEC_MAX_RANK], fast_linear;
     int64_t cached_chunk;
     size_t decodes, decoded_bytes, cache_hits, read_spans;
 } storage_input;
@@ -146,68 +151,173 @@ static me_status storage_validate(storage_input *state, const b2nd_exec_input_me
     return ME_SUCCESS;
 }
 
-static me_status storage_read(void *context, size_t start, size_t count,
-                               me_mut_buffer output, me_error *error) {
+static me_status storage_decode_chunk(storage_input *state, size_t chunk,
+                                      me_error *error, bool *was_miss) {
+    if (state->cached_chunk == (int64_t)chunk) {
+        *was_miss = false;
+        return ME_SUCCESS;
+    }
+    const b2nd_array_t *a = state->array;
+    size_t width = state->itemsize;
+    /* The admitted in-memory representation owns these bytes. Avoid
+     * schunk_get_chunk: it mutates shared current_nchunk even here. */
+    const uint8_t *encoded = a->sc->data[chunk];
+    int32_t nbytes = 0, cbytes = 0, blocksize = 0;
+    int rc = -1;
+    if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
+        cbytes >= BLOSC_MIN_HEADER_LENGTH && nbytes == (int32_t)state->bytes &&
+        blocksize == (int32_t)(state->block_items * width)) {
+        rc = blosc2_decompress_ctx(state->dctx, encoded, cbytes,
+                                   state->decoded, (int32_t)state->bytes);
+    }
+    if (rc != (int32_t)state->bytes) {
+        return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
+    }
+    state->cached_chunk = (int64_t)chunk;
+    state->decodes++;
+    state->decoded_bytes += state->bytes;
+    *was_miss = true;
+    return ME_SUCCESS;
+}
+
+static me_status storage_read(void *context, size_t group, size_t pos, size_t count,
+                              me_mut_buffer output, me_error *error) {
     storage_input *state = context;
     const b2nd_array_t *a = state->array;
     size_t width = state->itemsize;
-    if (start > state->items || count > state->items - start || output.capacity < count * width) {
+    if (output.capacity < count * width) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Invalid logical storage span");
     }
+    if (state->fast_linear) {
+        size_t start = state->is_reduction ? group * state->reduction_lanes + pos : pos;
+        if (start > state->items || count > state->items - start) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Invalid logical storage span");
+        }
+        state->read_spans++;
+        int last = a->ndim - 1;
+        size_t lane = 0;
+        while (lane < count) {
+            size_t remaining = start + lane, coords[B2ND_EXEC_MAX_RANK];
+            for (int i = a->ndim; i-- > 0;) {
+                coords[i] = remaining % (size_t)a->shape[i];
+                remaining /= (size_t)a->shape[i];
+            }
+            size_t chunk = 0, block = 0, item = 0;
+            size_t local_last = 0, item_last = 0;
+            for (int i = 0; i < a->ndim; i++) {
+                size_t local = coords[i] % (size_t)a->chunkshape[i];
+                size_t bitem = local % (size_t)a->blockshape[i];
+                chunk = chunk * state->chunk_grid[i] + coords[i] / (size_t)a->chunkshape[i];
+                block = block * state->block_grid[i] + local / (size_t)a->blockshape[i];
+                item = item * (size_t)a->blockshape[i] + bitem;
+                if (i == last) {
+                    local_last = local;
+                    item_last = bitem;
+                }
+            }
+            size_t rem_logical = (size_t)a->shape[last] - coords[last];
+            size_t rem_chunk = (size_t)a->chunkshape[last] - local_last;
+            size_t rem_block = (size_t)a->blockshape[last] - item_last;
+            size_t run = count - lane;
+            if (rem_logical < run) run = rem_logical;
+            if (rem_chunk < run) run = rem_chunk;
+            if (rem_block < run) run = rem_block;
+            bool miss = false;
+            me_status st = storage_decode_chunk(state, chunk, error, &miss);
+            if (st != ME_SUCCESS) return st;
+            if (miss) {
+                if (run > 1) state->cache_hits += run - 1;
+            } else {
+                state->cache_hits += run;
+            }
+            size_t offset = (block * state->block_items + item) * width;
+            memcpy((unsigned char *)output.data + lane * width, state->decoded + offset, run * width);
+            lane += run;
+        }
+        return ME_SUCCESS;
+    }
+
     state->read_spans++;
-    int last = a->ndim - 1;
+    if (!count) return ME_SUCCESS;
+    size_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    size_t g_rem = group, l_rem = pos;
+    size_t fast_axis = state->dom_ndim - 1;
+    for (size_t d = state->dom_ndim; d-- > 0;) {
+        size_t *idx = (state->is_reduction && !state->reduced_axis[d]) ? &g_rem : &l_rem;
+        coords[d] = *idx % (size_t)state->dom_shape[d];
+        *idx /= (size_t)state->dom_shape[d];
+    }
+    if (state->is_reduction) {
+        for (size_t d = state->dom_ndim; d-- > 0;) {
+            if (state->reduced_axis[d]) {
+                fast_axis = d;
+                break;
+            }
+        }
+    }
+    size_t shift = state->dom_ndim - (size_t)a->ndim;
+    size_t a_last = (size_t)a->ndim - 1;
     size_t lane = 0;
     while (lane < count) {
-        size_t remaining = start + lane, coords[B2ND_EXEC_MAX_RANK];
-        for (int i = a->ndim; i-- > 0;) {
-            coords[i] = remaining % (size_t)a->shape[i];
-            remaining /= (size_t)a->shape[i];
-        }
         size_t chunk = 0, block = 0, item = 0;
-        size_t local_last = 0, item_last = 0;
-        for (int i = 0; i < a->ndim; i++) {
-            size_t local = coords[i] % (size_t)a->chunkshape[i];
-            size_t bitem = local % (size_t)a->blockshape[i];
-            chunk = chunk * state->chunk_grid[i] + coords[i] / (size_t)a->chunkshape[i];
-            block = block * state->block_grid[i] + local / (size_t)a->blockshape[i];
-            item = item * (size_t)a->blockshape[i] + bitem;
-            if (i == last) {
-                local_last = local;
-                item_last = bitem;
+        size_t c_last = 0, b_last = 0;
+        for (int d = 0; d < a->ndim; d++) {
+            size_t coord = a->shape[d] == 1 ? 0 : coords[shift + (size_t)d];
+            size_t cdim = (size_t)a->chunkshape[d];
+            size_t bdim = (size_t)a->blockshape[d];
+            size_t local = coord % cdim;
+            size_t bitem = local % bdim;
+            chunk = chunk * state->chunk_grid[d] + coord / cdim;
+            block = block * state->block_grid[d] + local / bdim;
+            item = item * bdim + bitem;
+            if ((size_t)d == a_last) {
+                c_last = local;
+                b_last = bitem;
             }
         }
-        size_t rem_logical = (size_t)a->shape[last] - coords[last];
-        size_t rem_chunk = (size_t)a->chunkshape[last] - local_last;
-        size_t rem_block = (size_t)a->blockshape[last] - item_last;
+        bool fast_bcast = fast_axis < shift || a->shape[fast_axis - shift] == 1;
+        bool fast_inner = !fast_bcast && (fast_axis - shift == a_last);
+        size_t rem_dom = (size_t)state->dom_shape[fast_axis] - coords[fast_axis];
         size_t run = count - lane;
-        if (rem_logical < run) run = rem_logical;
-        if (rem_chunk < run) run = rem_chunk;
-        if (rem_block < run) run = rem_block;
-        if (state->cached_chunk != (int64_t)chunk) {
-            /* The admitted in-memory representation owns these bytes. Avoid
-             * schunk_get_chunk: it mutates shared current_nchunk even here. */
-            const uint8_t *encoded = a->sc->data[chunk];
-            int32_t nbytes = 0, cbytes = 0, blocksize = 0;
-            int rc = -1;
-            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
-                cbytes >= BLOSC_MIN_HEADER_LENGTH && nbytes == (int32_t)state->bytes &&
-                blocksize == (int32_t)(state->block_items * width)) {
-                rc = blosc2_decompress_ctx(state->dctx, encoded, cbytes,
-                                           state->decoded, (int32_t)state->bytes);
-            }
-            if (rc != (int32_t)state->bytes) {
-                return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
-            }
-            state->cached_chunk = (int64_t)chunk;
-            state->decodes++;
-            state->decoded_bytes += state->bytes;
+        if (rem_dom < run) run = rem_dom;
+        if (fast_inner) {
+            size_t rem_chunk = (size_t)a->chunkshape[a_last] - c_last;
+            size_t rem_block = (size_t)a->blockshape[a_last] - b_last;
+            if (rem_chunk < run) run = rem_chunk;
+            if (rem_block < run) run = rem_block;
+        } else if (!fast_bcast) {
+            run = 1;
+        }
+        bool miss = false;
+        me_status st = storage_decode_chunk(state, chunk, error, &miss);
+        if (st != ME_SUCCESS) return st;
+        if (miss) {
             if (run > 1) state->cache_hits += run - 1;
         } else {
             state->cache_hits += run;
         }
         size_t offset = (block * state->block_items + item) * width;
-        memcpy((unsigned char *)output.data + lane * width, state->decoded + offset, run * width);
+        unsigned char *dst = (unsigned char *)output.data + lane * width;
+        const unsigned char *src = state->decoded + offset;
+        if (fast_bcast) {
+            for (size_t k = 0; k < run; k++) {
+                memcpy(dst + k * width, src, width);
+            }
+        } else {
+            memcpy(dst, src, run * width);
+        }
         lane += run;
+        if (lane < count) {
+            coords[fast_axis] += run;
+            if (coords[fast_axis] >= (size_t)state->dom_shape[fast_axis]) {
+                coords[fast_axis] = 0;
+                for (size_t d = fast_axis; d-- > 0;) {
+                    if (state->is_reduction && !state->reduced_axis[d]) continue;
+                    if (++coords[d] < (size_t)state->dom_shape[d]) break;
+                    coords[d] = 0;
+                }
+            }
+        }
     }
     return ME_SUCCESS;
 }
@@ -229,6 +339,11 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     if (b2nd_exec_schedule_input(schedule, ninputs, &meta) == ME_SUCCESS) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Storage input count mismatch");
     }
+    b2nd_exec_plan_info plan_info = {0};
+    b2nd_exec_schedule_info sched_info = {0};
+    b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, NULL);
+    bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
+    b2nd_exec_schedule_layout(schedule, 0, NULL, NULL, reduced_axis);
     storage_input base_states[B2ND_EXEC_MAX_INPUTS] = {0};
     bool is_reader[B2ND_EXEC_MAX_INPUTS] = {0};
     b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS] = {0};
@@ -240,8 +355,16 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         }
         const b2nd_array_t *arr = arrays ? arrays[i] : NULL;
         if (arr) {
+            bool matches = false, suffix = false;
+            b2nd_exec_schedule_layout(schedule, i, &matches, &suffix, NULL);
             is_reader[i] = true;
             base_states[i].array = arr;
+            base_states[i].dom_ndim = sched_info.ndim;
+            memcpy(base_states[i].dom_shape, sched_info.shape, sizeof(base_states[i].dom_shape));
+            base_states[i].reduction_lanes = sched_info.reduction_lanes;
+            base_states[i].is_reduction = plan_info.reduction;
+            memcpy(base_states[i].reduced_axis, reduced_axis, sizeof(reduced_axis));
+            base_states[i].fast_linear = matches && (!plan_info.reduction || suffix);
             status = storage_validate(&base_states[i], &meta, error);
             if (status != ME_SUCCESS) return status;
             if (base_states[i].bytes > max_decode_bytes - per_job_decode) {
@@ -337,70 +460,120 @@ me_status b2nd_exec_execute_arrays(const b2nd_exec_schedule *schedule,
                                        max_decode_bytes, max_gather_bytes, NULL, report, error);
 }
 
-static me_status storage_read_box(storage_input *state, const size_t *origin,
-                                  const size_t *extent, unsigned char *dst, me_error *error) {
-    const b2nd_array_t *a = state->array;
+typedef struct {
+    const b2nd_array_t *array;
+    blosc2_context *dctx;
+    unsigned char *blocks[STORAGE_BLOCK_CACHE_SLOTS];
+    int64_t cached_chunk[STORAGE_BLOCK_CACHE_SLOTS];
+    int64_t cached_block[STORAGE_BLOCK_CACHE_SLOTS];
+    uint64_t lru_tick[STORAGE_BLOCK_CACHE_SLOTS];
+    uint64_t tick;
+    size_t nslots;
+    size_t itemsize, block_items, block_bytes;
+    size_t chunk_grid[B2ND_EXEC_MAX_RANK], block_grid[B2ND_EXEC_MAX_RANK];
+    size_t decodes, decoded_bytes, cache_hits, read_spans;
+} storage_block_cache;
+
+static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_ndim,
+                                         const size_t *origin, const size_t *extent,
+                                         unsigned char *dst, me_error *error) {
+    const b2nd_array_t *a = cache->array;
     size_t ndim = (size_t)a->ndim;
-    size_t last = ndim - 1;
-    size_t width = state->itemsize;
+    size_t shift = dom_ndim - ndim;
+    size_t d_last = dom_ndim - 1;
+    size_t a_last = ndim - 1;
+    size_t width = cache->itemsize;
     size_t total = 1;
-    for (size_t d = 0; d < ndim; d++) {
+    for (size_t d = 0; d < dom_ndim; d++) {
         total *= extent[d];
     }
-    state->read_spans++;
+    cache->read_spans++;
     if (!total) return ME_SUCCESS;
+    bool last_bcast = (d_last < shift) || (a->shape[a_last] == 1);
     size_t local_c[B2ND_EXEC_MAX_RANK] = {0};
     size_t lane = 0;
     while (lane < total) {
         size_t chunk = 0, block = 0, item = 0;
         size_t c_last = 0, b_last = 0;
         for (size_t d = 0; d < ndim; d++) {
-            size_t coord = origin[d] + local_c[d];
+            size_t coord = a->shape[d] == 1 ? 0 : (origin[shift + d] + local_c[shift + d]);
             size_t cdim = (size_t)a->chunkshape[d];
             size_t bdim = (size_t)a->blockshape[d];
             size_t local = coord % cdim;
             size_t bitem = local % bdim;
-            chunk = chunk * state->chunk_grid[d] + coord / cdim;
-            block = block * state->block_grid[d] + local / bdim;
+            chunk = chunk * cache->chunk_grid[d] + coord / cdim;
+            block = block * cache->block_grid[d] + local / bdim;
             item = item * bdim + bitem;
-            if (d == last) {
+            if (d == a_last) {
                 c_last = local;
                 b_last = bitem;
             }
         }
-        size_t rem_box = extent[last] - local_c[last];
-        size_t rem_chunk = (size_t)a->chunkshape[last] - c_last;
-        size_t rem_block = (size_t)a->blockshape[last] - b_last;
-        size_t run = rem_box < rem_chunk ? rem_box : rem_chunk;
-        if (rem_block < run) run = rem_block;
-        if (state->cached_chunk != (int64_t)chunk) {
+        size_t rem_box = extent[d_last] - local_c[d_last];
+        size_t run = rem_box;
+        if (!last_bcast) {
+            size_t rem_chunk = (size_t)a->chunkshape[a_last] - c_last;
+            size_t rem_block = (size_t)a->blockshape[a_last] - b_last;
+            if (rem_chunk < run) run = rem_chunk;
+            if (rem_block < run) run = rem_block;
+        }
+        size_t slot = cache->nslots;
+        bool hit = false;
+        for (size_t s = 0; s < cache->nslots; s++) {
+            if (cache->cached_chunk[s] == (int64_t)chunk &&
+                cache->cached_block[s] == (int64_t)block) {
+                slot = s;
+                hit = true;
+                break;
+            }
+        }
+        if (!hit) {
+            slot = 0;
+            for (size_t s = 0; s < cache->nslots; s++) {
+                if (cache->cached_chunk[s] < 0) {
+                    slot = s;
+                    break;
+                }
+                if (cache->lru_tick[s] < cache->lru_tick[slot]) {
+                    slot = s;
+                }
+            }
             const uint8_t *encoded = a->sc->data[chunk];
             int32_t nbytes = 0, cbytes = 0, blocksize = 0;
-            int rc = -1;
-            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
-                cbytes >= BLOSC_MIN_HEADER_LENGTH && nbytes == (int32_t)state->bytes &&
-                blocksize == (int32_t)(state->block_items * width)) {
-                rc = blosc2_decompress_ctx(state->dctx, encoded, cbytes,
-                                           state->decoded, (int32_t)state->bytes);
+            int got = -1;
+            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
+                got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes,
+                                         (int)(block * cache->block_items),
+                                         (int)cache->block_items, cache->blocks[slot],
+                                         (int32_t)cache->block_bytes);
             }
-            if (rc != (int32_t)state->bytes) {
-                return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
+            if (got != (int)cache->block_bytes) {
+                return storage_error(error, ME_ERR_EVAL, "Storage block decode failed");
             }
-            state->cached_chunk = (int64_t)chunk;
-            state->decodes++;
-            state->decoded_bytes += state->bytes;
-            if (run > 1) state->cache_hits += run - 1;
+            cache->cached_chunk[slot] = (int64_t)chunk;
+            cache->cached_block[slot] = (int64_t)block;
+            cache->decodes++;
+            cache->decoded_bytes += cache->block_bytes;
+            if (run > 1) cache->cache_hits += run - 1;
         } else {
-            state->cache_hits += run;
+            cache->cache_hits += run;
         }
-        size_t offset = (block * state->block_items + item) * width;
-        memcpy(dst + lane * width, state->decoded + offset, run * width);
+        cache->lru_tick[slot] = ++cache->tick;
+        const unsigned char *src = cache->blocks[slot] + item * width;
+        unsigned char *outp = dst + lane * width;
+        if (last_bcast) {
+            for (size_t k = 0; k < run; k++) {
+                memcpy(outp + k * width, src, width);
+            }
+        } else {
+            memcpy(outp, src, run * width);
+        }
         lane += run;
         if (lane < total) {
-            local_c[last] += run;
-            if (local_c[last] == extent[last]) {
-                local_c[last] = 0;
-                for (size_t d = last; d-- > 0;) {
+            local_c[d_last] += run;
+            if (local_c[d_last] == extent[d_last]) {
+                local_c[d_last] = 0;
+                for (size_t d = d_last; d-- > 0;) {
                     if (++local_c[d] < extent[d]) break;
                     local_c[d] = 0;
                 }
@@ -451,7 +624,7 @@ static void block_compact_or_scatter(size_t ndim, const int32_t *blockshape,
 }
 
 typedef struct {
-    storage_input states[B2ND_EXEC_MAX_INPUTS];
+    storage_block_cache bcaches[B2ND_EXEC_MAX_INPUTS];
     blosc2_context *dctx[B2ND_EXEC_MAX_INPUTS];
     unsigned char *in_buf[B2ND_EXEC_MAX_INPUTS];
     unsigned char *map_buf;
@@ -472,6 +645,7 @@ typedef struct {
     b2nd_exec_schedule_info sched_info;
     uint32_t direct_slot;
     size_t ninputs;
+    size_t input_widths[B2ND_EXEC_MAX_INPUTS];
     const b2nd_array_t *const *arrays;
     b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS];
     bool is_reader[B2ND_EXEC_MAX_INPUTS];
@@ -533,15 +707,7 @@ static int sink_prefilter(blosc2_prefilter_params *p) {
     me_buffer spans[B2ND_EXEC_MAX_INPUTS] = {0};
     for (size_t i = 0; i < sink->ninputs; i++) {
         if (!sink->needed[i]) continue;
-        size_t in_width = w->states[i].itemsize;
-        if (!in_width) {
-            b2nd_exec_input_meta meta;
-            if (b2nd_exec_schedule_input(sink->schedule, i, &meta) != ME_SUCCESS) {
-                w->status = storage_error(&w->error, ME_ERR_INVALID_ARG, "Invalid sink input metadata");
-                return -1;
-            }
-            in_width = meta.itemsize;
-        }
+        size_t in_width = sink->input_widths[i];
         size_t live_bytes = valid_nitems * in_width;
         if (sink->is_reader[i] && sink->matched_layout[i]) {
             const uint8_t *encoded = sink->arrays[i]->sc->data[sink->current_chunk];
@@ -565,7 +731,8 @@ static int sink_prefilter(blosc2_prefilter_params *p) {
                                          w->in_buf[i], w->in_buf[i], true);
             }
         } else if (sink->is_reader[i]) {
-            me_status st = storage_read_box(&w->states[i], origin, valid, w->in_buf[i], &w->error);
+            me_status st = storage_read_box_cached(&w->bcaches[i], ndim, origin, valid,
+                                                   w->in_buf[i], &w->error);
             if (st != ME_SUCCESS) {
                 w->status = st;
                 return -1;
@@ -710,20 +877,11 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
             return storage_error(error, ME_ERR_INVALID_ARG, "Sink input count mismatch");
         }
         sink.needed[i] = !plan_info.identity || i == direct_slot;
+        sink.input_widths[i] = meta.itemsize;
         const b2nd_array_t *arr = arrays ? arrays[i] : NULL;
         if (arr) {
             if (arr == output || arr->sc == output->sc) {
                 return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
-            }
-            if ((size_t)arr->ndim != sched_info.ndim) {
-                return storage_error(error, ME_ERR_UNSUPPORTED,
-                                     "Compressed sink does not broadcast compressed inputs");
-            }
-            for (int d = 0; d < arr->ndim; d++) {
-                if (arr->shape[d] != output->shape[d]) {
-                    return storage_error(error, ME_ERR_UNSUPPORTED,
-                                         "Compressed sink requires matching shape for compressed inputs");
-                }
             }
             sink.is_reader[i] = true;
             base_states[i].array = arr;
@@ -731,17 +889,18 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
             if (status != ME_SUCCESS) return status;
             status = storage_validate_chunks(&base_states[i], NULL, error);
             if (status != ME_SUCCESS) return status;
-            bool match = true;
-            for (int d = 0; d < arr->ndim; d++) {
-                if (arr->chunkshape[d] != output->chunkshape[d] ||
+            bool match = (size_t)arr->ndim == (size_t)output->ndim;
+            for (int d = 0; match && d < arr->ndim; d++) {
+                if (arr->shape[d] != output->shape[d] ||
+                    arr->chunkshape[d] != output->chunkshape[d] ||
                     arr->blockshape[d] != output->blockshape[d]) {
                     match = false;
-                    break;
                 }
             }
             sink.matched_layout[i] = match;
             if (sink.needed[i] && out_chunks) {
-                size_t d_need = match ? out_block_items * meta.itemsize : base_states[i].bytes;
+                size_t d_need = match ? out_block_items * meta.itemsize :
+                    (base_states[i].bytes ? base_states[i].block_items * meta.itemsize : 0);
                 if (d_need > max_decode_bytes - per_worker_decode) {
                     return storage_error(error, ME_ERR_INVALID_ARG, "Storage decode budget exceeded");
                 }
@@ -827,6 +986,32 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
     }
     if (!nworkers) nworkers = 1;
 
+    size_t cache_slots[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t worker_dec_budget = max_decode_bytes / nworkers;
+    size_t extra_budget = worker_dec_budget > per_worker_decode ?
+        worker_dec_budget - per_worker_decode : 0;
+    for (size_t i = 0; i < ninputs; i++) {
+        if (!sink.needed[i] || !sink.is_reader[i] || sink.matched_layout[i]) continue;
+        cache_slots[i] = 1;
+    }
+    for (size_t pass = 1; pass < STORAGE_BLOCK_CACHE_SLOTS; pass++) {
+        bool grew = false;
+        for (size_t i = 0; i < ninputs; i++) {
+            if (!cache_slots[i]) continue;
+            size_t bbytes = base_states[i].block_items * sink.input_widths[i];
+            size_t blocks_per_chunk = bbytes && base_states[i].bytes ?
+                base_states[i].bytes / bbytes : 1;
+            size_t total_blocks = (size_t)arrays[i]->sc->nchunks * blocks_per_chunk;
+            if (cache_slots[i] >= total_blocks) continue;
+            if (bbytes <= extra_budget) {
+                cache_slots[i]++;
+                extra_budget -= bbytes;
+                grew = true;
+            }
+        }
+        if (!grew) break;
+    }
+
     sink.nworkers = nworkers;
     sink.workers = calloc(nworkers, sizeof(*sink.workers));
     if (!sink.workers) {
@@ -847,14 +1032,9 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
             }
         }
         for (size_t i = 0; i < ninputs; i++) {
-            b2nd_exec_input_meta meta;
-            b2nd_exec_schedule_input(schedule, i, &meta);
-            sw->states[i] = base_states[i];
-            sw->states[i].dctx = NULL;
-            sw->states[i].decoded = NULL;
-            sw->states[i].itemsize = meta.itemsize;
             if (!sink.needed[i]) continue;
-            size_t in_buf_bytes = out_block_items * meta.itemsize;
+            size_t in_width = sink.input_widths[i];
+            size_t in_buf_bytes = out_block_items * in_width;
             sw->in_buf[i] = in_buf_bytes ? malloc(in_buf_bytes) : NULL;
             if (in_buf_bytes && !sw->in_buf[i]) {
                 status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink input buffer");
@@ -870,15 +1050,33 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
                 }
                 report->decode_bytes += in_buf_bytes;
             } else if (sink.is_reader[i]) {
-                sw->states[i].decoded = sw->states[i].bytes ? malloc(sw->states[i].bytes) : NULL;
-                if (sw->states[i].decoded) report->decode_bytes += sw->states[i].bytes;
+                storage_block_cache *bc = &sw->bcaches[i];
+                bc->array = base_states[i].array;
+                bc->itemsize = in_width;
+                bc->block_items = base_states[i].block_items;
+                bc->block_bytes = base_states[i].block_items * in_width;
+                bc->nslots = cache_slots[i];
+                memcpy(bc->chunk_grid, base_states[i].chunk_grid, sizeof(bc->chunk_grid));
+                memcpy(bc->block_grid, base_states[i].block_grid, sizeof(bc->block_grid));
                 blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
                 dp.nthreads = 1;
-                sw->states[i].dctx = blosc2_create_dctx(dp);
-                if ((sw->states[i].bytes && !sw->states[i].decoded) || !sw->states[i].dctx) {
-                    status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink decode workspace");
+                bc->dctx = blosc2_create_dctx(dp);
+                if (!bc->dctx) {
+                    status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink decode context");
                     break;
                 }
+                for (size_t s = 0; s < bc->nslots; s++) {
+                    bc->cached_chunk[s] = -1;
+                    bc->cached_block[s] = -1;
+                    bc->blocks[s] = bc->block_bytes ? malloc(bc->block_bytes) : NULL;
+                    if (bc->block_bytes && !bc->blocks[s]) {
+                        status = storage_error(error, ME_ERR_OOM,
+                                               "Cannot allocate sink block cache slot");
+                        break;
+                    }
+                    report->decode_bytes += bc->block_bytes;
+                }
+                if (status != ME_SUCCESS) break;
             }
         }
     }
@@ -952,13 +1150,16 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
             any_fp = true;
         }
         for (size_t i = 0; i < ninputs; i++) {
-            report->decodes += sw->states[i].decodes;
-            report->decoded_bytes += sw->states[i].decoded_bytes;
-            report->cache_hits += sw->states[i].cache_hits;
-            report->read_spans += sw->states[i].read_spans;
+            storage_block_cache *bc = &sw->bcaches[i];
+            report->decodes += bc->decodes;
+            report->decoded_bytes += bc->decoded_bytes;
+            report->cache_hits += bc->cache_hits;
+            report->read_spans += bc->read_spans;
             if (sw->dctx[i]) blosc2_free_ctx(sw->dctx[i]);
-            if (sw->states[i].dctx) blosc2_free_ctx(sw->states[i].dctx);
-            free(sw->states[i].decoded);
+            if (bc->dctx) blosc2_free_ctx(bc->dctx);
+            for (size_t s = 0; s < STORAGE_BLOCK_CACHE_SLOTS; s++) {
+                free(bc->blocks[s]);
+            }
             free(sw->in_buf[i]);
         }
         free(sw->map_buf);
