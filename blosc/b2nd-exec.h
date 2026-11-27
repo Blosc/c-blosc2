@@ -93,6 +93,7 @@ typedef struct {
     me_dtype map_dtype;
     size_t map_itemsize;
     me_reduction_kind reducer;
+    size_t plan_metadata_bytes; /* Excludes kernel/compiler allocations. */
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -101,6 +102,7 @@ typedef struct {
     size_t mapped_bytes; /* Invocation mapped tile only; excludes core scratch. */
     size_t reducer_bytes;
     size_t output_items;
+    size_t schedule_metadata_bytes;
 } b2nd_exec_schedule_info;
 
 typedef struct {

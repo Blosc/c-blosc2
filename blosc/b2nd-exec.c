@@ -305,6 +305,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         b2nd_exec_plan_free(plan);
         return status;
     }
+    plan->info.plan_metadata_bytes = sizeof(*plan) + plan->nnodes * sizeof(*plan->nodes);
     *out = plan;
     return ME_SUCCESS;
 }
@@ -353,6 +354,7 @@ me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer
     }
     plan->kernel = *kernel;
     *kernel = NULL;
+    plan->info.plan_metadata_bytes = sizeof(*plan);
     *out = plan;
     return ME_SUCCESS;
 }
@@ -428,7 +430,7 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     schedule->plan = plan;
     schedule->info = (b2nd_exec_schedule_info){
         items, lanes, mapped, plan->info.reduction ? sizeof(uint64_t) : 0,
-        plan->info.reduction ? 1 : items};
+        plan->info.reduction ? 1 : items, sizeof(*schedule)};
     memcpy(schedule->inputs, inputs, ninputs * sizeof(*inputs));
     *out = schedule;
     return ME_SUCCESS;
