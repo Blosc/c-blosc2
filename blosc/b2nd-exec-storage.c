@@ -173,7 +173,8 @@ static me_status storage_validate_chunks(const storage_input *state,
             if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage chunk metadata");
         }
-        if ((width <= 255 && chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width) ||
+        uint8_t expected_ts = width <= 255 ? (uint8_t)width : 1u;
+        if (chunk[BLOSC2_CHUNK_TYPESIZE] != expected_ts ||
             (chunk[BLOSC2_CHUNK_FLAGS] >> 5) > BLOSC_ZSTD_LIB) {
             if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk codec");
@@ -455,6 +456,9 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     b2nd_exec_plan_info plan_info = {0};
     b2nd_exec_schedule_info sched_info = {0};
     b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, NULL);
+    if (plan_info.has_where) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Compressed masked execution is not admitted");
+    }
     bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
     b2nd_exec_schedule_layout(schedule, 0, NULL, NULL, reduced_axis);
     blosc2_pthread_mutex_t frame_mutexes[B2ND_EXEC_MAX_INPUTS];
@@ -646,9 +650,13 @@ static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_
             int got = -1;
             if (fetch_rc >= 0 && encoded &&
                 blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
-                got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes, 0,
-                                         (int)cache->block_items, cache->blocks[0],
-                                         (int32_t)cache->block_bytes);
+                size_t ts = encoded[BLOSC2_CHUNK_TYPESIZE];
+                size_t nunits = ts ? cache->block_bytes / ts : 0;
+                if (ts && cache->block_bytes % ts == 0 && nunits <= (size_t)INT_MAX) {
+                    got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes, 0,
+                                             (int)nunits, cache->blocks[0],
+                                             (int32_t)cache->block_bytes);
+                }
             }
             if (needs_free) free((void *)encoded);
             if (got != (int)cache->block_bytes) {
@@ -727,10 +735,16 @@ static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_
             int got = -1;
             if (fetch_rc >= 0 && encoded &&
                 blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
-                got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes,
-                                         (int)(block * cache->block_items),
-                                         (int)cache->block_items, cache->blocks[slot],
-                                         (int32_t)cache->block_bytes);
+                size_t ts = encoded[BLOSC2_CHUNK_TYPESIZE];
+                size_t start_units = ts ? (block * cache->block_bytes) / ts : 0;
+                size_t nunits = ts ? cache->block_bytes / ts : 0;
+                if (ts && cache->block_bytes % ts == 0 &&
+                    start_units <= (size_t)INT_MAX && nunits <= (size_t)INT_MAX) {
+                    got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes,
+                                             (int)start_units,
+                                             (int)nunits, cache->blocks[slot],
+                                             (int32_t)cache->block_bytes);
+                }
             }
             if (needs_free) free((void *)encoded);
             if (got != (int)cache->block_bytes) {
@@ -1672,7 +1686,7 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
     if (error) *error = (me_error){0};
     b2nd_exec_callback_report local_rep = {0};
     if (report) *report = local_rep;
-    if (!schedule || !sources || !ninputs || ninputs > B2ND_EXEC_MAX_INPUTS ||
+    if (!schedule || (!sources && ninputs) || ninputs > B2ND_EXEC_MAX_INPUTS ||
         (raise_mask & ~15u)) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Invalid source callback execution bindings");
     }
@@ -1736,6 +1750,9 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
 
     size_t idx_bytes = (has_cb && sched_info.nitems && sched_info.tile_items)
         ? sched_info.tile_items * sizeof(size_t) : 0;
+    if (has_cb && plan_info.has_where) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Reader-backed masked execution is not admitted");
+    }
     size_t *idx_buf = idx_bytes ? malloc(idx_bytes) : NULL;
     if (idx_bytes && !idx_buf) {
         return storage_error(error, ME_ERR_OOM, "Cannot allocate callback index buffer");

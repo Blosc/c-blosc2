@@ -23,6 +23,7 @@ struct b2nd_exec_plan {
     size_t nnodes;
     uint32_t root;
     uint32_t direct_slot;
+    uint32_t mask_slot;
     b2nd_exec_input_meta inputs[B2ND_EXEC_MAX_INPUTS];
 };
 
@@ -50,6 +51,14 @@ static me_status exec_error(me_error *error, me_status status, const char *messa
  * Strings/complex extrema are deliberately not admitted by this first slice. */
 static size_t numeric_width(me_dtype dtype) {
     return me_extrema_itemsize(dtype);
+}
+
+static bool gather_reserve(size_t *total, size_t *offset, size_t bytes, size_t alignment) {
+    size_t padding = (alignment - *total % alignment) % alignment;
+    if (*total > SIZE_MAX - padding || *total + padding > SIZE_MAX - bytes) return false;
+    *offset = *total + padding;
+    *total = *offset + bytes;
+    return true;
 }
 
 static me_reduction_kind reduction_kind(b2nd_exec_op op) {
@@ -165,7 +174,7 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
                                        bool allow_stages, me_error *error) {
     if (!d || d->struct_size != sizeof(*d) || !d->nodes ||
         !d->nnodes || d->nnodes > B2ND_EXEC_MAX_NODES ||
-        !d->ninputs || d->ninputs > B2ND_EXEC_MAX_INPUTS || d->root >= d->nnodes) {
+        d->ninputs > B2ND_EXEC_MAX_INPUTS || d->root >= d->nnodes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution descriptor bounds");
     }
     bool slots[B2ND_EXEC_MAX_INPUTS] = {0};
@@ -173,7 +182,7 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
     size_t captures = 0, inputs = 0;
     for (size_t i = 0; i < d->nnodes; i++) {
         const b2nd_exec_node *n = &d->nodes[i];
-        if (n->struct_size != sizeof(*n) || n->id != i || n->nargs > 2) {
+        if (n->struct_size != sizeof(*n) || n->id != i || n->nargs > 3) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution node ID or size");
         }
         size_t arity;
@@ -184,7 +193,28 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
             case B2ND_EXEC_ANY: case B2ND_EXEC_ALL:
             case B2ND_EXEC_ARGMIN: case B2ND_EXEC_ARGMAX:
             case B2ND_EXEC_VAR: case B2ND_EXEC_STD: arity = 1; break;
-            case B2ND_EXEC_ADD: case B2ND_EXEC_SUBTRACT: case B2ND_EXEC_MULTIPLY: arity = 2; break;
+            case B2ND_EXEC_CAST: case B2ND_EXEC_INVERT: case B2ND_EXEC_NOT:
+            case B2ND_EXEC_POS: arity = 1; break;
+            case B2ND_EXEC_ADD: case B2ND_EXEC_SUBTRACT: case B2ND_EXEC_MULTIPLY:
+            case B2ND_EXEC_DIVIDE: case B2ND_EXEC_LT: case B2ND_EXEC_GT:
+            case B2ND_EXEC_EQ: case B2ND_EXEC_NE: case B2ND_EXEC_LE: case B2ND_EXEC_GE:
+            case B2ND_EXEC_BITAND: case B2ND_EXEC_BITOR: case B2ND_EXEC_BITXOR:
+            case B2ND_EXEC_FLOORDIV: case B2ND_EXEC_MOD: case B2ND_EXEC_POWER:
+            case B2ND_EXEC_LSHIFT: case B2ND_EXEC_RSHIFT:
+            case B2ND_EXEC_AND: case B2ND_EXEC_OR: arity = 2; break;
+            case B2ND_EXEC_SELECT: arity = 3; break;
+            case B2ND_EXEC_FUNCTION:
+                if (!n->nargs || !memchr(n->function, 0, sizeof(n->function)) || !n->function[0]) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Invalid typed function descriptor");
+                }
+                for (size_t k = 0; n->function[k]; k++) {
+                    unsigned char c = (unsigned char)n->function[k];
+                    if (!((c >= 'a' && c <= 'z') || c == '_' || (k && c >= '0' && c <= '9'))) {
+                        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid typed function identifier");
+                    }
+                }
+                arity = n->nargs;
+                break;
             default: return exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution operation");
         }
         if (n->nargs != arity) {
@@ -221,10 +251,23 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
                 (n->dtype == ME_BOOL && n->scalar[0] > 1)) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Malformed execution scalar capture");
             }
+        } else if (n->op == B2ND_EXEC_CAST) {
+            if (!numeric_width(n->dtype) || n->itemsize != numeric_width(n->dtype) || n->scalar_size) {
+                return exec_error(error, ME_ERR_SIGNATURE, "Invalid typed cast target");
+            }
         } else if (n->dtype != ME_AUTO || n->itemsize || n->scalar_size) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Operation dtype constraints are not yet supported");
         }
         if (is_reduction_op(n->op)) {
+            if (n->has_where) {
+                if (n->where >= i || d->nodes[n->where].op != B2ND_EXEC_INPUT ||
+                    d->nodes[n->where].dtype != ME_BOOL ||
+                    is_argextrema_op(n->op) || is_moments_op(n->op) ||
+                    ((n->op == B2ND_EXEC_MIN || n->op == B2ND_EXEC_MAX) && !n->has_initial)) {
+                    return exec_error(error, ME_ERR_UNSUPPORTED,
+                                      "Reduction where requires a Boolean input and extrema initial");
+                }
+            }
             if (!allow_stages && i != d->root) {
                 return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
             }
@@ -261,7 +304,7 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
                 return exec_error(error, ME_ERR_INVALID_ARG,
                                   "Unexpected initial payload without has_initial");
             }
-        } else if (n->has_axes || n->naxes || n->keepdims || n->has_initial ||
+        } else if (n->has_axes || n->naxes || n->keepdims || n->has_initial || n->has_where ||
                    n->initial_size || n->initial_dtype != ME_AUTO || n->ddof != 0.0) {
             return exec_error(error, ME_ERR_INVALID_ARG,
                               "Unexpected reduction options on non-reduction node");
@@ -271,6 +314,34 @@ me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
         return exec_error(error, ME_ERR_INVALID_ARG, "Missing execution input slot");
     }
     return ME_SUCCESS;
+}
+
+static const char *cast_name(me_dtype dtype) {
+    switch (dtype) {
+        case ME_BOOL: return "bool";
+        case ME_INT8: return "int8"; case ME_UINT8: return "uint8";
+        case ME_INT16: return "int16"; case ME_UINT16: return "uint16";
+        case ME_INT32: return "int32"; case ME_UINT32: return "uint32";
+        case ME_INT64: return "int64"; case ME_UINT64: return "uint64";
+        case ME_FLOAT32: return "float32"; case ME_FLOAT64: return "float64";
+        default: return NULL;
+    }
+}
+
+static const char *binary_operator(b2nd_exec_op op) {
+    switch (op) {
+        case B2ND_EXEC_ADD: return " + "; case B2ND_EXEC_SUBTRACT: return " - ";
+        case B2ND_EXEC_MULTIPLY: return " * "; case B2ND_EXEC_DIVIDE: return " / ";
+        case B2ND_EXEC_LT: return " < "; case B2ND_EXEC_GT: return " > ";
+        case B2ND_EXEC_EQ: return " == "; case B2ND_EXEC_NE: return " != ";
+        case B2ND_EXEC_LE: return " <= "; case B2ND_EXEC_GE: return " >= ";
+        case B2ND_EXEC_BITAND: return " & "; case B2ND_EXEC_BITOR: return " | ";
+        case B2ND_EXEC_BITXOR: return " ^ "; case B2ND_EXEC_FLOORDIV: return " // ";
+        case B2ND_EXEC_MOD: return " % "; case B2ND_EXEC_POWER: return " ** ";
+        case B2ND_EXEC_LSHIFT: return " << "; case B2ND_EXEC_RSHIFT: return " >> ";
+        case B2ND_EXEC_AND: return " and "; case B2ND_EXEC_OR: return " or ";
+        default: return NULL;
+    }
 }
 
 static bool emit_text(char *source, size_t capacity, size_t *used, const char *text) {
@@ -297,12 +368,25 @@ static bool emit_map(char *source, size_t capacity, size_t *used,
             n->op == B2ND_EXEC_INPUT ? n->slot : id);
         return emit_text(source, capacity, used, name);
     }
-    if (!emit_text(source, capacity, used, n->op == B2ND_EXEC_NEGATE ? "(-" : "(") ||
+    if (n->op == B2ND_EXEC_FUNCTION || n->op == B2ND_EXEC_CAST || n->op == B2ND_EXEC_SELECT) {
+        const char *function = n->op == B2ND_EXEC_CAST ? cast_name(n->dtype) :
+            n->op == B2ND_EXEC_SELECT ? "where" : n->function;
+        if (!emit_text(source, capacity, used, function) || !emit_text(source, capacity, used, "(")) return false;
+        for (size_t a = 0; a < n->nargs; a++) {
+            if ((a && !emit_text(source, capacity, used, ", ")) ||
+                !emit_map(source, capacity, used, nodes, uses, n->args[a], false)) return false;
+        }
+        return emit_text(source, capacity, used, ")");
+    }
+    const char *prefix = n->op == B2ND_EXEC_NEGATE ? "(-" :
+        n->op == B2ND_EXEC_POS ? "(+" :
+        n->op == B2ND_EXEC_INVERT ? "(~" : n->op == B2ND_EXEC_NOT ? "(not " : "(";
+    if (!emit_text(source, capacity, used, prefix) ||
         !emit_map(source, capacity, used, nodes, uses, n->args[0], false)) {
         return false;
     }
     if (n->nargs == 2) {
-        const char *op = n->op == B2ND_EXEC_ADD ? " + " : n->op == B2ND_EXEC_SUBTRACT ? " - " : " * ";
+        const char *op = binary_operator(n->op);
         if (!emit_text(source, capacity, used, op) ||
             !emit_map(source, capacity, used, nodes, uses, n->args[1], false)) {
             return false;
@@ -407,9 +491,11 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     plan->info.ninputs = d->ninputs;
     plan->info.reducer = reduction_kind(plan->root_op);
     plan->info.reduction = is_reduction_op(plan->root_op);
+    plan->info.has_where = d->nodes[d->root].has_where;
+    if (plan->info.has_where) plan->mask_slot = d->nodes[d->nodes[d->root].where].slot;
     /* Current DAG map ops are all lane-local; ordered sums/products stay serial. */
     plan->info.partitionable = plan->info.reducer != ME_REDUCTION_SUM &&
-        plan->info.reducer != ME_REDUCTION_PROD;
+        plan->info.reducer != ME_REDUCTION_PROD && !plan->info.has_where;
     uint32_t map = plan->info.reduction ? d->nodes[d->root].args[0] : d->root;
     plan->info.identity = d->nodes[map].op == B2ND_EXEC_INPUT;
     plan->direct_slot = plan->info.identity ? d->nodes[map].slot : 0;
@@ -454,7 +540,8 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
             snprintf(capture_names[ncaptures], sizeof(capture_names[ncaptures]), "c%zu", i);
             captures[ncaptures] = (me_capture){
                 {capture_names[ncaptures], n->dtype, n->itemsize}, n->scalar, n->category};
-            used += (size_t)snprintf(source + used, capacity - used, ", c%zu", i);
+            used += (size_t)snprintf(source + used, capacity - used,
+                                     "%sc%zu", d->ninputs || ncaptures ? ", " : "", i);
             ncaptures++;
         }
     }
@@ -662,10 +749,10 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
     if (out) {
         *out = NULL;
     }
-    if (!out || !plan || !inputs || ninputs != plan->info.ninputs || !tile_items) {
+    if (!out || !plan || (!inputs && ninputs) || ninputs != plan->info.ninputs || !tile_items) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution specialization");
     }
-    if (!ninputs || plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim ||
+    if (plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim ||
         !numeric_width(plan->info.map_dtype)) {
         return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
     }
@@ -675,6 +762,9 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
          plan->info.dtype != plan->info.map_dtype)) {
         return exec_error(error, ME_ERR_UNSUPPORTED,
                           "Pairwise sum requires matching floating map and accumulator dtypes");
+    }
+    if (pairwise_sum && plan->info.has_where) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Masked pairwise sums are not admitted");
     }
     size_t out_ndim = 0;
     for (size_t i = 0; i < ninputs; i++) {
@@ -699,7 +789,7 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
         if (in_items > SIZE_MAX / inputs[i].itemsize) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Execution input byte size overflow");
         }
-        if (inputs[i].ndim > out_ndim) {
+        if ((!plan->info.has_where || i != plan->mask_slot) && inputs[i].ndim > out_ndim) {
             out_ndim = inputs[i].ndim;
         }
     }
@@ -708,6 +798,7 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
     for (size_t axis = 0; axis < out_ndim; axis++) {
         int64_t extent = 1;
         for (size_t i = 0; i < ninputs; i++) {
+            if (plan->info.has_where && i == plan->mask_slot) continue;
             if (inputs[i].ndim + axis >= out_ndim) {
                 int64_t in_extent = inputs[i].shape[inputs[i].ndim + axis - out_ndim];
                 if (in_extent != 1) {
@@ -724,6 +815,17 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
             return exec_error(error, ME_ERR_INVALID_ARG, "Execution shape size overflow");
         }
         items *= (size_t)extent;
+    }
+    if (plan->info.has_where) {
+        const b2nd_exec_input_meta *mask = &inputs[plan->mask_slot];
+        if (mask->ndim > out_ndim) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Reduction mask cannot expand the value domain");
+        }
+        for (size_t a = 0; a < mask->ndim; a++) {
+            if (mask->shape[a] != 1 && mask->shape[a] != out_shape[out_ndim - mask->ndim + a]) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Incompatible reduction mask shape");
+            }
+        }
     }
     bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
     bool suffix = true;
@@ -1217,6 +1319,7 @@ typedef struct {
     bool entered; /* Written only by this job, inspected after synchronous drain. */
     me_argextrema_state arg_partial;
     double moments_partial[4];
+    const uint8_t *mask;
 } exec_job;
 
 static bool exec_moments_update(me_dtype dtype, const void *values, size_t count,
@@ -1414,6 +1517,15 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
     size_t red_count = schedule->info.reduction_lanes;
     uint32_t direct_slot = plan->direct_slot;
     const void *values;
+    job->mask = NULL;
+    if (plan->info.has_where) {
+        size_t slot = plan->mask_slot;
+        if (!exec_gather_tile(job, slot, group, pos, count)) return;
+        uint8_t *mask = job->gather_slots[slot];
+        for (size_t i = 0; i < count; i++) mask[i] = mask[i] != 0;
+        job->gathered_bytes += count;
+        job->mask = mask;
+    }
     if (plan->info.identity) {
         if (job->direct[direct_slot]) {
             size_t linear = group * red_count + pos;
@@ -1440,6 +1552,10 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
     me_buffer spans[B2ND_EXEC_MAX_INPUTS];
     for (size_t i = 0; i < job->ninputs; i++) {
         size_t input_width = schedule->inputs[i].itemsize;
+        if (plan->info.has_where && i == plan->mask_slot) {
+            spans[i] = (me_buffer){job->mask, count};
+            continue;
+        }
         if (job->direct[i]) {
             size_t linear = group * red_count + pos;
             spans[i] = (me_buffer){
@@ -1454,6 +1570,8 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
     }
     me_block block = ME_BLOCK_INITIALIZER;
     block.nitems = count;
+    block.valid_mask = job->mask;
+    block.valid_mask_capacity = job->mask ? count : 0;
     me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
     me_fp_status fp = {0};
     options.fp_status = &fp;
@@ -1482,6 +1600,21 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
 
 /* Traverse this job's tile or group range. Each job owns its mapped tile,
  * gather scratch and FP scope, so jobs may run on different host threads. */
+static void exec_reduce_masked(exec_job *job, const void *values, size_t count,
+                               uint64_t *acc, bool *initialized) {
+    size_t width = job->schedule->plan->info.map_itemsize;
+    for (size_t pos = 0; pos < count;) {
+        while (pos < count && job->mask && !job->mask[pos]) pos++;
+        size_t start = pos;
+        while (pos < count && (!job->mask || job->mask[pos])) pos++;
+        if (pos > start) {
+            exec_reduce_values(job->schedule->plan, (const unsigned char *)values + start * width,
+                                pos - start, acc, *initialized, &job->error, &job->status);
+            *initialized = true;
+        }
+    }
+}
+
 static void exec_run(exec_job *job) {
     const b2nd_exec_schedule *schedule = job->schedule;
     const b2nd_exec_plan *plan = schedule->plan;
@@ -1550,8 +1683,7 @@ static void exec_run(exec_job *job) {
                         break;
                     }
                 } else {
-                    exec_reduce_values(plan, values, count, &acc, acc_init, &job->error, &job->status);
-                    acc_init = true;
+                    exec_reduce_masked(job, values, count, &acc, &acc_init);
                 }
                 if (job->status == ME_SUCCESS) {
                     job->tiles++;
@@ -1625,9 +1757,7 @@ static void exec_run(exec_job *job) {
                         break;
                     }
                 } else {
-                    exec_reduce_values(plan, values, count, &job->partial,
-                                       job->has_init_state, &job->error, &job->status);
-                    job->has_init_state = true;
+                    exec_reduce_masked(job, values, count, &job->partial, &job->has_init_state);
                 }
             }
             if (job->status == ME_SUCCESS) {
@@ -1747,7 +1877,7 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
                                     size_t *out_gather, size_t *out_mapped,
                                     bool *out_scatter, size_t *out_work_items,
                                     size_t *out_tasks, me_error *error,
-                                    size_t planned_slot, bool planned_output) {
+                                    const bool *planned_inputs, bool planned_output) {
     const b2nd_exec_plan *plan = schedule->plan;
     if (schedule->partition.is_partition_schedule) {
         return exec_error(error, ME_ERR_INVALID_ARG,
@@ -1762,23 +1892,26 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent, alignment or strides");
     }
     size_t per_job_gather = 0;
+    size_t gather_alignment = 1;
     for (size_t i = 0; i < ninputs; i++) {
-        bool needed = !plan->info.identity || i == plan->direct_slot;
+        bool planned = planned_inputs && planned_inputs[i];
+        bool needed = !plan->info.identity || i == plan->direct_slot ||
+            (plan->info.has_where && i == plan->mask_slot);
         if (is_reader && is_reader[i]) {
             if (needed && items && schedule->info.tile_items) {
                 size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
-                if (per_job_gather > SIZE_MAX - tile_bytes) {
+                size_t alignment = schedule->inputs[i].itemsize;
+                if (!gather_reserve(&per_job_gather, &gather_offsets[i], tile_bytes, alignment)) {
                     return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
                 }
-                gather_offsets[i] = per_job_gather;
-                per_job_gather += tile_bytes;
+                if (alignment > gather_alignment) gather_alignment = alignment;
             }
             continue;
         }
-        if (i != planned_slot && !view_valid(&inputs[i], &schedule->inputs[i])) {
+        if (!planned && !view_valid(&inputs[i], &schedule->inputs[i])) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
         }
-        if (i != planned_slot && !planned_output &&
+        if (!planned && !planned_output &&
             inputs[i].capacity && output_bytes && output->capacity &&
             (uintptr_t)inputs[i].base < (uintptr_t)output->base + output->capacity &&
             (uintptr_t)output->base < (uintptr_t)inputs[i].base + inputs[i].capacity) {
@@ -1786,18 +1919,21 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
         }
         direct[i] = schedule->suffix_reduction && schedule->matches_shape[i] &&
             view_native(&inputs[i]) && view_contiguous(&inputs[i], &schedule->inputs[i]) &&
-            (i == planned_slot || !items ||
+            (planned || !items ||
              ((uintptr_t)inputs[i].base + inputs[i].offset) % schedule->inputs[i].itemsize == 0);
+        if (plan->info.has_where && i == plan->mask_slot) direct[i] = false;
         if (needed && !direct[i] && items && schedule->info.tile_items) {
             size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
-            if (per_job_gather > SIZE_MAX - tile_bytes) {
+            size_t alignment = schedule->inputs[i].itemsize;
+            if (!gather_reserve(&per_job_gather, &gather_offsets[i], tile_bytes, alignment)) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
             }
-            gather_offsets[i] = per_job_gather;
-            per_job_gather += tile_bytes;
+            if (alignment > gather_alignment) gather_alignment = alignment;
         }
     }
-    if (per_job_gather > max_gather_bytes) {
+    size_t ignored_offset;
+    if (!gather_reserve(&per_job_gather, &ignored_offset, 0, gather_alignment) ||
+        per_job_gather > max_gather_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer budget exceeded");
     }
     bool scatter = !planned_output && !output_contiguous(output, schedule->info.output_ndim,
@@ -1893,7 +2029,7 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
     me_status bind_status = exec_plan_bindings(
         schedule, inputs, is_reader, ninputs, output, max_gather_bytes, jobs,
         direct, gather_offsets, &per_job_gather, &per_job_mapped, &scatter,
-        &work_items, &ntasks, error, SIZE_MAX, false);
+        &work_items, &ntasks, error, NULL, false);
     if (bind_status != ME_SUCCESS) {
         return bind_status;
     }
@@ -1962,11 +2098,12 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
             single_group_acc ? initial_val : identity_val,
             0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, task_readers, false,
-            {0}, {0}};
+            {0}, {0}, NULL};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {
-                bool needed = !plan->info.identity || s == plan->direct_slot;
+                bool needed = !plan->info.identity || s == plan->direct_slot ||
+                    (plan->info.has_where && s == plan->mask_slot);
                 if (needed && !direct[s] && items && schedule->info.tile_items) {
                     parts[i].gather_slots[s] = base + gather_offsets[s];
                 }
@@ -2220,7 +2357,7 @@ me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
                                  me_mut_buffer output, size_t max_gather_bytes,
                                  const b2nd_exec_jobs *jobs,
                                  size_t *out_tasks, me_error *error,
-                                 size_t planned_slot, bool planned_output) {
+                                 const bool *planned_inputs, bool planned_output) {
     if (error) {
         *error = (me_error){0};
     }
@@ -2242,7 +2379,7 @@ me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
     return exec_plan_bindings(schedule, views, is_reader, ninputs, &out,
                               max_gather_bytes, jobs, direct, gather_offsets,
                               &gather, &mapped, &scatter, &work_items,
-                              out_tasks, error, planned_slot, planned_output);
+                              out_tasks, error, planned_inputs, planned_output);
 }
 
 me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
@@ -2252,9 +2389,15 @@ me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
                                  const b2nd_exec_jobs *jobs,
                                  size_t *out_tasks, me_error *error) {
     return b2nd_exec_plan_stage_readers(schedule, views, is_reader, ninputs, output,
-                                        max_gather_bytes, jobs, out_tasks, error, SIZE_MAX, false);
+                                        max_gather_bytes, jobs, out_tasks, error, NULL, false);
 }
 
+me_status b2nd_exec_plan_input(const b2nd_exec_plan *plan, size_t slot,
+                               b2nd_exec_input_meta *out) {
+    if (!plan || !out || slot >= plan->info.ninputs) return ME_ERR_INVALID_ARG;
+    *out = plan->inputs[slot];
+    return ME_SUCCESS;
+}
 me_status b2nd_exec_execute_readers_ex(const b2nd_exec_schedule *schedule,
                                       const b2nd_exec_view *views,
                                       const b2nd_exec_reader *readers,

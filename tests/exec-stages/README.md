@@ -1,35 +1,32 @@
-# Typed reduction-to-map stage slice
+# Typed staged graph planner and executor
 
-`b2nd_exec_staged_prepare` splits a typed graph containing exactly one reduction
-feeding an arithmetic map. It remaps node IDs and input slots into two ordinary
-plans directly, without artifact handles, interchange serialization, or another
-numerical traversal loop. It rejects unreachable nodes and multiple/nested
-reductions. This is the first native M7 slice, not the complete staged planner.
+`b2nd_exec_staged_prepare` / `b2nd_exec_staged_prepare_ex` splits a typed graph
+into up to `B2ND_EXEC_MAX_STAGES` (32) regions at reductions and strong-dependent
+shared computed nodes. It remaps node IDs and input/producer slots directly into
+ordinary plans without artifact handles, interchange serialization, or another
+numerical traversal loop. Explicit composition via `b2nd_exec_staged_assemble` /
+`b2nd_exec_staged_assemble_ex` borrows prepared child plans (including authored
+Menudet kernels and resident masked reductions) without copying or re-lowering.
+Automatic conditional/masked multi-stage graphs and shared scalar-only
+materialization retain the adapter's prepare-time rejections.
 
-Specialization infers the producer dtype/shape through the existing executor,
-including accumulator promotion. It calculates the producer's bytes and last
-consumer before execution. A budget one byte below that result is rejected.
-Schedules borrow plans and retain no operand values.
+Specialization infers each producer dtype/shape through the existing executor,
+including accumulator promotion. It calculates cumulative intermediate bytes,
+per-stage `last_consumer`, and stage/node diagnostics before execution. A budget
+one byte below that requirement is rejected during specialization. Schedules
+borrow plans and retain no operand values.
 
 Execution currently accepts resident views and synchronous generic sources,
-serially, with resident contiguous output. Both stages' source metadata, output
-bindings and gather budgets pass preflight before the first reader callback.
-The common binding validator explicitly supports planned stage-owned contiguous
-allocations without an address; preflight does not fabricate pointers or
-allocate the producer result. Binding arrays are bounded heap metadata sized by
-actual child input counts, not two maximum-sized arrays on the worker stack.
-The only full intermediate is the explicitly budgeted producer result; it is
-invocation-local and released after the consumer, or on any failure. Final map
-failure can leave prefix output writes. FP flags are unioned in the report, with
-`raise_mask` applied after each stage's traversal, matching the adapter: a
-flagged producer must not enter its consumer. Callbacks are never replayed.
-`fp_observed` distinguishes absent observation from unsupported FP; staged support
-is an AND over observing stages, not an OR. Fault injection checks both merge
-orders and an absent observation.
-
-Compressed bindings/sinks, multiple stages/reductions, masks, imported stage
-bindings, Python facade integration and default dispatch are not implemented.
-The native tests do not establish those gates or cross-platform qualification.
+serially, with resident contiguous output. Reader-backed masked stages and
+compressed staged operands reject before any reader callback. All stages' source
+metadata, output bindings and gather budgets pass preflight before the first
+reader callback. Binding arrays are bounded heap metadata sized by actual child
+input counts. Intermediates are invocation-local, released as soon as their
+last consumer completes, and cleaned up on every failure. Final map failure can
+leave prefix output writes; FP flags are unioned across entered stages,
+`fp.supported` and plan `has_jit` combine with AND across observing/component
+stages, and `raise_mask` applies after each stage's traversal. Callbacks are
+never replayed.
 
 Build against an artifact-off C-Blosc2 and miniexpr installation:
 
@@ -42,17 +39,14 @@ ctest --test-dir <build> --output-on-failure
 
 ASan/UBSan flags can be supplied in `CMAKE_C_FLAGS` / `CMAKE_EXE_LINKER_FLAGS`.
 The fixture compiles the staged owner with warnings as errors. Fault injection
-covers all staged-owner preparation allocations, schedule/intermediate OOM,
-source failures in both stages, no replay and recovery.
-The shared-input `x - sum(x)` fixture checks source coverage across both regions,
-consumer failure, resident parity and reuse. Empty non-NULL buffer origins are
-checked separately from nonempty overlapping allocations. Failed metadata
-preflight reports zero producer allocation, while the peak byte counter remains
-truthful for buffers actually allocated.
+covers staged-owner preparation allocations, schedule/intermediate OOM, source
+failures across stages, no replay and recovery. The installed consumer fixture
+`tests/installed-miniexpr/exec-stages.c` runs the same core staged suite against
+the installed artifact-off static archive.
 
 For optional differential qualification, additionally set
 `EXEC_STAGES_ADAPTER_LIBRARY` to a matching `libminiexpr_artifact.a` and
 `EXEC_STAGES_ADAPTER_INCLUDE_DIR` to its graph-header directory. This adds a
-separate adapter comparison target for bitwise values, dtype/rank, stage count
-and FP flags/support across tile widths and a late signaling NaN. The default
-fixture and installed C consumer still require no artifact library.
+separate adapter comparison target for multi-stage, nested integer, and masked
+explicit stage parity. The default fixture and installed C consumer still require
+no artifact library.

@@ -36,7 +36,9 @@ me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
                                        me_mut_buffer output, size_t max_gather_bytes,
                                        const b2nd_exec_jobs *jobs,
                                        size_t *out_tasks, me_error *error,
-                                       size_t planned_slot, bool planned_output);
+                                       const bool *planned_inputs, bool planned_output);
+me_status b2nd_exec_plan_input(const b2nd_exec_plan *plan, size_t slot,
+                               b2nd_exec_input_meta *out);
 /* Readers are serial per-task logical C-order spans laid out as
  * readers[task * reader_stride + slot] (or shared at stride 0 when serial).
  * NULL read selects the corresponding resident view. */

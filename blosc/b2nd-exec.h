@@ -61,14 +61,21 @@ typedef enum {
     B2ND_EXEC_ARGMIN,
     B2ND_EXEC_ARGMAX,
     B2ND_EXEC_VAR,
-    B2ND_EXEC_STD
+    B2ND_EXEC_STD,
+    B2ND_EXEC_DIVIDE, B2ND_EXEC_CAST, B2ND_EXEC_FUNCTION,
+    B2ND_EXEC_LT, B2ND_EXEC_GT, B2ND_EXEC_EQ, B2ND_EXEC_NE, B2ND_EXEC_LE, B2ND_EXEC_GE,
+    B2ND_EXEC_BITAND, B2ND_EXEC_BITOR, B2ND_EXEC_BITXOR,
+    B2ND_EXEC_FLOORDIV, B2ND_EXEC_MOD, B2ND_EXEC_POWER,
+    B2ND_EXEC_LSHIFT, B2ND_EXEC_RSHIFT,
+    B2ND_EXEC_INVERT, B2ND_EXEC_NOT, B2ND_EXEC_AND, B2ND_EXEC_OR, B2ND_EXEC_SELECT,
+    B2ND_EXEC_POS
 } b2nd_exec_op;
 
 typedef struct {
     size_t struct_size;
     uint32_t id;
     b2nd_exec_op op;
-    uint32_t args[2];
+    uint32_t args[3];
     size_t nargs;
     uint32_t slot;
     me_dtype dtype;
@@ -86,6 +93,9 @@ typedef struct {
     uint8_t initial_scalar[16];
     size_t initial_size;
     double ddof;
+    char function[32]; /* Identifier only; numerical arity/inference are core-owned. */
+    bool has_where;
+    uint32_t where; /* Earlier Boolean input node; never an interchange reference. */
 } b2nd_exec_node;
 
 typedef struct {
@@ -139,6 +149,7 @@ typedef struct {
     bool keepdims;
     bool has_initial;
     bool has_jit; /* Prepared availability, not proof that an invocation used JIT. */
+    bool has_where;
 } b2nd_exec_plan_info;
 
 typedef struct {
