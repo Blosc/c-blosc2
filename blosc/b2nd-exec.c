@@ -6,6 +6,7 @@
 #include "b2nd-exec-launch.h"
 #include "miniexpr_reduce.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,6 +15,8 @@ struct b2nd_exec_plan {
     me_kernel *kernel;
     me_kernel *initial_kernel;
     uint64_t initial_value;
+    b2nd_exec_op root_op;
+    double ddof;
     b2nd_exec_plan_info info;
     b2nd_exec_node *nodes;
     size_t nnodes;
@@ -59,10 +62,28 @@ static me_reduction_kind reduction_kind(b2nd_exec_op op) {
     }
 }
 
-static void result_info(b2nd_exec_plan_info *out, const me_kernel_info *map) {
+static bool is_argextrema_op(b2nd_exec_op op) {
+    return op == B2ND_EXEC_ARGMIN || op == B2ND_EXEC_ARGMAX;
+}
+
+static bool is_moments_op(b2nd_exec_op op) {
+    return op == B2ND_EXEC_VAR || op == B2ND_EXEC_STD;
+}
+
+static bool is_reduction_op(b2nd_exec_op op) {
+    return reduction_kind(op) != ME_REDUCTION_NONE || is_argextrema_op(op) || is_moments_op(op);
+}
+
+static void result_info(b2nd_exec_plan_info *out, b2nd_exec_op root_op, const me_kernel_info *map) {
     out->map_dtype = map->output_dtype;
     out->map_itemsize = map->output_itemsize;
-    out->dtype = me_reduce_accumulator_dtype(map->output_dtype, out->reducer, ME_AUTO);
+    if (is_argextrema_op(root_op)) {
+        out->dtype = ME_INT64;
+    } else if (is_moments_op(root_op)) {
+        out->dtype = map->output_dtype == ME_FLOAT32 ? ME_FLOAT32 : ME_FLOAT64;
+    } else {
+        out->dtype = me_reduce_accumulator_dtype(map->output_dtype, out->reducer, ME_AUTO);
+    }
     out->itemsize = numeric_width(out->dtype);
     out->cardinality = map->cardinality;
     out->context_ndim = map->context_ndim;
@@ -157,7 +178,9 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
             case B2ND_EXEC_INPUT: case B2ND_EXEC_CAPTURE: arity = 0; break;
             case B2ND_EXEC_NEGATE: case B2ND_EXEC_MIN: case B2ND_EXEC_MAX:
             case B2ND_EXEC_SUM: case B2ND_EXEC_PROD:
-            case B2ND_EXEC_ANY: case B2ND_EXEC_ALL: arity = 1; break;
+            case B2ND_EXEC_ANY: case B2ND_EXEC_ALL:
+            case B2ND_EXEC_ARGMIN: case B2ND_EXEC_ARGMAX:
+            case B2ND_EXEC_VAR: case B2ND_EXEC_STD: arity = 1; break;
             case B2ND_EXEC_ADD: case B2ND_EXEC_SUBTRACT: case B2ND_EXEC_MULTIPLY: arity = 2; break;
             default: return exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution operation");
         }
@@ -166,7 +189,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         }
         depth[i] = 1;
         for (size_t a = 0; a < n->nargs; a++) {
-            if (n->args[a] >= i || reduction_kind(d->nodes[n->args[a]].op) != ME_REDUCTION_NONE) {
+            if (n->args[a] >= i || is_reduction_op(d->nodes[n->args[a]].op)) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Forward, cyclic or nested reduction reference");
             }
             unsigned next = depth[n->args[a]] + 1;
@@ -198,7 +221,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         } else if (n->dtype != ME_AUTO || n->itemsize || n->scalar_size) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Operation dtype constraints are not yet supported");
         }
-        if (reduction_kind(n->op) != ME_REDUCTION_NONE) {
+        if (is_reduction_op(n->op)) {
             if (i != d->root) {
                 return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
             }
@@ -210,10 +233,18 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
                     return exec_error(error, ME_ERR_INVALID_ARG, "Reduction axis exceeds maximum rank");
                 }
             }
+            if (is_moments_op(n->op)) {
+                if (!isfinite(n->ddof) || n->ddof < 0.0) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Invalid ddof for statistical reduction");
+                }
+            } else if (n->ddof != 0.0) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Unexpected ddof on non-moment reduction");
+            }
             if (n->has_initial) {
-                if (n->op == B2ND_EXEC_ANY || n->op == B2ND_EXEC_ALL) {
+                if (n->op == B2ND_EXEC_ANY || n->op == B2ND_EXEC_ALL ||
+                    is_argextrema_op(n->op) || is_moments_op(n->op)) {
                     return exec_error(error, ME_ERR_INVALID_ARG,
-                                      "Truth reductions do not accept initial values");
+                                      "This reduction does not accept initial values");
                 }
                 size_t iw = numeric_width(n->initial_dtype);
                 if (!iw || n->initial_size != iw ||
@@ -228,7 +259,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
                                   "Unexpected initial payload without has_initial");
             }
         } else if (n->has_axes || n->naxes || n->keepdims || n->has_initial ||
-                   n->initial_size || n->initial_dtype != ME_AUTO) {
+                   n->initial_size || n->initial_dtype != ME_AUTO || n->ddof != 0.0) {
             return exec_error(error, ME_ERR_INVALID_ARG,
                               "Unexpected reduction options on non-reduction node");
         }
@@ -321,9 +352,11 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     memcpy(plan->nodes, d->nodes, d->nnodes * sizeof(*d->nodes));
     plan->nnodes = d->nnodes;
     plan->root = d->root;
+    plan->root_op = d->nodes[d->root].op;
+    plan->ddof = d->nodes[d->root].ddof;
     plan->info.ninputs = d->ninputs;
-    plan->info.reducer = reduction_kind(d->nodes[d->root].op);
-    plan->info.reduction = plan->info.reducer != ME_REDUCTION_NONE;
+    plan->info.reducer = reduction_kind(plan->root_op);
+    plan->info.reduction = is_reduction_op(plan->root_op);
     /* Current DAG map ops are all lane-local; ordered sums/products stay serial. */
     plan->info.partitionable = plan->info.reducer != ME_REDUCTION_SUM &&
         plan->info.reducer != ME_REDUCTION_PROD;
@@ -418,7 +451,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
             info.cardinality != ME_ELEMENTWISE || info.context_ndim)) {
             status = exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution map result");
         }
-        result_info(&plan->info, &info);
+        result_info(&plan->info, plan->root_op, &info);
         plan->info.partitionable &= me_kernel_is_partitionable(plan->kernel);
     }
     if (status == ME_SUCCESS && plan->info.reduction) {
@@ -488,12 +521,13 @@ me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer
     if (!plan) {
         return exec_error(error, ME_ERR_OOM, "Cannot allocate direct execution plan");
     }
+    plan->root_op = B2ND_EXEC_INPUT;
     plan->info.ninputs = count;
     plan->info.reducer = reducer;
     plan->info.reduction = reducer != ME_REDUCTION_NONE;
     plan->info.partitionable = reducer != ME_REDUCTION_SUM && reducer != ME_REDUCTION_PROD &&
         me_kernel_is_partitionable(*kernel);
-    result_info(&plan->info, &info);
+    result_info(&plan->info, B2ND_EXEC_INPUT, &info);
     /* Direct complex/string kernels remain inspectable, not resident-admitted. */
     if (reducer == ME_REDUCTION_NONE) {
         plan->info.dtype = info.output_dtype;
@@ -540,7 +574,7 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
         return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
     }
     if (pairwise_sum &&
-        (plan->info.reducer != ME_REDUCTION_SUM ||
+        (plan->root_op != B2ND_EXEC_SUM ||
          (plan->info.map_dtype != ME_FLOAT32 && plan->info.map_dtype != ME_FLOAT64) ||
          plan->info.dtype != plan->info.map_dtype)) {
         return exec_error(error, ME_ERR_UNSUPPORTED,
@@ -643,9 +677,16 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
             }
         }
         output_items = groups;
-        if ((plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX) &&
+        if ((plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX ||
+             is_argextrema_op(plan->root_op)) &&
             !plan->info.has_initial && !red_count && groups) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Extremum of an empty execution domain");
+        }
+        if (is_moments_op(plan->root_op) && groups &&
+            (!red_count || (double)red_count <= plan->ddof ||
+             (uint64_t)red_count > UINT64_C(9007199254740992))) {
+            return exec_error(error, ME_ERR_INVALID_ARG,
+                              "Moments require more items than ddof within 2**53");
         }
     } else if (out_ndim) {
         memcpy(output_shape, out_shape, out_ndim * sizeof(int64_t));
@@ -686,10 +727,19 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
     if (!schedule) {
         return exec_error(error, ME_ERR_OOM, "Cannot allocate execution schedule");
     }
+    size_t reducer_bytes = 0;
+    if (is_argextrema_op(plan->root_op)) {
+        reducer_bytes = sizeof(me_argextrema_state);
+    } else if (is_moments_op(plan->root_op)) {
+        reducer_bytes = sizeof(double) * 4;
+    } else if (pairwise_sum) {
+        reducer_bytes = sizeof(me_pairwise_sum_state);
+    } else if (plan->info.reduction) {
+        reducer_bytes = sizeof(uint64_t);
+    }
     schedule->plan = plan;
     schedule->info = (b2nd_exec_schedule_info){
-        items, lanes, mapped,
-        pairwise_sum ? sizeof(me_pairwise_sum_state) : (plan->info.reduction ? sizeof(uint64_t) : 0),
+        items, lanes, mapped, reducer_bytes,
         output_items, sizeof(*schedule),
         out_ndim, {0}, broadcast_gather,
         output_ndim, {0}, groups, red_count, pairwise_sum};
@@ -945,7 +995,59 @@ typedef struct {
     me_error error;
     const b2nd_exec_reader *readers;
     bool entered; /* Written only by this job, inspected after synchronous drain. */
+    me_argextrema_state arg_partial;
+    double moments_partial[4];
 } exec_job;
+
+static bool exec_moments_update(me_dtype dtype, const void *values, size_t count,
+                                double acc[4]) {
+    if (!count) return true;
+    double part[4] = {0};
+    if (dtype == ME_FLOAT32 || dtype == ME_FLOAT64) {
+        return me_moments_span(dtype, values, count, part) && me_moments_merge(acc, part);
+    }
+    double scratch[256];
+    size_t width = numeric_width(dtype);
+    if (!width) return false;
+    for (size_t done = 0; done < count;) {
+        size_t chunk = count - done < 256 ? count - done : 256;
+        for (size_t i = 0; i < chunk; i++) {
+            uint64_t raw = 0;
+            if (!load_scalar_u64(dtype, (const unsigned char *)values + (done + i) * width, &raw)) {
+                return false;
+            }
+            if (dtype == ME_UINT8 || dtype == ME_UINT16 || dtype == ME_UINT32 ||
+                dtype == ME_UINT64 || dtype == ME_BOOL) {
+                scratch[i] = (double)raw;
+            } else {
+                scratch[i] = (double)(int64_t)raw;
+            }
+        }
+        if (!me_moments_span(ME_FLOAT64, scratch, chunk, part) || !me_moments_merge(acc, part)) {
+            return false;
+        }
+        done += chunk;
+    }
+    return true;
+}
+
+static bool exec_store_moments(me_dtype out_dtype, const double acc[4], double ddof,
+                               bool is_std, void *dst) {
+    double result = 0.0;
+    if (!me_moments_finish(acc, ddof, is_std, &result)) {
+        return false;
+    }
+    if (out_dtype == ME_FLOAT32) {
+        float fval = (float)result;
+        memcpy(dst, &fval, sizeof(fval));
+        return true;
+    }
+    if (out_dtype == ME_FLOAT64) {
+        memcpy(dst, &result, sizeof(result));
+        return true;
+    }
+    return false;
+}
 
 static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_idx,
                              const b2nd_exec_view *view, size_t group, size_t pos,
@@ -1169,7 +1271,8 @@ static void exec_run(exec_job *job) {
     size_t red_count = schedule->info.reduction_lanes;
     bool pairwise = schedule->info.pairwise_sum;
     bool floating = plan->info.reduction &&
-        (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
+        (is_moments_op(plan->root_op) ||
+         plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
     bool scoped = floating || job->raise_mask != 0;
     job->fp_scoped = scoped;
     me_fp_scope scope;
@@ -1193,6 +1296,8 @@ static void exec_run(exec_job *job) {
             uint64_t acc = job->initial_val;
             bool acc_init = job->has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX);
+            me_argextrema_state arg_state = {0};
+            double mom_state[4] = {0};
             me_pairwise_sum_state pw;
             if (pairwise && me_pairwise_sum_init(&pw, plan->info.dtype) != ME_PAIRWISE_SUM_SUCCESS) {
                 job->status = exec_error(&job->error, ME_ERR_EVAL, "Cannot initialize pairwise sum");
@@ -1211,6 +1316,19 @@ static void exec_run(exec_job *job) {
                         job->status = exec_error(&job->error, ME_ERR_EVAL, "Pairwise sum update failed");
                         break;
                     }
+                } else if (is_argextrema_op(plan->root_op)) {
+                    if (!me_argextrema_update(plan->info.map_dtype, values, count, (int64_t)pos,
+                                              plan->root_op == B2ND_EXEC_ARGMIN, &arg_state)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Arg-extrema reduction failed");
+                        break;
+                    }
+                } else if (is_moments_op(plan->root_op)) {
+                    if (!exec_moments_update(plan->info.map_dtype, values, count, mom_state)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Moments reduction failed");
+                        break;
+                    }
                 } else {
                     exec_reduce_values(plan, values, count, &acc, acc_init, &job->error, &job->status);
                     acc_init = true;
@@ -1220,17 +1338,33 @@ static void exec_run(exec_job *job) {
                 }
             }
             if (job->status == ME_SUCCESS) {
-                if (pairwise) {
-                    acc = exec_pairwise_finish(plan->info.dtype, &pw, job->has_initial,
-                                               job->initial_val, red_count > 0);
-                }
                 size_t out_off = job->scatter ?
                     output_offset(job->out_view, schedule->info.output_ndim,
                                   schedule->info.output_shape, g) :
                     job->out_view->offset + g * width;
-                if (!me_reduce_store_scalar(plan->info.dtype, acc,
-                                            (unsigned char *)job->out_view->base + out_off)) {
-                    job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution scalar store failed");
+                unsigned char *out_ptr = (unsigned char *)job->out_view->base + out_off;
+                if (is_argextrema_op(plan->root_op)) {
+                    if (!arg_state.initialized) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Empty arg-extrema reduction");
+                    } else {
+                        memcpy(out_ptr, &arg_state.index, sizeof(arg_state.index));
+                    }
+                } else if (is_moments_op(plan->root_op)) {
+                    if (!exec_store_moments(plan->info.dtype, mom_state, plan->ddof,
+                                            plan->root_op == B2ND_EXEC_STD, out_ptr)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Moments finalization failed");
+                    }
+                } else {
+                    if (pairwise) {
+                        acc = exec_pairwise_finish(plan->info.dtype, &pw, job->has_initial,
+                                                   job->initial_val, red_count > 0);
+                    }
+                    if (!me_reduce_store_scalar(plan->info.dtype, acc, out_ptr)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Execution scalar store failed");
+                    }
                 }
             }
         }
@@ -1254,6 +1388,20 @@ static void exec_run(exec_job *job) {
                 if (pairwise) {
                     if (me_pairwise_sum_update(&pw, values, count) != ME_PAIRWISE_SUM_SUCCESS) {
                         job->status = exec_error(&job->error, ME_ERR_EVAL, "Pairwise sum update failed");
+                        break;
+                    }
+                } else if (is_argextrema_op(plan->root_op)) {
+                    if (!me_argextrema_update(plan->info.map_dtype, values, count, (int64_t)pos,
+                                              plan->root_op == B2ND_EXEC_ARGMIN, &job->arg_partial)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Arg-extrema reduction failed");
+                        break;
+                    }
+                } else if (is_moments_op(plan->root_op)) {
+                    if (!exec_moments_update(plan->info.map_dtype, values, count,
+                                             job->moments_partial)) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL,
+                                                 "Moments reduction failed");
                         break;
                     }
                 } else {
@@ -1584,7 +1732,8 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
             single_group_acc && (plan->info.has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
             single_group_acc ? initial_val : identity_val,
-            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, task_readers, false};
+            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, task_readers, false,
+            {0}, {0}};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {
@@ -1623,14 +1772,20 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
     }
     if (status == ME_SUCCESS && plan->info.reduction && groups == 1) {
         uint64_t result = initial_val;
+        me_argextrema_state arg_acc = {0};
+        double mom_acc[4] = {0};
         if (ntasks == 1) {
             if (parts[0].tiles) {
                 result = parts[0].partial;
+                arg_acc = parts[0].arg_partial;
+                memcpy(mom_acc, parts[0].moments_partial, sizeof(mom_acc));
             }
         } else {
             bool floating_extrema =
-                (plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX) &&
-                (plan->info.dtype == ME_FLOAT32 || plan->info.dtype == ME_FLOAT64);
+                is_moments_op(plan->root_op) ||
+                ((plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX ||
+                  is_argextrema_op(plan->root_op)) &&
+                 (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64));
             bool scoped = floating_extrema || raise_mask != 0;
             me_fp_scope combine_scope;
             me_fp_status combine_fp = {0};
@@ -1648,8 +1803,23 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
                     if (!parts[i].tiles) {
                         continue; /* An empty domain contributes no value, not an identity. */
                     }
-                    if (!exec_combine_partial(plan->info.reducer, plan->info.dtype,
-                                              &result, parts[i].partial, initialized)) {
+                    if (is_argextrema_op(plan->root_op)) {
+                        if (!me_argextrema_merge(plan->info.map_dtype, &arg_acc,
+                                                 parts[i].arg_partial.value,
+                                                 parts[i].arg_partial.index,
+                                                 plan->root_op == B2ND_EXEC_ARGMIN)) {
+                            status = exec_error(error, ME_ERR_EVAL,
+                                                "Arg-extrema combination failed");
+                            break;
+                        }
+                    } else if (is_moments_op(plan->root_op)) {
+                        if (!me_moments_merge(mom_acc, parts[i].moments_partial)) {
+                            status = exec_error(error, ME_ERR_EVAL,
+                                                "Moments combination failed");
+                            break;
+                        }
+                    } else if (!exec_combine_partial(plan->info.reducer, plan->info.dtype,
+                                                     &result, parts[i].partial, initialized)) {
                         status = exec_error(error, ME_ERR_EVAL,
                                             "Execution reduction combination failed");
                         break;
@@ -1670,10 +1840,22 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
         if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
             status = exec_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
         }
-        if (status == ME_SUCCESS &&
-            !me_reduce_store_scalar(plan->info.dtype, result,
-                                    (unsigned char *)output->base + output->offset)) {
-            status = exec_error(error, ME_ERR_EVAL, "Execution scalar store failed");
+        if (status == ME_SUCCESS) {
+            unsigned char *out_ptr = (unsigned char *)output->base + output->offset;
+            if (is_argextrema_op(plan->root_op)) {
+                if (!arg_acc.initialized) {
+                    status = exec_error(error, ME_ERR_EVAL, "Empty arg-extrema reduction");
+                } else {
+                    memcpy(out_ptr, &arg_acc.index, sizeof(arg_acc.index));
+                }
+            } else if (is_moments_op(plan->root_op)) {
+                if (!exec_store_moments(plan->info.dtype, mom_acc, plan->ddof,
+                                        plan->root_op == B2ND_EXEC_STD, out_ptr)) {
+                    status = exec_error(error, ME_ERR_EVAL, "Moments finalization failed");
+                }
+            } else if (!me_reduce_store_scalar(plan->info.dtype, result, out_ptr)) {
+                status = exec_error(error, ME_ERR_EVAL, "Execution scalar store failed");
+            }
         }
     } else if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
         status = exec_error(error, ME_ERR_EVAL, "Execution raised floating-point status");

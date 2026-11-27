@@ -57,7 +57,11 @@ typedef enum {
     B2ND_EXEC_PROD,
     B2ND_EXEC_MAX,
     B2ND_EXEC_ANY,
-    B2ND_EXEC_ALL
+    B2ND_EXEC_ALL,
+    B2ND_EXEC_ARGMIN,
+    B2ND_EXEC_ARGMAX,
+    B2ND_EXEC_VAR,
+    B2ND_EXEC_STD
 } b2nd_exec_op;
 
 typedef struct {
@@ -81,6 +85,7 @@ typedef struct {
     me_capture_category initial_category;
     uint8_t initial_scalar[16];
     size_t initial_size;
+    double ddof;
 } b2nd_exec_node;
 
 typedef struct {

@@ -1,6 +1,8 @@
 /* Native storage is a binding adapter, not another numerical scheduler. */
 #include "b2nd-exec-storage.h"
 #include "b2nd-exec-private.h"
+#include "frame.h"
+#include "threading.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +13,7 @@
 typedef struct {
     const b2nd_array_t *array;
     blosc2_context *dctx;
+    blosc2_pthread_mutex_t *frame_mutex;
     unsigned char *decoded;
     size_t itemsize, bytes, items, block_items;
     size_t chunk_grid[B2ND_EXEC_MAX_RANK], block_grid[B2ND_EXEC_MAX_RANK];
@@ -20,6 +23,28 @@ typedef struct {
     int64_t cached_chunk;
     size_t decodes, decoded_bytes, cache_hits, read_spans;
 } storage_input;
+
+static int storage_fetch_chunk(const b2nd_array_t *a, blosc2_pthread_mutex_t *lock,
+                               int64_t chunk, const uint8_t **out_chunk, bool *needs_free) {
+    *out_chunk = NULL;
+    *needs_free = false;
+    if (!a || !a->sc || chunk < 0 || chunk >= a->sc->nchunks) return BLOSC2_ERROR_INVALID_PARAM;
+    if (!a->sc->frame) {
+        *out_chunk = a->sc->data[chunk];
+        return 0;
+    }
+    blosc2_frame_s *frame = (blosc2_frame_s *)a->sc->frame;
+    if (lock) blosc2_pthread_mutex_lock(lock);
+    int rc = frame_lock(frame, false);
+    if (rc >= 0) {
+        uint8_t *ptr = NULL;
+        rc = frame_get_chunk(frame, chunk, &ptr, needs_free);
+        frame_unlock(frame);
+        *out_chunk = ptr;
+    }
+    if (lock) blosc2_pthread_mutex_unlock(lock);
+    return rc;
+}
 
 static me_status storage_error(me_error *error, me_status status, const char *message) {
     if (error) {
@@ -68,31 +93,47 @@ static me_status storage_validate_chunks(const storage_input *state,
                                          me_error *error) {
     const b2nd_array_t *a = state->array;
     size_t width = state->itemsize;
+    if (a->sc->frame && alias_output && alias_output->capacity) {
+        const blosc2_frame_s *frame = (const blosc2_frame_s *)a->sc->frame;
+        if (frame->cframe && frame->len > 0 &&
+            (size_t)frame->len <= UINTPTR_MAX - (uintptr_t)frame->cframe &&
+            (uintptr_t)frame->cframe < (uintptr_t)alias_output->data + alias_output->capacity &&
+            (uintptr_t)alias_output->data < (uintptr_t)frame->cframe + (size_t)frame->len) {
+            return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
+        }
+    }
     for (int64_t c = 0; c < a->sc->nchunks; c++) {
-        const uint8_t *chunk = a->sc->data[c];
+        const uint8_t *chunk = NULL;
+        bool needs_free = false;
+        int rc = storage_fetch_chunk(a, NULL, c, &chunk, &needs_free);
         int32_t nbytes, cbytes, blocksize;
-        if (!chunk || blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, &blocksize) < 0 ||
+        if (rc < 0 || !chunk || blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, &blocksize) < 0 ||
             cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
             (size_t)cbytes > state->bytes + BLOSC2_MAX_OVERHEAD ||
             nbytes != (int32_t)state->bytes ||
             blocksize != (int32_t)(state->block_items * width) ||
             (size_t)cbytes > UINTPTR_MAX - (uintptr_t)chunk) {
+            if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage chunk metadata");
         }
         if (chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width ||
             (chunk[BLOSC2_CHUNK_FLAGS] >> 5) > BLOSC_ZSTD_LIB) {
+            if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk codec");
         }
         for (size_t f = 0; f < BLOSC2_MAX_FILTERS; f++) {
             if (chunk[BLOSC2_CHUNK_FILTER_CODES + f] > BLOSC_DELTA) {
+                if (needs_free) free((void *)chunk);
                 return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk filter");
             }
         }
         if (alias_output && alias_output->capacity &&
             (uintptr_t)chunk < (uintptr_t)alias_output->data + alias_output->capacity &&
             (uintptr_t)alias_output->data < (uintptr_t)chunk + (size_t)cbytes) {
+            if (needs_free) free((void *)chunk);
             return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
         }
+        if (needs_free) free((void *)chunk);
     }
     return ME_SUCCESS;
 }
@@ -105,8 +146,10 @@ static me_status storage_validate(storage_input *state, const b2nd_exec_input_me
         (size_t)a->ndim != meta->ndim || !width || width > 8 ||
         a->dtype_format != DTYPE_NUMPY_FORMAT ||
         !storage_dtype_matches(a->dtype, meta->dtype, width) ||
-        a->sc->typesize != (int32_t)width || a->sc->frame ||
-        (a->sc->nchunks && !a->sc->data) || a->sc->compcode > BLOSC_ZSTD) {
+        a->sc->typesize != (int32_t)width ||
+        (!a->sc->frame && a->sc->nchunks && !a->sc->data) ||
+        (a->sc->frame && ((const blosc2_frame_s *)a->sc->frame)->schunk != a->sc) ||
+        a->sc->compcode > BLOSC_ZSTD) {
         return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported native storage binding");
     }
     blosc2_dparams params;
@@ -159,17 +202,20 @@ static me_status storage_decode_chunk(storage_input *state, size_t chunk,
     }
     const b2nd_array_t *a = state->array;
     size_t width = state->itemsize;
-    /* The admitted in-memory representation owns these bytes. Avoid
-     * schunk_get_chunk: it mutates shared current_nchunk even here. */
-    const uint8_t *encoded = a->sc->data[chunk];
+    /* Fetch without mutating schunk->current_nchunk; serialize frame reads via frame_mutex. */
+    const uint8_t *encoded = NULL;
+    bool needs_free = false;
+    int fetch_rc = storage_fetch_chunk(a, state->frame_mutex, (int64_t)chunk, &encoded, &needs_free);
     int32_t nbytes = 0, cbytes = 0, blocksize = 0;
     int rc = -1;
-    if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
+    if (fetch_rc >= 0 && encoded &&
+        blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
         cbytes >= BLOSC_MIN_HEADER_LENGTH && nbytes == (int32_t)state->bytes &&
         blocksize == (int32_t)(state->block_items * width)) {
         rc = blosc2_decompress_ctx(state->dctx, encoded, cbytes,
                                    state->decoded, (int32_t)state->bytes);
     }
+    if (needs_free) free((void *)encoded);
     if (rc != (int32_t)state->bytes) {
         return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
     }
@@ -344,6 +390,8 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, NULL);
     bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
     b2nd_exec_schedule_layout(schedule, 0, NULL, NULL, reduced_axis);
+    blosc2_pthread_mutex_t frame_mutexes[B2ND_EXEC_MAX_INPUTS];
+    bool has_frame_mutex[B2ND_EXEC_MAX_INPUTS];
     storage_input base_states[B2ND_EXEC_MAX_INPUTS] = {0};
     bool is_reader[B2ND_EXEC_MAX_INPUTS] = {0};
     b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS] = {0};
@@ -403,14 +451,29 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         }
     }
     if (ntasks > B2ND_EXEC_MAX_TASKS) return storage_error(error, ME_ERR_INVALID_ARG, "Task limit exceeded");
+    for (size_t i = 0; i < ninputs; i++) {
+        if (ntasks > 1 && is_reader[i] && base_states[i].array->sc->frame) {
+            blosc2_pthread_mutex_init(&frame_mutexes[i], NULL);
+            has_frame_mutex[i] = true;
+            base_states[i].frame_mutex = &frame_mutexes[i];
+        }
+    }
     storage_input *states = calloc(ntasks * ninputs, sizeof(*states));
-    if (!states) return storage_error(error, ME_ERR_OOM, "Cannot allocate storage binding metadata");
+    if (!states) {
+        for (size_t i = 0; i < ninputs; i++) {
+            if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
+        }
+        return storage_error(error, ME_ERR_OOM, "Cannot allocate storage binding metadata");
+    }
     report->storage_metadata_bytes = ntasks * ninputs * sizeof(*states);
     b2nd_exec_reader stack_readers[B2ND_EXEC_MAX_INPUTS] = {0};
     b2nd_exec_reader *readers = stack_readers;
     if (ntasks > 1) {
         readers = calloc(ntasks * ninputs, sizeof(*readers));
         if (!readers) {
+            for (size_t i = 0; i < ninputs; i++) {
+                if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
+            }
             free(states);
             return storage_error(error, ME_ERR_OOM, "Cannot allocate storage reader workspace");
         }
@@ -446,6 +509,9 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         if (states[idx].dctx) blosc2_free_ctx(states[idx].dctx);
         free(states[idx].decoded);
     }
+    for (size_t i = 0; i < ninputs; i++) {
+        if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
+    }
     if (readers != stack_readers) free(readers);
     free(states);
     return status;
@@ -463,6 +529,7 @@ me_status b2nd_exec_execute_arrays(const b2nd_exec_schedule *schedule,
 typedef struct {
     const b2nd_array_t *array;
     blosc2_context *dctx;
+    blosc2_pthread_mutex_t *frame_mutex;
     unsigned char *blocks[STORAGE_BLOCK_CACHE_SLOTS];
     int64_t cached_chunk[STORAGE_BLOCK_CACHE_SLOTS];
     int64_t cached_block[STORAGE_BLOCK_CACHE_SLOTS];
@@ -538,15 +605,20 @@ static me_status storage_read_box_cached(storage_block_cache *cache, size_t dom_
                     slot = s;
                 }
             }
-            const uint8_t *encoded = a->sc->data[chunk];
+            const uint8_t *encoded = NULL;
+            bool needs_free = false;
+            int fetch_rc = storage_fetch_chunk(a, cache->frame_mutex, (int64_t)chunk,
+                                               &encoded, &needs_free);
             int32_t nbytes = 0, cbytes = 0, blocksize = 0;
             int got = -1;
-            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
+            if (fetch_rc >= 0 && encoded &&
+                blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
                 got = blosc2_getitem_ctx(cache->dctx, encoded, cbytes,
                                          (int)(block * cache->block_items),
                                          (int)cache->block_items, cache->blocks[slot],
                                          (int32_t)cache->block_bytes);
             }
+            if (needs_free) free((void *)encoded);
             if (got != (int)cache->block_bytes) {
                 return storage_error(error, ME_ERR_EVAL, "Storage block decode failed");
             }
@@ -651,6 +723,7 @@ typedef struct {
     bool is_reader[B2ND_EXEC_MAX_INPUTS];
     bool matched_layout[B2ND_EXEC_MAX_INPUTS];
     bool needed[B2ND_EXEC_MAX_INPUTS];
+    blosc2_pthread_mutex_t *frame_mutex[B2ND_EXEC_MAX_INPUTS];
     b2nd_array_t *output;
     size_t out_block_items;
     size_t out_chunk_grid[B2ND_EXEC_MAX_RANK];
@@ -710,15 +783,20 @@ static int sink_prefilter(blosc2_prefilter_params *p) {
         size_t in_width = sink->input_widths[i];
         size_t live_bytes = valid_nitems * in_width;
         if (sink->is_reader[i] && sink->matched_layout[i]) {
-            const uint8_t *encoded = sink->arrays[i]->sc->data[sink->current_chunk];
+            const uint8_t *encoded = NULL;
+            bool needs_free = false;
+            int fetch_rc = storage_fetch_chunk(sink->arrays[i], sink->frame_mutex[i],
+                                               sink->current_chunk, &encoded, &needs_free);
             int32_t nbytes = 0, cbytes = 0, blocksize = 0;
             int got = -1;
-            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
+            if (fetch_rc >= 0 && encoded &&
+                blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
                 got = blosc2_getitem_ctx(w->dctx[i], encoded, cbytes,
                                          (int)(p->nblock * (int32_t)sink->out_block_items),
                                          (int)sink->out_block_items, w->in_buf[i],
                                          (int32_t)(sink->out_block_items * in_width));
             }
+            if (needs_free) free((void *)encoded);
             w->read_spans++;
             if (got != (int)(sink->out_block_items * in_width)) {
                 w->status = storage_error(&w->error, ME_ERR_EVAL, "Storage block decode failed");
@@ -813,7 +891,9 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         (size_t)output->ndim != sched_info.output_ndim || !out_width || out_width > 8 ||
         output->dtype_format != DTYPE_NUMPY_FORMAT ||
         !storage_dtype_matches(output->dtype, plan_info.dtype, out_width) ||
-        output->sc->typesize != (int32_t)out_width || output->sc->frame || !output->sc->cctx) {
+        output->sc->typesize != (int32_t)out_width ||
+        (output->sc->frame && ((const blosc2_frame_s *)output->sc->frame)->schunk != output->sc) ||
+        !output->sc->cctx) {
         return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported compressed sink destination");
     }
     blosc2_cparams cparams;
@@ -880,7 +960,13 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         sink.input_widths[i] = meta.itemsize;
         const b2nd_array_t *arr = arrays ? arrays[i] : NULL;
         if (arr) {
-            if (arr == output || arr->sc == output->sc) {
+            if (arr == output || arr->sc == output->sc ||
+                (arr->sc->frame && output->sc->frame &&
+                 (arr->sc->frame == output->sc->frame ||
+                  (((const blosc2_frame_s *)arr->sc->frame)->urlpath &&
+                   ((const blosc2_frame_s *)output->sc->frame)->urlpath &&
+                   strcmp(((const blosc2_frame_s *)arr->sc->frame)->urlpath,
+                          ((const blosc2_frame_s *)output->sc->frame)->urlpath) == 0)))) {
                 return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
             }
             sink.is_reader[i] = true;
@@ -916,7 +1002,16 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         } else if (views) {
             status = b2nd_exec_validate_view(schedule, i, &views[i], error);
             if (status != ME_SUCCESS) return status;
-            if (views[i].capacity && output->sc->data) {
+            if (views[i].capacity && output->sc->frame) {
+                const blosc2_frame_s *out_frame = (const blosc2_frame_s *)output->sc->frame;
+                if (out_frame->cframe && out_frame->len > 0 &&
+                    (size_t)out_frame->len <= UINTPTR_MAX - (uintptr_t)out_frame->cframe &&
+                    (uintptr_t)out_frame->cframe < (uintptr_t)views[i].base + views[i].capacity &&
+                    (uintptr_t)views[i].base < (uintptr_t)out_frame->cframe + (size_t)out_frame->len) {
+                    return storage_error(error, ME_ERR_UNSUPPORTED,
+                                         "Aliased compressed storage output");
+                }
+            } else if (views[i].capacity && output->sc->data) {
                 for (int64_t c = 0; c < output->sc->nchunks; c++) {
                     const uint8_t *chunk = output->sc->data[c];
                     int32_t nb = 0, cb = 0, bs = 0;
@@ -1012,9 +1107,22 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         if (!grew) break;
     }
 
+    blosc2_pthread_mutex_t frame_mutexes[B2ND_EXEC_MAX_INPUTS];
+    bool has_frame_mutex[B2ND_EXEC_MAX_INPUTS];
+    memset(has_frame_mutex, 0, sizeof(has_frame_mutex));
+    for (size_t i = 0; i < ninputs; i++) {
+        if (nworkers > 1 && sink.needed[i] && sink.is_reader[i] && arrays[i]->sc->frame) {
+            blosc2_pthread_mutex_init(&frame_mutexes[i], NULL);
+            has_frame_mutex[i] = true;
+            sink.frame_mutex[i] = &frame_mutexes[i];
+        }
+    }
     sink.nworkers = nworkers;
     sink.workers = calloc(nworkers, sizeof(*sink.workers));
     if (!sink.workers) {
+        for (size_t i = 0; i < ninputs; i++) {
+            if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
+        }
         return storage_error(error, ME_ERR_OOM, "Cannot allocate sink worker metadata");
     }
     report->storage_metadata_bytes = nworkers * sizeof(*sink.workers);
@@ -1052,6 +1160,7 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
             } else if (sink.is_reader[i]) {
                 storage_block_cache *bc = &sw->bcaches[i];
                 bc->array = base_states[i].array;
+                bc->frame_mutex = sink.frame_mutex[i];
                 bc->itemsize = in_width;
                 bc->block_items = base_states[i].block_items;
                 bc->block_bytes = base_states[i].block_items * in_width;
@@ -1165,6 +1274,9 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         free(sw->map_buf);
     }
     free(sink.workers);
+    for (size_t i = 0; i < ninputs; i++) {
+        if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
+    }
     if (any_fp) {
         report->execution.fp.supported = all_supported;
     } else if (raise_mask != 0) {

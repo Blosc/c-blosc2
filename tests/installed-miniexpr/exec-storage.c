@@ -458,6 +458,149 @@ int main(void) {
         b2nd_free(out_match); b2nd_free(out_mis);
     }
 
+    {
+        /* Frame-backed (cframe & urlpath) inputs/sinks + argmin/argmax + var/std. */
+        double fx[35], fy[35];
+        for (size_t i = 0; i < 35; i++) {
+            fx[i] = (double)((i * 7) % 13) - 4.0;
+            fy[i] = (double)(i % 5) * 0.5;
+        }
+        fx[3] = -0.0; fx[9] = 0.0; fx[17] = -4.0;
+        blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+        cp.typesize = 8;
+        blosc2_storage st_cf = {.contiguous = true, .cparams = &cp};
+#ifdef STORAGE_FAULT_TEST
+        const char *p_in = "/tmp/b2_exec_storage_fault_in.b2nd";
+        const char *p_out = "/tmp/b2_exec_storage_fault_out.b2nd";
+#else
+        const char *p_in = "/tmp/b2_exec_storage_test_in.b2nd";
+        const char *p_out = "/tmp/b2_exec_storage_test_out.b2nd";
+#endif
+        remove(p_in); remove(p_out);
+        blosc2_storage st_disk_in = {.contiguous = true, .urlpath = (char *)p_in, .cparams = &cp};
+        blosc2_storage st_disk_out = {.contiguous = true, .urlpath = (char *)p_out, .cparams = &cp};
+        b2nd_context_t *c_cf = b2nd_create_ctx(&st_cf, 2, shape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_context_t *c_din = b2nd_create_ctx(&st_disk_in, 2, shape, chunks[1], blocks[1], "=f8", 0, NULL, 0);
+        b2nd_context_t *c_dout = b2nd_create_ctx(&st_disk_out, 2, shape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_array_t *acf = NULL, *adin = NULL, *adout = NULL, *ocf = NULL;
+        assert(c_cf && c_din && c_dout);
+        assert(b2nd_from_cbuffer(c_cf, &acf, fx, sizeof(fx)) == 0);
+        assert(b2nd_from_cbuffer(c_din, &adin, fy, sizeof(fy)) == 0);
+        assert(b2nd_uninit(c_cf, &ocf) == 0);
+        assert(b2nd_uninit(c_dout, &adout) == 0);
+        b2nd_free_ctx(c_cf); b2nd_free_ctx(c_din); b2nd_free_ctx(c_dout);
+        assert(acf->sc->frame && adin->sc->frame && adout->sc->frame && ocf->sc->frame);
+
+        b2nd_exec_node fn[3] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT), make_node(2, B2ND_EXEC_ADD)};
+        fn[0].dtype = ME_FLOAT64; fn[0].itemsize = 8;
+        fn[1].slot = 1; fn[1].dtype = ME_FLOAT64; fn[1].itemsize = 8;
+        fn[2].nargs = 2; fn[2].args[1] = 1;
+        b2nd_exec_descriptor fd = {sizeof(fd), fn, 3, 2, 2};
+        b2nd_exec_plan *fp = NULL;
+        me_error ferr;
+        assert(b2nd_exec_prepare(&fd, NULL, &fp, &ferr) == ME_SUCCESS);
+        b2nd_exec_input_meta fm[] = {{ME_FLOAT64, 8, 2, {5, 7}}, {ME_FLOAT64, 8, 2, {5, 7}}};
+        b2nd_exec_schedule *fs = NULL;
+        assert(b2nd_exec_specialize(fp, fm, 2, 8, 64, &fs, &ferr) == ME_SUCCESS);
+
+        const b2nd_array_t *fin[] = {acf, adin};
+        b2nd_exec_storage_report fsr;
+        b2nd_exec_jobs fj = {sizeof(fj), 3, 65536};
+        size_t fdec = (size_t)(acf->extchunknitems + adin->extchunknitems) * 8 * 4;
+        double fout[35], got_cf[35], got_disk[35];
+        int64_t cnc0 = acf->sc->current_nchunk, cnc1 = adin->sc->current_nchunk;
+        assert(b2nd_exec_execute_arrays_ex(fs, fin, NULL, 2, (me_mut_buffer){fout, sizeof(fout)},
+            0, fdec, 128, &fj, &fsr, &ferr) == ME_SUCCESS);
+        assert(acf->sc->current_nchunk == cnc0 && adin->sc->current_nchunk == cnc1);
+        for (size_t i = 0; i < 35; i++) assert(fout[i] == fx[i] + fy[i]);
+
+        assert(b2nd_exec_execute_to_array(fs, fin, NULL, 2, ocf, 0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+        assert(b2nd_to_cbuffer(ocf, got_cf, sizeof(got_cf)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got_cf[i] == fx[i] + fy[i]);
+
+        assert(b2nd_exec_execute_to_array(fs, fin, NULL, 2, adout, 0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+        assert(b2nd_to_cbuffer(adout, got_disk, sizeof(got_disk)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got_disk[i] == fx[i] + fy[i]);
+
+        const b2nd_array_t *falias[] = {acf, adin};
+        assert(b2nd_exec_execute_to_array(fs, falias, NULL, 2, acf, 0, fdec, 64, NULL, &fsr, &ferr) == ME_ERR_UNSUPPORTED);
+        b2nd_exec_schedule_free(fs); b2nd_exec_plan_free(fp);
+
+        const b2nd_array_t *p_acf = acf;
+        /* Arg-extrema: ties choose earliest, parallel matches resident views, partial-axis supported. */
+        for (int is_min = 0; is_min <= 1; is_min++) {
+            b2nd_exec_node an[2] = {
+                make_node(0, B2ND_EXEC_INPUT),
+                make_node(1, is_min ? B2ND_EXEC_ARGMIN : B2ND_EXEC_ARGMAX)};
+            an[0].dtype = ME_FLOAT64; an[0].itemsize = 8;
+            an[1].nargs = 1; an[1].args[0] = 0;
+            b2nd_exec_descriptor ad = {sizeof(ad), an, 2, 1, 1};
+            b2nd_exec_plan *ap = NULL;
+            b2nd_exec_schedule *as = NULL;
+            assert(b2nd_exec_prepare(&ad, NULL, &ap, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_specialize(ap, &fm[0], 1, 6, 64, &as, &ferr) == ME_SUCCESS);
+            int64_t idx_res = -1, idx_b2 = -1;
+            b2nd_exec_view vfx = {sizeof(vfx), fx, sizeof(fx), 0, {56, 8}, 0};
+            b2nd_exec_report vr;
+            assert(b2nd_exec_execute_views(as, &vfx, 1, (me_mut_buffer){&idx_res, sizeof(idx_res)},
+                0, 64, &fj, &vr, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_execute_arrays_ex(as, &p_acf, NULL, 1, (me_mut_buffer){&idx_b2, sizeof(idx_b2)},
+                0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+            assert(idx_res == idx_b2 && idx_b2 == (is_min ? 0 : 11));
+            b2nd_exec_schedule_free(as); b2nd_exec_plan_free(ap);
+
+            an[1].has_axes = true; an[1].naxes = 1; an[1].axes[0] = 0;
+            assert(b2nd_exec_prepare(&ad, NULL, &ap, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_specialize(ap, &fm[0], 1, 2, 64, &as, &ferr) == ME_SUCCESS);
+            int64_t pidx_res[7], pidx_b2[7];
+            assert(b2nd_exec_execute_views(as, &vfx, 1, (me_mut_buffer){pidx_res, sizeof(pidx_res)},
+                0, 64, &fj, &vr, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_execute_arrays_ex(as, &p_acf, NULL, 1, (me_mut_buffer){pidx_b2, sizeof(pidx_b2)},
+                0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+            assert(!memcmp(pidx_res, pidx_b2, sizeof(pidx_res)));
+            b2nd_exec_schedule_free(as); b2nd_exec_plan_free(ap);
+        }
+
+        /* Moments: var/std with ddof=0 & ddof=1, parallel whole-domain & partial-axis. */
+        for (int is_std = 0; is_std <= 1; is_std++) {
+            b2nd_exec_node mn2[2] = {
+                make_node(0, B2ND_EXEC_INPUT),
+                make_node(1, is_std ? B2ND_EXEC_STD : B2ND_EXEC_VAR)};
+            mn2[0].dtype = ME_FLOAT64; mn2[0].itemsize = 8;
+            mn2[1].nargs = 1; mn2[1].args[0] = 0;
+            mn2[1].ddof = is_std ? 1.0 : 0.0;
+            b2nd_exec_descriptor md2 = {sizeof(md2), mn2, 2, 1, 1};
+            b2nd_exec_plan *mp2 = NULL;
+            b2nd_exec_schedule *ms2 = NULL;
+            assert(b2nd_exec_prepare(&md2, NULL, &mp2, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_specialize(mp2, &fm[0], 1, 6, 64, &ms2, &ferr) == ME_SUCCESS);
+            double mv_res = 0.0, mv_b2 = 0.0;
+            b2nd_exec_view vfx = {sizeof(vfx), fx, sizeof(fx), 0, {56, 8}, 0};
+            b2nd_exec_report vr;
+            assert(b2nd_exec_execute_views(ms2, &vfx, 1, (me_mut_buffer){&mv_res, sizeof(mv_res)},
+                0, 64, &fj, &vr, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_execute_arrays_ex(ms2, &p_acf, NULL, 1, (me_mut_buffer){&mv_b2, sizeof(mv_b2)},
+                0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+            assert(mv_res == mv_b2);
+            b2nd_exec_schedule_free(ms2); b2nd_exec_plan_free(mp2);
+
+            mn2[1].has_axes = true; mn2[1].naxes = 1; mn2[1].axes[0] = 1; mn2[1].keepdims = true;
+            assert(b2nd_exec_prepare(&md2, NULL, &mp2, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_specialize(mp2, &fm[0], 1, 3, 64, &ms2, &ferr) == ME_SUCCESS);
+            double pmv_res[5], pmv_b2[5];
+            assert(b2nd_exec_execute_views(ms2, &vfx, 1, (me_mut_buffer){pmv_res, sizeof(pmv_res)},
+                0, 64, &fj, &vr, &ferr) == ME_SUCCESS);
+            assert(b2nd_exec_execute_arrays_ex(ms2, &p_acf, NULL, 1, (me_mut_buffer){pmv_b2, sizeof(pmv_b2)},
+                0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
+            assert(!memcmp(pmv_res, pmv_b2, sizeof(pmv_res)));
+            b2nd_exec_schedule_free(ms2); b2nd_exec_plan_free(mp2);
+        }
+
+        b2nd_free(acf); b2nd_free(adin); b2nd_free(ocf); b2nd_free(adout);
+        remove(p_in); remove(p_out);
+    }
+
     blosc2_destroy();
     return 0;
 }

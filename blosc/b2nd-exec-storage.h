@@ -14,14 +14,14 @@ typedef struct {
     size_t read_spans; /* Attempted logical span reads, including a failing span. */
 } b2nd_exec_storage_report;
 
-/* In-memory native numeric chunked arrays (with right-aligned N-D broadcasting
- * and optional mixed resident views when `arrays[i]` is NULL and `views != NULL`).
- * Admits maps, whole-domain/partial-axis reductions, and elementwise compressed
- * sinks (`b2nd_exec_execute_to_array`). Frame-backed sources/sinks remain deferred.
- * Arrays/schunk metadata and contents must remain unchanged for the call.
- * Decode and gather/mapped budgets are independent; all preflight precedes
- * compressed reads or sink writes. Each worker owns single-thread codec contexts
- * and private decode caches without mutating shared array/context state. */
+/* In-memory or frame-backed native numeric chunked arrays (with right-aligned N-D
+ * broadcasting and optional mixed resident views when `arrays[i]` is NULL and
+ * `views != NULL`). Admits maps, whole-domain/partial-axis reductions (including
+ * moments and arg-extrema), and elementwise compressed sinks
+ * (`b2nd_exec_execute_to_array`). Arrays/schunk metadata and contents must remain
+ * unchanged for the call. Decode and gather/mapped budgets are independent; all
+ * preflight precedes compressed reads or sink writes. Each worker owns single-thread
+ * codec contexts and private decode caches without mutating shared `current_nchunk`. */
 me_status b2nd_exec_execute_arrays(const b2nd_exec_schedule *schedule,
                                   const b2nd_array_t *const *inputs, size_t ninputs,
                                   me_mut_buffer output, unsigned raise_mask,
