@@ -513,6 +513,7 @@ me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *ou
         return ME_ERR_INVALID_ARG;
     }
     *out = plan->info;
+    out->has_jit = me_kernel_has_jit(plan->kernel);
     return ME_SUCCESS;
 }
 
@@ -929,6 +930,7 @@ typedef struct {
     bool has_init_state;
     uint64_t partial;
     size_t tiles, map_calls, direct_tiles, gathered_bytes;
+    size_t interpreter_calls, jit_calls;
     me_fp_status fp;
     bool fp_seen;
     bool fp_scoped;
@@ -1113,8 +1115,11 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
      * reducer flags. A raise mask must not truncate later tiles. */
     options.raise_mask = 0;
     void *target = (plan->info.reduction || job->scatter) ? job->mapped : direct_out;
-    job->status = me_eval_block(plan->kernel, spans, job->ninputs,
-        (me_mut_buffer){target, count * map_width}, &block, &options, &job->error);
+    me_execution_backend backend = ME_BACKEND_NONE;
+    job->status = me_eval_block_backend(plan->kernel, spans, job->ninputs,
+        (me_mut_buffer){target, count * map_width}, &block, &options, &backend, &job->error);
+    job->interpreter_calls += backend == ME_BACKEND_INTERPRETER;
+    job->jit_calls += backend == ME_BACKEND_JIT;
     job->fp.flags |= fp.flags;
     job->fp.supported = job->fp_seen ? job->fp.supported && fp.supported : fp.supported;
     job->fp_seen = true;
@@ -1273,6 +1278,8 @@ static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t 
     for (size_t i = 0; i < ntasks; i++) {
         report->tiles += jobs[i].tiles;
         report->map_calls += jobs[i].map_calls;
+        report->interpreter_calls += jobs[i].interpreter_calls;
+        report->jit_calls += jobs[i].jit_calls;
         report->direct_tiles += jobs[i].direct_tiles;
         report->gathered_bytes += jobs[i].gathered_bytes;
         report->fp.flags |= jobs[i].fp.flags;
@@ -1456,7 +1463,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
             single_group_acc && (plan->info.has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
             single_group_acc ? initial_val : identity_val,
-            0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}};
+            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {

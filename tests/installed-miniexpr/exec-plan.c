@@ -4,6 +4,7 @@
 #include <fenv.h>
 #include <float.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,7 +29,68 @@ static double scalar_value(me_dtype dtype, uint64_t bits) {
     double value; memcpy(&value, &bits, sizeof(value)); return value;
 }
 
-int main(void) {
+static void backend_contracts(bool require_jit) {
+    b2nd_exec_node nodes[3];
+    nodes[0] = node(0, B2ND_EXEC_INPUT);
+    nodes[0].dtype = ME_FLOAT64;
+    nodes[0].itemsize = sizeof(double);
+    nodes[1] = node(1, B2ND_EXEC_NEGATE);
+    nodes[1].nargs = 1;
+    nodes[1].args[0] = 0;
+    nodes[2] = node(2, B2ND_EXEC_MIN);
+    nodes[2].nargs = 1;
+    nodes[2].args[0] = 1;
+    b2nd_exec_descriptor descriptor = {sizeof(descriptor), nodes, 3, 1, 2};
+    b2nd_exec_input_meta meta = {ME_FLOAT64, sizeof(double), 1, {17}};
+    double values[17], result;
+    for (size_t i = 0; i < 17; i++) values[i] = (double)i;
+    me_buffer input = {values, sizeof(values)};
+    for (int policy = ME_EXEC_INTERPRET;
+         policy <= (require_jit ? ME_EXEC_REQUIRE_JIT : ME_EXEC_PREFER_JIT); policy++) {
+        b2nd_exec_options options = B2ND_EXEC_OPTIONS_INITIALIZER;
+        options.execution = (me_execution_policy)policy;
+        b2nd_exec_plan *plan = NULL;
+        b2nd_exec_schedule *schedule = NULL;
+        b2nd_exec_plan_info info;
+        b2nd_exec_report report;
+        me_error error;
+        me_status status = b2nd_exec_prepare(&descriptor, &options, &plan, &error);
+        if (status != ME_SUCCESS) {
+            fprintf(stderr, "Backend policy %d: %s\n", policy, error.message);
+        }
+        assert(status == ME_SUCCESS);
+        assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
+        assert(policy != ME_EXEC_INTERPRET || !info.has_jit);
+        assert(policy != ME_EXEC_REQUIRE_JIT || info.has_jit);
+        assert(b2nd_exec_specialize(plan, &meta, 1, 4, 32, &schedule, &error) == ME_SUCCESS);
+        b2nd_exec_jobs jobs = {sizeof(jobs), 3, 96};
+        assert(b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){&result, sizeof(result)}, 0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(result == -16 && report.map_calls == 5);
+        assert(report.jit_calls == (info.has_jit ? 5u : 0u));
+        assert(report.interpreter_calls == (info.has_jit ? 0u : 5u));
+        /* Identity traversal must not claim JIT use merely because its
+         * prepared numerical kernel has generated code available. */
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+        descriptor.root = 0;
+        descriptor.nnodes = 1;
+        assert(b2nd_exec_prepare(&descriptor, &options, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(plan, &meta, 1, 4, 0, &schedule, &error) == ME_SUCCESS);
+        double copied[17];
+        assert(b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){copied, sizeof(copied)}, 0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(!memcmp(copied, values, sizeof(values)));
+        assert(report.direct_tiles == 5 && !report.jit_calls && !report.interpreter_calls);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+        descriptor.root = 2;
+        descriptor.nnodes = 3;
+    }
+}
+
+int main(int argc, char **argv) {
+    backend_contracts(argc > 1 && !strcmp(argv[1], "--require-jit"));
     /* The shared scope restores caller rounding/flags and nests collectors. */
 #ifndef __EMSCRIPTEN__
     int rounding = fegetround();

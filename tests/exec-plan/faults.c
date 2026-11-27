@@ -1,6 +1,24 @@
 /* Fail each allocation owned by the new planner, independently of core tests. */
 #include <assert.h>
 #include <stdlib.h>
+#ifndef _WIN32
+#include <pthread.h>
+#include <errno.h>
+static size_t submissions, submission_fail_at, joins;
+static int fault_pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                                void *(*start)(void *), void *arg) {
+    if (++submissions == submission_fail_at) {
+        return EAGAIN;
+    }
+    return pthread_create(thread, attr, start, arg);
+}
+static int fault_pthread_join(pthread_t thread, void **value) {
+    joins++;
+    return pthread_join(thread, value);
+}
+#define pthread_create fault_pthread_create
+#define pthread_join fault_pthread_join
+#endif
 
 static size_t allocations, fail_at;
 static void *fault_malloc(size_t size) {
@@ -14,6 +32,10 @@ static void *fault_calloc(size_t count, size_t size) {
 #include "../../blosc/b2nd-exec.c"
 #undef malloc
 #undef calloc
+#ifndef _WIN32
+#undef pthread_create
+#undef pthread_join
+#endif
 
 int main(void) {
     b2nd_exec_node node = {0};
@@ -68,6 +90,27 @@ int main(void) {
     assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){output, sizeof(output)},
         0, NULL, &report, &error) == ME_ERR_OOM);
     assert(!report.tiles && ((unsigned char *)output)[0] == 0x55);
+#ifndef _WIN32
+    /* Submission failure must join all earlier tasks, publish no reduction,
+     * retain accurate route counters, and never replay the invocation. */
+    fail_at = 0;
+    b2nd_exec_jobs jobs = {sizeof(jobs), 3, 192};
+    for (size_t failure = 1; failure <= 3; failure++) {
+        submissions = joins = 0;
+        submission_fail_at = failure;
+        assert(b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){output, sizeof(output)}, 0, &jobs, &report, &error) == ME_ERR_UNSUPPORTED);
+        assert(submissions == failure && joins == failure - 1);
+        assert(report.tasks == failure - 1 && report.tiles == failure - 1);
+        assert(report.interpreter_calls == failure - 1 && !report.jit_calls);
+        assert(((unsigned char *)output)[0] == 0x55);
+    }
+    submissions = joins = submission_fail_at = 0;
+    assert(b2nd_exec_execute(schedule, &input, 1,
+        (me_mut_buffer){output, sizeof(output)}, 0, &jobs, &report, &error) == ME_SUCCESS);
+    assert(submissions == 3 && joins == 3 && report.tiles == 3 && output[0] == 0);
+    memset(output, 0x55, sizeof(output));
+#endif
     /* Inject OOM across mapped, gather and job allocations for strided views. */
     b2nd_exec_view strided = {sizeof(strided), values, sizeof(values), 0, {8}, 0};
     b2nd_exec_schedule *strided_schedule = NULL;

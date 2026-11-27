@@ -25,6 +25,9 @@
 #ifndef ME_PAIRWISE_SUM_API
 #error "The typed executor requires miniexpr pairwise sum primitives"
 #endif
+#ifndef ME_KERNEL_BACKEND_INFO_API
+#error "The typed executor requires miniexpr invocation backend reporting"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
@@ -121,6 +124,7 @@ typedef struct {
     int axes[B2ND_EXEC_MAX_RANK];
     bool keepdims;
     bool has_initial;
+    bool has_jit; /* Prepared availability, not proof that an invocation used JIT. */
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -151,6 +155,8 @@ typedef struct {
     size_t gather_bytes; /* Per-job gather scratch allocation. */
     size_t gathered_bytes;
     size_t staging_bytes; /* Separate transactional alias staging buffer, if used. */
+    size_t interpreter_calls; /* Map routes entered, including failed calls. */
+    size_t jit_calls;
 } b2nd_exec_report;
 
 /* Writable, native-endian, provably injective destination view. */

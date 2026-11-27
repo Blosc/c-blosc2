@@ -53,6 +53,13 @@ cmake --build <build>
 ctest --test-dir <build> --output-on-failure
 ```
 
+Add `-DEXEC_PLAN_TEST_JIT=ON` to require a working system compiler (`cc`) in
+the optional backend fixture. Prepared `has_jit` availability and actual
+`interpreter_calls` / `jit_calls` are separate diagnostics: identity traversal
+increments neither call counter. Backend counters record entered map routes
+even on failure, whereas `map_calls` counts successful calls. Task-start fault
+injection verifies joins, no reduction publication and recovery without replay.
+
 Use a Debug build (the fixtures use assertions). The installed-miniexpr suite
 also links this fixture against the actual C-Blosc2 static library.
 `faults.c` injects failures in planner-owned allocations; core/compiler
