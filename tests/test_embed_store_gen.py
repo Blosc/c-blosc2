@@ -52,11 +52,15 @@ def gen_v1_msgpack(current_offset: int, items: dict, out_file: str):
     write_packed(out_file, packed)
 
 def gen_v1_embed_store(items: dict, out_file: str):
-    embed_store = blosc2.EmbedStore(out_file, mode="w")
+    cparams = blosc2.CParams( # BLOSCLZ is required so the tests that remove ZSTD (the default Codec) pass without any problem
+        codec=blosc2.Codec.BLOSCLZ,
+        clevel=1,
+    )
+    embed_store = blosc2.EmbedStore(out_file, mode="w", cparams=cparams)
     for k, v in items.items():
         first, second = v
         if isinstance(first, str):
-            embed_store[k] = blosc2.C2Array(first, urlbase=second)
+            embed_store[k] = blosc2.C2Array(first, urlbase=second, cparams=cparams)
         else:
             embed_store[k] = np.arange(10)
 
@@ -95,8 +99,3 @@ if __name__ == "__main__":
     gen_v1_msgpack(816, gen_items, "test_embed_store_v1.msgpack")
     gen_v1_embed_store(gen_items, "test_embed_store_v1.b2e")
     gen_v2_msgpack("test_embed_store.msgpack")
-
-    with open("out_buf.msgpack", mode="rb") as file:
-        buf = file.read()
-
-    print(msgpack.unpackb(buf))
