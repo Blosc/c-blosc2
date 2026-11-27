@@ -68,6 +68,21 @@ int main(void) {
     assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){output, sizeof(output)},
         0, NULL, &report, &error) == ME_ERR_OOM);
     assert(!report.tiles && ((unsigned char *)output)[0] == 0x55);
+    /* Inject OOM across mapped, gather and job allocations for strided views. */
+    b2nd_exec_view strided = {sizeof(strided), values, sizeof(values), 0, {8}, 0};
+    b2nd_exec_schedule *strided_schedule = NULL;
+    b2nd_exec_input_meta half_meta = {ME_INT64, 8, 1, {8}};
+    fail_at = 0;
+    assert(b2nd_exec_specialize(plan, &half_meta, 1, 4, 32, &strided_schedule, &error) == ME_SUCCESS);
+    strided.strides[0] = 16;
+    for (size_t failure = 1; failure <= 3; failure++) {
+        allocations = 0;
+        fail_at = failure;
+        assert(b2nd_exec_execute_views(strided_schedule, &strided, 1,
+            (me_mut_buffer){output, sizeof(output)}, 0, 32, NULL, &report, &error) == ME_ERR_OOM);
+        assert(!report.tiles && ((unsigned char *)output)[0] == 0x55);
+    }
+    b2nd_exec_schedule_free(strided_schedule);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
     return 0;

@@ -89,7 +89,7 @@ int main(void) {
     assert(b2nd_exec_prepare(&d, &options, &plan, &error) == ME_SUCCESS);
     b2nd_exec_plan_info info;
     assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
-    assert(info.dtype == ME_INT64 && info.reduction && !info.identity && info.ninputs == 2);
+    assert(info.dtype == ME_INT64 && info.reduction && !info.identity && info.ninputs == 2 && info.partitionable);
     b2nd_exec_input_meta metadata[2] = {
         {ME_INT64, 8, 1, {17}}, {ME_INT64, 8, 1, {17}}
     };
@@ -415,10 +415,14 @@ int main(void) {
     assert(kernel);
     assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_NONE, &plan, &error) == ME_SUCCESS);
     assert(!kernel);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && !info.partitionable);
     b2nd_exec_input_meta direct_meta = {ME_INT64, 8, 1, {3}};
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
     int64_t direct_input[] = {7, -2, 5}, direct_output[3];
     me_buffer direct_buffer = {direct_input, sizeof(direct_input)};
+    b2nd_exec_jobs direct_jobs = {sizeof(direct_jobs), 2, 0};
+    assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
+        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &direct_jobs, &report, &error) == ME_ERR_UNSUPPORTED);
     assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
         (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
     assert(direct_output[0] == 14 && direct_output[1] == -4 && direct_output[2] == 10);
@@ -440,6 +444,246 @@ int main(void) {
     assert(!report.tiles && !report.map_calls);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
+
+    /* Narrow-integer sum/prod overflow past input dtype width. */
+    {
+        int8_t i8_ones[200];
+        uint8_t u8_ones[300];
+        uint8_t bool_ones[256];
+        int8_t i8_twos[10];
+        for (size_t i = 0; i < 200; i++) i8_ones[i] = 1;
+        for (size_t i = 0; i < 300; i++) u8_ones[i] = 1;
+        for (size_t i = 0; i < 256; i++) bool_ones[i] = 1;
+        for (size_t i = 0; i < 10; i++) i8_twos[i] = 2;
+        b2nd_exec_node narrow[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        narrow[1].nargs = 1;
+        narrow[1].args[0] = 0;
+        b2nd_exec_descriptor nd = {sizeof(nd), narrow, 2, 1, 1};
+
+        narrow[0].dtype = ME_INT8;
+        narrow[0].itemsize = 1;
+        assert(b2nd_exec_prepare(&nd, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta nm = {ME_INT8, 1, 1, {200}};
+        assert(b2nd_exec_specialize(plan, &nm, 1, 64, 0, &schedule, &error) == ME_SUCCESS);
+        int64_t s_out = 0;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){i8_ones, sizeof(i8_ones)}, 1,
+            (me_mut_buffer){&s_out, sizeof(s_out)}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(s_out == 200);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        narrow[0].dtype = ME_UINT8;
+        assert(b2nd_exec_prepare(&nd, NULL, &plan, &error) == ME_SUCCESS);
+        nm.dtype = ME_UINT8;
+        nm.shape[0] = 300;
+        assert(b2nd_exec_specialize(plan, &nm, 1, 64, 0, &schedule, &error) == ME_SUCCESS);
+        uint64_t u_out = 0;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){u8_ones, sizeof(u8_ones)}, 1,
+            (me_mut_buffer){&u_out, sizeof(u_out)}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(u_out == 300);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        narrow[0].dtype = ME_BOOL;
+        assert(b2nd_exec_prepare(&nd, NULL, &plan, &error) == ME_SUCCESS);
+        nm.dtype = ME_BOOL;
+        nm.shape[0] = 256;
+        assert(b2nd_exec_specialize(plan, &nm, 1, 64, 0, &schedule, &error) == ME_SUCCESS);
+        s_out = 0;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){bool_ones, sizeof(bool_ones)}, 1,
+            (me_mut_buffer){&s_out, sizeof(s_out)}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(s_out == 256);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        narrow[0].dtype = ME_INT8;
+        narrow[1].op = B2ND_EXEC_PROD;
+        assert(b2nd_exec_prepare(&nd, NULL, &plan, &error) == ME_SUCCESS);
+        nm.dtype = ME_INT8;
+        nm.shape[0] = 10;
+        assert(b2nd_exec_specialize(plan, &nm, 1, 4, 0, &schedule, &error) == ME_SUCCESS);
+        s_out = 0;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){i8_twos, sizeof(i8_twos)}, 1,
+            (me_mut_buffer){&s_out, sizeof(s_out)}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(s_out == 1024);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+    }
+
+    /* Truth reductions (any/all), multi-task FP combine, and task cap. */
+    {
+        b2nd_exec_node truth[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_ANY)};
+        truth[0].dtype = ME_FLOAT32;
+        truth[0].itemsize = 4;
+        truth[1].nargs = 1;
+        truth[1].args[0] = 0;
+        b2nd_exec_descriptor td = {sizeof(td), truth, 2, 1, 1};
+        assert(b2nd_exec_prepare(&td, NULL, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS &&
+               info.dtype == ME_BOOL && info.partitionable && info.reducer == ME_REDUCTION_ANY);
+        b2nd_exec_input_meta tm = {ME_FLOAT32, 4, 1, {0}};
+        assert(b2nd_exec_specialize(plan, &tm, 1, 4, 0, &schedule, &error) == ME_SUCCESS);
+        uint8_t b_out = 9;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){NULL, 0}, 1,
+            (me_mut_buffer){&b_out, 1}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(b_out == 0);
+        b2nd_exec_schedule_free(schedule);
+
+        float vals[100];
+        for (size_t i = 0; i < 100; i++) vals[i] = 0.0f;
+        vals[0] = 1.0f;
+#ifndef __EMSCRIPTEN__
+        uint32_t snan_bits = UINT32_C(0x7f800001);
+        memcpy(&vals[99], &snan_bits, sizeof(snan_bits));
+#endif
+        tm.shape[0] = 100;
+        assert(b2nd_exec_specialize(plan, &tm, 1, 1, 0, &schedule, &error) == ME_SUCCESS);
+        b2nd_exec_jobs jobs = {sizeof(jobs), 1000, 0};
+        b_out = 0;
+#ifndef __EMSCRIPTEN__
+        assert(b2nd_exec_execute(schedule, &(me_buffer){vals, sizeof(vals)}, 1,
+            (me_mut_buffer){&b_out, 1}, ME_FP_INVALID, &jobs, &report, &error) == ME_ERR_EVAL);
+        assert(report.tasks <= B2ND_EXEC_MAX_TASKS && report.fp.supported && (report.fp.flags & ME_FP_INVALID));
+#endif
+        vals[99] = 0.0f;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){vals, sizeof(vals)}, 1,
+            (me_mut_buffer){&b_out, 1}, 0, &jobs, &report, &error) == ME_SUCCESS);
+        assert(b_out == 1 && report.tasks == B2ND_EXEC_MAX_TASKS);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        truth[1].op = B2ND_EXEC_ALL;
+        assert(b2nd_exec_prepare(&td, NULL, &plan, &error) == ME_SUCCESS);
+        tm.shape[0] = 0;
+        assert(b2nd_exec_specialize(plan, &tm, 1, 4, 0, &schedule, &error) == ME_SUCCESS);
+        b_out = 9;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){NULL, 0}, 1,
+            (me_mut_buffer){&b_out, 1}, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(b_out == 1);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Multi-task float min checks sNaN and -0.0/+0.0 across tasks. */
+        truth[1].op = B2ND_EXEC_MIN;
+        assert(b2nd_exec_prepare(&td, NULL, &plan, &error) == ME_SUCCESS);
+        tm.shape[0] = 8;
+        assert(b2nd_exec_specialize(plan, &tm, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+        float zvals[8] = {0.0f, 1.0f, 2.0f, 3.0f, -0.0f, 4.0f, 5.0f, 6.0f};
+        float f_out = 99.0f;
+        jobs.workers = 4;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){zvals, sizeof(zvals)}, 1,
+            (me_mut_buffer){&f_out, sizeof(f_out)}, 0, &jobs, &report, &error) == ME_SUCCESS);
+        uint32_t f_bits = 0;
+        memcpy(&f_bits, &f_out, sizeof(f_bits));
+        assert(f_bits == UINT32_C(0x80000000) && report.fp.supported);
+#ifndef __EMSCRIPTEN__
+        memcpy(&zvals[7], &snan_bits, sizeof(snan_bits));
+        f_out = 99.0f;
+        assert(b2nd_exec_execute(schedule, &(me_buffer){zvals, sizeof(zvals)}, 1,
+            (me_mut_buffer){&f_out, sizeof(f_out)}, ME_FP_INVALID, &jobs, &report, &error) == ME_ERR_EVAL);
+        assert(f_out == 99.0f && (report.fp.flags & ME_FP_INVALID));
+#endif
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+    }
+
+    /* Broadcast, strided, reversed, unaligned and byte-swapped views. */
+    {
+        b2nd_exec_node bnodes[3];
+        bnodes[0] = node(0, B2ND_EXEC_INPUT);
+        bnodes[0].dtype = ME_INT32;
+        bnodes[0].itemsize = 4;
+        bnodes[1] = bnodes[0];
+        bnodes[1].id = 1;
+        bnodes[1].slot = 1;
+        bnodes[2] = node(2, B2ND_EXEC_ADD);
+        bnodes[2].nargs = 2;
+        bnodes[2].args[0] = 0;
+        bnodes[2].args[1] = 1;
+        b2nd_exec_descriptor bd = {sizeof(bd), bnodes, 3, 2, 2};
+        assert(b2nd_exec_prepare(&bd, NULL, &plan, &error) == ME_SUCCESS);
+
+        b2nd_exec_input_meta bad_bcast[2] = {
+            {ME_INT32, 4, 2, {3, 2}}, {ME_INT32, 4, 2, {3, 3}}
+        };
+        assert(b2nd_exec_specialize(plan, bad_bcast, 2, 4, 0, &schedule, &error) == ME_ERR_INVALID_ARG);
+
+        b2nd_exec_input_meta bmeta[2] = {
+            {ME_INT32, 4, 2, {3, 1}}, {ME_INT32, 4, 2, {1, 5}}
+        };
+        assert(b2nd_exec_specialize(plan, bmeta, 2, 4, 0, &schedule, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe_schedule(schedule, &geometry) == ME_SUCCESS);
+        assert(geometry.ndim == 2 && geometry.shape[0] == 3 && geometry.shape[1] == 5 &&
+               geometry.nitems == 15 && geometry.broadcast_gather_bytes == 32);
+
+        /* Non-native endianness on input 0 + unaligned offset on input 1. */
+        uint8_t buf0[1 + 3 * 4] = {0};
+        uint8_t buf1[3 + 5 * 8] = {0};
+        uint16_t endian = 1;
+        unsigned non_native = *(const uint8_t *)&endian ? 2u : 1u;
+        for (int32_t i = 0; i < 3; i++) {
+            int32_t val = (i + 1) * 10;
+            uint8_t raw[4];
+            memcpy(raw, &val, 4);
+            for (size_t b = 0; b < 4; b++) {
+                buf0[1 + i * 4 + b] = raw[3 - b];
+            }
+        }
+        for (int32_t j = 0; j < 5; j++) {
+            int32_t val = j + 1;
+            memcpy(buf1 + 3 + (size_t)(4 - j) * 8, &val, 4); /* Reversed stride -8! */
+        }
+        b2nd_exec_view views[2] = {
+            {sizeof(b2nd_exec_view), buf0, sizeof(buf0), 1, {4, 4}, non_native},
+            {sizeof(b2nd_exec_view), buf1, sizeof(buf1), 3 + 4 * 8, {0, -8}, 0}
+        };
+        int32_t b_out[15] = {0};
+        assert(b2nd_exec_execute_views(schedule, views, 2, (me_mut_buffer){b_out, sizeof(b_out)},
+            0, 31, NULL, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(b_out[0] == 0);
+        assert(b2nd_exec_execute_views(schedule, views, 2, (me_mut_buffer){b_out, sizeof(b_out)},
+            0, 32, NULL, &report, &error) == ME_SUCCESS);
+        for (int32_t i = 0; i < 3; i++) {
+            for (int32_t j = 0; j < 5; j++) {
+                assert(b_out[i * 5 + j] == (i + 1) * 10 + (j + 1));
+            }
+        }
+        assert(report.gather_bytes == 32 && report.gathered_bytes == 120);
+
+        /* Forged underflow/overflow views must fail before touching output. */
+        b_out[0] = -99;
+        views[1].offset = 3; /* Reversed stride -8 from offset 3 underflows buf1. */
+        assert(b2nd_exec_execute_views(schedule, views, 2, (me_mut_buffer){b_out, sizeof(b_out)},
+            0, 64, NULL, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(b_out[0] == -99);
+        views[1].offset = 3 + 4 * 8;
+        views[0].capacity -= 1; /* One byte short on last element. */
+        assert(b2nd_exec_execute_views(schedule, views, 2, (me_mut_buffer){b_out, sizeof(b_out)},
+            0, 64, NULL, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(b_out[0] == -99);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Identity reduction over a strided view gathers without map calls. */
+        b2nd_exec_node id_min[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_MIN)};
+        id_min[0].dtype = ME_INT32;
+        id_min[0].itemsize = 4;
+        id_min[1].nargs = 1;
+        id_min[1].args[0] = 0;
+        b2nd_exec_descriptor id_d = {sizeof(id_d), id_min, 2, 1, 1};
+        assert(b2nd_exec_prepare(&id_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta id_meta = {ME_INT32, 4, 1, {4}};
+        assert(b2nd_exec_specialize(plan, &id_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+        int32_t strided_vals[] = {10, -999, 3, -999, -4, -999, 8};
+        b2nd_exec_view sv = {sizeof(sv), strided_vals, sizeof(strided_vals), 0, {8}, 0};
+        int32_t min_res = 0;
+        assert(b2nd_exec_execute_views(schedule, &sv, 1, (me_mut_buffer){&min_res, 4},
+            0, 8, NULL, &report, &error) == ME_SUCCESS);
+        assert(min_res == -4 && report.map_calls == 0 && report.direct_tiles == 2 &&
+               report.gathered_bytes == 16);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+    }
 
     direct_meta = (b2nd_exec_input_meta){ME_INT64, 8, 1, {3}};
     signature.cardinality = ME_BLOCK_SCALAR;

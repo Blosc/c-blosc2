@@ -16,6 +16,12 @@
 #ifndef ME_SERIAL_REDUCE_API
 #error "The typed executor requires miniexpr serial reduction primitives"
 #endif
+#ifndef ME_TRUTH_REDUCE_API
+#error "The typed executor requires miniexpr truth reduction primitives"
+#endif
+#ifndef ME_REDUCE_STORE_SCALAR_API
+#error "The typed executor requires miniexpr scalar store primitives"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
@@ -25,6 +31,7 @@
 #define B2ND_EXEC_MAX_CAPTURES 128
 #define B2ND_EXEC_MAX_DEPTH 128
 #define B2ND_EXEC_MAX_RANK 16
+#define B2ND_EXEC_MAX_TASKS 64
 
 typedef enum {
     B2ND_EXEC_INPUT,
@@ -36,7 +43,9 @@ typedef enum {
     B2ND_EXEC_MIN,
     B2ND_EXEC_SUM,
     B2ND_EXEC_PROD,
-    B2ND_EXEC_MAX
+    B2ND_EXEC_MAX,
+    B2ND_EXEC_ANY,
+    B2ND_EXEC_ALL
 } b2nd_exec_op;
 
 typedef struct {
@@ -88,6 +97,7 @@ typedef struct {
     size_t ninputs;
     bool reduction;
     bool identity;
+    bool partitionable;
     me_cardinality cardinality;
     int context_ndim;
     me_dtype map_dtype;
@@ -103,6 +113,9 @@ typedef struct {
     size_t reducer_bytes;
     size_t output_items;
     size_t schedule_metadata_bytes;
+    size_t ndim;
+    int64_t shape[B2ND_EXEC_MAX_RANK];
+    size_t broadcast_gather_bytes;
 } b2nd_exec_schedule_info;
 
 typedef struct {
@@ -112,8 +125,23 @@ typedef struct {
     size_t mapped_bytes;
     me_fp_status fp;
     size_t tasks;        /* Started jobs, including a serial fallback. */
-    size_t worker_bytes; /* Aggregate mapped tiles actually held this call. */
+    size_t worker_bytes; /* Aggregate mapped + gather scratch actually held this call. */
+    size_t gather_bytes; /* Per-job gather scratch allocation. */
+    size_t gathered_bytes;
 } b2nd_exec_report;
+
+/* Borrowed resident array view. `base` and `capacity` describe the entire
+ * owning allocation; `offset` is the byte offset of element [0, ..., 0]
+ * within [base, base + capacity). `strides` are signed byte strides.
+ * `byte_order`: 0 = native, 1 = little-endian, 2 = big-endian. */
+typedef struct {
+    size_t struct_size;
+    const void *base;
+    size_t capacity;
+    size_t offset;
+    int64_t strides[B2ND_EXEC_MAX_RANK];
+    unsigned byte_order;
+} b2nd_exec_view;
 
 /* Invocation-local job request. Hosts request at most `workers` jobs; the
  * executor decides how many are safe. Aggregate mapped scratch across those
@@ -158,6 +186,15 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
                             me_mut_buffer output, unsigned raise_mask,
                             const b2nd_exec_jobs *jobs,
                             b2nd_exec_report *report, me_error *error);
+/* Resident views supporting N-D broadcasting, arbitrary byte strides,
+ * unaligned offsets and endian conversion via bounded per-job gathering.
+ * Output remains native, aligned, contiguous and disjoint. */
+me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
+                                  const b2nd_exec_view *inputs, size_t ninputs,
+                                  me_mut_buffer output, unsigned raise_mask,
+                                  size_t max_gather_bytes,
+                                  const b2nd_exec_jobs *jobs,
+                                  b2nd_exec_report *report, me_error *error);
 void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule);
 void b2nd_exec_plan_free(b2nd_exec_plan *plan);
 

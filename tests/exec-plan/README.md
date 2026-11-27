@@ -14,14 +14,17 @@ Input values, callbacks and outputs are not part of preparation/specialization.
 The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
-The executor binds native aligned contiguous buffers in slot order.
-Same-shape metadata includes rank-zero scalars and ranked empty map domains;
-empty minimum remains an error. No broadcasting or strided gathering is implied.
-Default whole-domain sum/product/min/max use shared core primitives and
+The executor binds native aligned contiguous buffers in slot order, or
+resident views (`b2nd_exec_execute_views`) supporting N-D right-aligned NumPy
+broadcasting, signed byte strides, unaligned offsets and non-native byte order
+via bounded per-job gather scratch. Same-shape metadata includes rank-zero
+scalars and ranked empty map domains; empty min/max remains an error. No
+arbitrary output strides or aliases are admitted yet.
+Default whole-domain sum/product/min/max/any/all use shared core primitives and
 accumulator typing. Serial sums/products carry accumulator state across tiles;
 tiles are not independently reduced. Narrow integer sums/products return the
 core-resolved 64-bit accumulator dtype while mapped scratch retains map width.
-Empty sum/product identities come from the core. Any/all, explicit accumulator
+Empty sum/product/any/all identities come from the core. Explicit accumulator
 conversions, axes, masks, initial values and pairwise sums remain unadmitted.
 Computed maps feeding a reducer use one bounded mapped tile; disjoint pure maps
 evaluate directly into the destination with zero mapped scratch. Proven identity maps read their
