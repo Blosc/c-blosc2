@@ -239,6 +239,122 @@ int main(void) {
         b2nd_free(af);
     }
 
+    {
+        /* Compressed output sinks: matched layout, mismatched layout, mixed, and preflight rejections. */
+        double y_swap_buf[35];
+        memcpy(y_swap_buf, y, sizeof(y));
+        blosc2_cparams cp64 = BLOSC2_CPARAMS_DEFAULTS;
+        cp64.typesize = 8;
+        blosc2_storage st64 = {.cparams = &cp64};
+        b2nd_array_t *ax = NULL, *ay_match = NULL, *ay_mis = NULL, *out_match = NULL, *out_mis = NULL;
+        b2nd_context_t *cx = b2nd_create_ctx(&st64, 2, shape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_context_t *cy = b2nd_create_ctx(&st64, 2, shape, chunks[1], blocks[1], "=f8", 0, NULL, 0);
+        const int32_t out_c[] = {2, 5}, out_b[] = {2, 2};
+        b2nd_context_t *com = b2nd_create_ctx(&st64, 2, shape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_context_t *co2 = b2nd_create_ctx(&st64, 2, shape, out_c, out_b, "=f8", 0, NULL, 0);
+        assert(cx && cy && com && co2);
+        assert(b2nd_from_cbuffer(cx, &ax, x, sizeof(x)) == 0);
+        assert(b2nd_from_cbuffer(cx, &ay_match, y, sizeof(y)) == 0);
+        assert(b2nd_from_cbuffer(cy, &ay_mis, y, sizeof(y)) == 0);
+        assert(b2nd_uninit(com, &out_match) == 0);
+        assert(b2nd_uninit(co2, &out_mis) == 0);
+        b2nd_free_ctx(cx); b2nd_free_ctx(cy); b2nd_free_ctx(com); b2nd_free_ctx(co2);
+        poison_padding(ax);
+        poison_padding(ay_match);
+        poison_padding(ay_mis);
+
+        b2nd_exec_node sn[3] = {
+            make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_INPUT), make_node(2, B2ND_EXEC_ADD)};
+        sn[0].dtype = ME_FLOAT64; sn[0].itemsize = 8;
+        sn[1].slot = 1; sn[1].dtype = ME_FLOAT64; sn[1].itemsize = 8;
+        sn[2].nargs = 2; sn[2].args[1] = 1;
+        b2nd_exec_descriptor sd = {sizeof(sd), sn, 3, 2, 2};
+        b2nd_exec_plan *sp = NULL;
+        me_error serr;
+        assert(b2nd_exec_prepare(&sd, NULL, &sp, &serr) == ME_SUCCESS);
+        b2nd_exec_input_meta sm[] = {{ME_FLOAT64, 8, 2, {5, 7}}, {ME_FLOAT64, 8, 2, {5, 7}}};
+        b2nd_exec_schedule *ss = NULL;
+        assert(b2nd_exec_specialize(sp, sm, 2, 8, 64, &ss, &serr) == ME_SUCCESS);
+
+        const b2nd_array_t *in_match[] = {ax, ay_match};
+        b2nd_exec_storage_report sr;
+        b2nd_exec_jobs sj = {sizeof(sj), 3, 0};
+        size_t match_dec_b = 2 * (size_t)out_match->blocknitems * 8;
+        assert(b2nd_exec_execute_to_array(ss, in_match, NULL, 2, out_match, 0,
+                                          match_dec_b * 3, 64, &sj, &sr, &serr) == ME_SUCCESS);
+        double got[35];
+        assert(b2nd_to_cbuffer(out_match, got, sizeof(got)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got[i] == x[i] + y_swap_buf[i]);
+        assert(sr.execution.fp.flags == 0 && sr.execution.gather_bytes == 0);
+        assert(sr.decode_bytes == sr.execution.tasks * match_dec_b);
+
+        const b2nd_array_t *in_mis[] = {ax, ay_mis};
+        size_t mis_dec_b = (size_t)(ax->extchunknitems + ay_mis->extchunknitems) * 8;
+        assert(b2nd_exec_execute_to_array(ss, in_mis, NULL, 2, out_mis, 0,
+                                          mis_dec_b * 3, 2 * 4 * 8, &sj, &sr, &serr) == ME_SUCCESS);
+        assert(b2nd_to_cbuffer(out_mis, got, sizeof(got)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got[i] == x[i] + y_swap_buf[i]);
+
+        /* Rejections before sink mutation: tight decode/gather budgets and aliased sink. */
+        assert(b2nd_exec_execute_to_array(ss, in_match, NULL, 2, out_match, 0,
+                                          match_dec_b - 1, 64, NULL, &sr, &serr) == ME_ERR_INVALID_ARG);
+        assert(!sr.decodes);
+        assert(b2nd_exec_execute_to_array(ss, in_mis, NULL, 2, out_mis, 0,
+                                          mis_dec_b, 2 * 4 * 8 - 1, NULL, &sr, &serr) == ME_ERR_INVALID_ARG);
+        assert(!sr.decodes);
+        const b2nd_array_t *alias_in[] = {out_match, ay_match};
+        assert(b2nd_exec_execute_to_array(ss, alias_in, NULL, 2, out_match, 0,
+                                          match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_UNSUPPORTED);
+        assert(!sr.decodes);
+
+        /* Reject reductions cleanly as compressed sink destination. */
+        b2nd_exec_node rn[2] = {make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_MIN)};
+        rn[0].dtype = ME_FLOAT64; rn[0].itemsize = 8;
+        rn[1].nargs = 1; rn[1].args[0] = 0;
+        b2nd_exec_descriptor rd = {sizeof(rd), rn, 2, 1, 1};
+        b2nd_exec_plan *rp = NULL;
+        b2nd_exec_schedule *rs = NULL;
+        assert(b2nd_exec_prepare(&rd, NULL, &rp, &serr) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(rp, sm, 1, 8, 64, &rs, &serr) == ME_SUCCESS);
+        const b2nd_array_t *rin = ax;
+        assert(b2nd_exec_execute_to_array(rs, &rin, NULL, 1, out_match, 0,
+                                          match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_UNSUPPORTED);
+        b2nd_exec_schedule_free(rs); b2nd_exec_plan_free(rp);
+
+        /* Late logical sNaN raises ME_ERR_EVAL when requested. */
+        double x_nan[35];
+        memcpy(x_nan, x, sizeof(x_nan));
+        uint64_t snan = UINT64_C(0x7ff0000000000001);
+        memcpy(&x_nan[34], &snan, sizeof(snan));
+        b2nd_context_t *cnan = b2nd_create_ctx(&st64, 2, shape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_array_t *anan = NULL;
+        assert(cnan && b2nd_from_cbuffer(cnan, &anan, x_nan, sizeof(x_nan)) == 0);
+        b2nd_free_ctx(cnan);
+        const b2nd_array_t *in_nan[] = {anan, ay_match};
+        assert(b2nd_exec_execute_to_array(ss, in_nan, NULL, 2, out_match, ME_FP_INVALID,
+                                          match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_EVAL);
+        assert(sr.execution.fp.flags & ME_FP_INVALID);
+        b2nd_free(anan);
+
+        /* Empty 0-item sink succeeds cleanly. */
+        const int64_t eshape[] = {0, 7};
+        b2nd_context_t *ce = b2nd_create_ctx(&st64, 2, eshape, chunks[0], blocks[0], "=f8", 0, NULL, 0);
+        b2nd_array_t *ae = NULL, *oe = NULL;
+        assert(ce && b2nd_empty(ce, &ae) == 0 && b2nd_uninit(ce, &oe) == 0);
+        b2nd_free_ctx(ce);
+        b2nd_exec_input_meta em[] = {{ME_FLOAT64, 8, 2, {0, 7}}, {ME_FLOAT64, 8, 2, {0, 7}}};
+        b2nd_exec_schedule *es = NULL;
+        assert(b2nd_exec_specialize(sp, em, 2, 8, 64, &es, &serr) == ME_SUCCESS);
+        const b2nd_array_t *ine[] = {ae, ae};
+        assert(b2nd_exec_execute_to_array(es, ine, NULL, 2, oe, 0, 64, 64, NULL, &sr, &serr) == ME_SUCCESS);
+        assert(!sr.decodes && !sr.execution.tiles);
+        b2nd_exec_schedule_free(es); b2nd_free(ae); b2nd_free(oe);
+
+        b2nd_exec_schedule_free(ss); b2nd_exec_plan_free(sp);
+        b2nd_free(ax); b2nd_free(ay_match); b2nd_free(ay_mis);
+        b2nd_free(out_match); b2nd_free(out_mis);
+    }
+
     blosc2_destroy();
     return 0;
 }

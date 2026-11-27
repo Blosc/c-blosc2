@@ -35,4 +35,14 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
                                      size_t max_decode_bytes, size_t max_gather_bytes,
                                      const b2nd_exec_jobs *jobs,
                                      b2nd_exec_storage_report *report, me_error *error);
+/* Materialize an elementwise schedule directly into a compressed in-memory
+ * b2nd_array_t destination using a block-level Blosc2 compression prefilter.
+ * Validates all inputs/outputs/budgets before mutating `output`. */
+me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
+                                     const b2nd_array_t *const *arrays,
+                                     const b2nd_exec_view *views, size_t ninputs,
+                                     b2nd_array_t *output, unsigned raise_mask,
+                                     size_t max_decode_bytes, size_t max_gather_bytes,
+                                     const b2nd_exec_jobs *jobs,
+                                     b2nd_exec_storage_report *report, me_error *error);
 #endif

@@ -1707,6 +1707,61 @@ me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t sl
     return ME_SUCCESS;
 }
 
+const me_kernel *b2nd_exec_schedule_kernel(const b2nd_exec_schedule *schedule,
+                                           b2nd_exec_plan_info *plan_out,
+                                           b2nd_exec_schedule_info *sched_out,
+                                           uint32_t *direct_slot_out) {
+    if (!schedule || !schedule->plan) return NULL;
+    if (plan_out) *plan_out = schedule->plan->info;
+    if (sched_out) *sched_out = schedule->info;
+    if (direct_slot_out) *direct_slot_out = schedule->plan->direct_slot;
+    return schedule->plan->kernel;
+}
+
+me_status b2nd_exec_validate_view(const b2nd_exec_schedule *schedule, size_t slot,
+                                   const b2nd_exec_view *view, me_error *error) {
+    if (!schedule || !schedule->plan || slot >= schedule->plan->info.ninputs) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution view slot");
+    }
+    if (!view_valid(view, &schedule->inputs[slot])) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
+    }
+    return ME_SUCCESS;
+}
+
+void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,
+                          const b2nd_exec_view *view, const size_t *origin,
+                          const size_t *extent, unsigned char *dst) {
+    const b2nd_exec_input_meta *meta = &schedule->inputs[slot];
+    size_t ndim = schedule->info.ndim;
+    size_t width = meta->itemsize;
+    size_t shift = ndim - meta->ndim;
+    size_t nitems = 1;
+    for (size_t d = 0; d < ndim; d++) {
+        nitems *= extent[d];
+    }
+    if (!nitems) return;
+    size_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    for (size_t lane = 0; lane < nitems; lane++) {
+        size_t offset = view->offset;
+        for (size_t a = 0; a < meta->ndim; a++) {
+            if (meta->shape[a] != 1) {
+                view_add(offset, view->strides[a],
+                         (uint64_t)(origin[shift + a] + coords[shift + a]), &offset);
+            }
+        }
+        view_load(view, offset, dst + lane * width, width);
+        if (lane + 1 < nitems) {
+            for (size_t d = ndim; d-- > 0;) {
+                if (++coords[d] < extent[d]) {
+                    break;
+                }
+                coords[d] = 0;
+            }
+        }
+    }
+}
+
 me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
                                  const b2nd_exec_view *views,
                                  const bool *is_reader, size_t ninputs,

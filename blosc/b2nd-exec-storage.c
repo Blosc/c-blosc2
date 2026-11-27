@@ -58,8 +58,42 @@ static bool storage_dtype_matches(const char *dtype, me_dtype expected, size_t w
     return strcmp(dtype + 1, suffix) == 0;
 }
 
+static me_status storage_validate_chunks(const storage_input *state,
+                                         const me_mut_buffer *alias_output,
+                                         me_error *error) {
+    const b2nd_array_t *a = state->array;
+    size_t width = state->itemsize;
+    for (int64_t c = 0; c < a->sc->nchunks; c++) {
+        const uint8_t *chunk = a->sc->data[c];
+        int32_t nbytes, cbytes, blocksize;
+        if (!chunk || blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, &blocksize) < 0 ||
+            cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
+            (size_t)cbytes > state->bytes + BLOSC2_MAX_OVERHEAD ||
+            nbytes != (int32_t)state->bytes ||
+            blocksize != (int32_t)(state->block_items * width) ||
+            (size_t)cbytes > UINTPTR_MAX - (uintptr_t)chunk) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage chunk metadata");
+        }
+        if (chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width ||
+            (chunk[BLOSC2_CHUNK_FLAGS] >> 5) > BLOSC_ZSTD_LIB) {
+            return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk codec");
+        }
+        for (size_t f = 0; f < BLOSC2_MAX_FILTERS; f++) {
+            if (chunk[BLOSC2_CHUNK_FILTER_CODES + f] > BLOSC_DELTA) {
+                return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk filter");
+            }
+        }
+        if (alias_output && alias_output->capacity &&
+            (uintptr_t)chunk < (uintptr_t)alias_output->data + alias_output->capacity &&
+            (uintptr_t)alias_output->data < (uintptr_t)chunk + (size_t)cbytes) {
+            return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
+        }
+    }
+    return ME_SUCCESS;
+}
+
 static me_status storage_validate(storage_input *state, const b2nd_exec_input_meta *meta,
-                                   me_error *error) {
+                                  me_error *error) {
     const b2nd_array_t *a = state->array;
     size_t width = meta->itemsize;
     if (!a || !a->sc || a->ndim < 1 || a->ndim > B2ND_EXEC_MAX_RANK ||
@@ -227,32 +261,8 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     }
     for (size_t i = 0; i < ninputs; i++) {
         if (!is_reader[i]) continue;
-        size_t width = base_states[i].itemsize;
-        for (int64_t c = 0; c < arrays[i]->sc->nchunks; c++) {
-            const uint8_t *chunk = arrays[i]->sc->data[c];
-            int32_t nbytes, cbytes, blocksize;
-            if (!chunk || blosc2_cbuffer_sizes(chunk, &nbytes, &cbytes, &blocksize) < 0 ||
-                cbytes < BLOSC_EXTENDED_HEADER_LENGTH ||
-                (size_t)cbytes > base_states[i].bytes + BLOSC2_MAX_OVERHEAD ||
-                nbytes != (int32_t)base_states[i].bytes ||
-                blocksize != (int32_t)(base_states[i].block_items * width) ||
-                (size_t)cbytes > UINTPTR_MAX - (uintptr_t)chunk) {
-                return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage chunk metadata");
-            }
-            if (chunk[BLOSC2_CHUNK_TYPESIZE] != (uint8_t)width ||
-                (chunk[BLOSC2_CHUNK_FLAGS] >> 5) > BLOSC_ZSTD_LIB) {
-                return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk codec");
-            }
-            for (size_t f = 0; f < BLOSC2_MAX_FILTERS; f++) {
-                if (chunk[BLOSC2_CHUNK_FILTER_CODES + f] > BLOSC_DELTA) {
-                    return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported storage chunk filter");
-                }
-            }
-            if (output.capacity && (uintptr_t)chunk < (uintptr_t)output.data + output.capacity &&
-                (uintptr_t)output.data < (uintptr_t)chunk + (size_t)cbytes) {
-                return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
-            }
-        }
+        status = storage_validate_chunks(&base_states[i], &output, error);
+        if (status != ME_SUCCESS) return status;
     }
     b2nd_exec_jobs capped_jobs;
     const b2nd_exec_jobs *eff_jobs = jobs;
@@ -325,4 +335,642 @@ me_status b2nd_exec_execute_arrays(const b2nd_exec_schedule *schedule,
                                   b2nd_exec_storage_report *report, me_error *error) {
     return b2nd_exec_execute_arrays_ex(schedule, inputs, NULL, ninputs, output, raise_mask,
                                        max_decode_bytes, max_gather_bytes, NULL, report, error);
+}
+
+static me_status storage_read_box(storage_input *state, const size_t *origin,
+                                  const size_t *extent, unsigned char *dst, me_error *error) {
+    const b2nd_array_t *a = state->array;
+    size_t ndim = (size_t)a->ndim;
+    size_t last = ndim - 1;
+    size_t width = state->itemsize;
+    size_t total = 1;
+    for (size_t d = 0; d < ndim; d++) {
+        total *= extent[d];
+    }
+    state->read_spans++;
+    if (!total) return ME_SUCCESS;
+    size_t local_c[B2ND_EXEC_MAX_RANK] = {0};
+    size_t lane = 0;
+    while (lane < total) {
+        size_t chunk = 0, block = 0, item = 0;
+        size_t c_last = 0, b_last = 0;
+        for (size_t d = 0; d < ndim; d++) {
+            size_t coord = origin[d] + local_c[d];
+            size_t cdim = (size_t)a->chunkshape[d];
+            size_t bdim = (size_t)a->blockshape[d];
+            size_t local = coord % cdim;
+            size_t bitem = local % bdim;
+            chunk = chunk * state->chunk_grid[d] + coord / cdim;
+            block = block * state->block_grid[d] + local / bdim;
+            item = item * bdim + bitem;
+            if (d == last) {
+                c_last = local;
+                b_last = bitem;
+            }
+        }
+        size_t rem_box = extent[last] - local_c[last];
+        size_t rem_chunk = (size_t)a->chunkshape[last] - c_last;
+        size_t rem_block = (size_t)a->blockshape[last] - b_last;
+        size_t run = rem_box < rem_chunk ? rem_box : rem_chunk;
+        if (rem_block < run) run = rem_block;
+        if (state->cached_chunk != (int64_t)chunk) {
+            const uint8_t *encoded = a->sc->data[chunk];
+            int32_t nbytes = 0, cbytes = 0, blocksize = 0;
+            int rc = -1;
+            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0 &&
+                cbytes >= BLOSC_MIN_HEADER_LENGTH && nbytes == (int32_t)state->bytes &&
+                blocksize == (int32_t)(state->block_items * width)) {
+                rc = blosc2_decompress_ctx(state->dctx, encoded, cbytes,
+                                           state->decoded, (int32_t)state->bytes);
+            }
+            if (rc != (int32_t)state->bytes) {
+                return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
+            }
+            state->cached_chunk = (int64_t)chunk;
+            state->decodes++;
+            state->decoded_bytes += state->bytes;
+            if (run > 1) state->cache_hits += run - 1;
+        } else {
+            state->cache_hits += run;
+        }
+        size_t offset = (block * state->block_items + item) * width;
+        memcpy(dst + lane * width, state->decoded + offset, run * width);
+        lane += run;
+        if (lane < total) {
+            local_c[last] += run;
+            if (local_c[last] == extent[last]) {
+                local_c[last] = 0;
+                for (size_t d = last; d-- > 0;) {
+                    if (++local_c[d] < extent[d]) break;
+                    local_c[d] = 0;
+                }
+            }
+        }
+    }
+    return ME_SUCCESS;
+}
+
+static void block_compact_or_scatter(size_t ndim, const int32_t *blockshape,
+                                     const size_t *valid, size_t width,
+                                     void *phys, void *compact, bool to_compact) {
+    size_t row_bytes = valid[ndim - 1] * width;
+    size_t phys_row_stride = (size_t)blockshape[ndim - 1] * width;
+    if (ndim == 1) {
+        if (!to_compact) memcpy(phys, compact, row_bytes);
+        return;
+    }
+    size_t nrows = 1;
+    for (size_t d = 0; d < ndim - 1; d++) nrows *= valid[d];
+    size_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    size_t bstrides[B2ND_EXEC_MAX_RANK] = {0};
+    size_t stride = phys_row_stride;
+    for (size_t d = ndim - 1; d-- > 0;) {
+        bstrides[d] = stride;
+        stride *= (size_t)blockshape[d];
+    }
+    for (size_t r = 0; r < nrows; r++) {
+        size_t phys_off = 0;
+        for (size_t d = 0; d < ndim - 1; d++) phys_off += coords[d] * bstrides[d];
+        size_t comp_off = r * row_bytes;
+        if (to_compact) {
+            if (comp_off != phys_off) {
+                memmove((unsigned char *)compact + comp_off,
+                        (const unsigned char *)phys + phys_off, row_bytes);
+            }
+        } else {
+            memcpy((unsigned char *)phys + phys_off,
+                   (const unsigned char *)compact + comp_off, row_bytes);
+        }
+        if (r + 1 < nrows) {
+            for (size_t d = ndim - 1; d-- > 0;) {
+                if (++coords[d] < valid[d]) break;
+                coords[d] = 0;
+            }
+        }
+    }
+}
+
+typedef struct {
+    storage_input states[B2ND_EXEC_MAX_INPUTS];
+    blosc2_context *dctx[B2ND_EXEC_MAX_INPUTS];
+    unsigned char *in_buf[B2ND_EXEC_MAX_INPUTS];
+    unsigned char *map_buf;
+    size_t tiles, map_calls, direct_tiles, gathered_bytes;
+    size_t decodes, decoded_bytes, cache_hits, read_spans;
+    size_t interpreter_calls, jit_calls;
+    me_fp_status fp;
+    bool fp_seen;
+    bool entered;
+    me_status status;
+    me_error error;
+} sink_worker;
+
+typedef struct {
+    const b2nd_exec_schedule *schedule;
+    const me_kernel *kernel;
+    b2nd_exec_plan_info plan_info;
+    b2nd_exec_schedule_info sched_info;
+    uint32_t direct_slot;
+    size_t ninputs;
+    const b2nd_array_t *const *arrays;
+    b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS];
+    bool is_reader[B2ND_EXEC_MAX_INPUTS];
+    bool matched_layout[B2ND_EXEC_MAX_INPUTS];
+    bool needed[B2ND_EXEC_MAX_INPUTS];
+    b2nd_array_t *output;
+    size_t out_block_items;
+    size_t out_chunk_grid[B2ND_EXEC_MAX_RANK];
+    size_t out_block_grid[B2ND_EXEC_MAX_RANK];
+    int64_t current_chunk;
+    sink_worker *workers;
+    size_t nworkers;
+} sink_context;
+
+static int sink_prefilter(blosc2_prefilter_params *p) {
+    sink_context *sink = p ? p->user_data : NULL;
+    if (!sink || p->tid < 0 || (size_t)p->tid >= sink->nworkers) return -1;
+    sink_worker *w = &sink->workers[p->tid];
+    w->entered = true;
+    if (w->status != ME_SUCCESS) return -1;
+
+    const b2nd_array_t *out = sink->output;
+    size_t ndim = (size_t)out->ndim;
+    size_t out_width = sink->plan_info.itemsize;
+    size_t origin[B2ND_EXEC_MAX_RANK] = {0};
+    size_t valid[B2ND_EXEC_MAX_RANK] = {0};
+    size_t c_rem = (size_t)sink->current_chunk;
+    size_t b_rem = (size_t)p->nblock;
+    size_t valid_nitems = 1;
+    for (size_t d = ndim; d-- > 0;) {
+        size_t cg = sink->out_chunk_grid[d];
+        size_t bg = sink->out_block_grid[d];
+        size_t cdim = c_rem % cg;
+        size_t bdim = b_rem % bg;
+        c_rem /= cg;
+        b_rem /= bg;
+        size_t chunk_off = cdim * (size_t)out->chunkshape[d];
+        size_t local_off = bdim * (size_t)out->blockshape[d];
+        origin[d] = chunk_off + local_off;
+        size_t rem_shape = origin[d] < (size_t)out->shape[d] ? (size_t)out->shape[d] - origin[d] : 0;
+        size_t rem_chunk = local_off < (size_t)out->chunkshape[d] ?
+            (size_t)out->chunkshape[d] - local_off : 0;
+        size_t rem_block = (size_t)out->blockshape[d];
+        size_t v = rem_shape < rem_chunk ? rem_shape : rem_chunk;
+        if (rem_block < v) v = rem_block;
+        valid[d] = v;
+        valid_nitems *= v;
+    }
+    if (!valid_nitems) {
+        memset(p->output, 0, (size_t)p->output_size);
+        return 0;
+    }
+    bool padded = valid_nitems != sink->out_block_items;
+    if (padded && !w->map_buf) {
+        w->status = storage_error(&w->error, ME_ERR_INVALID_ARG, "Missing padded sink map buffer");
+        return -1;
+    }
+
+    me_buffer spans[B2ND_EXEC_MAX_INPUTS] = {0};
+    for (size_t i = 0; i < sink->ninputs; i++) {
+        if (!sink->needed[i]) continue;
+        size_t in_width = w->states[i].itemsize;
+        if (!in_width) {
+            b2nd_exec_input_meta meta;
+            if (b2nd_exec_schedule_input(sink->schedule, i, &meta) != ME_SUCCESS) {
+                w->status = storage_error(&w->error, ME_ERR_INVALID_ARG, "Invalid sink input metadata");
+                return -1;
+            }
+            in_width = meta.itemsize;
+        }
+        size_t live_bytes = valid_nitems * in_width;
+        if (sink->is_reader[i] && sink->matched_layout[i]) {
+            const uint8_t *encoded = sink->arrays[i]->sc->data[sink->current_chunk];
+            int32_t nbytes = 0, cbytes = 0, blocksize = 0;
+            int got = -1;
+            if (encoded && blosc2_cbuffer_sizes(encoded, &nbytes, &cbytes, &blocksize) == 0) {
+                got = blosc2_getitem_ctx(w->dctx[i], encoded, cbytes,
+                                         (int)(p->nblock * (int32_t)sink->out_block_items),
+                                         (int)sink->out_block_items, w->in_buf[i],
+                                         (int32_t)(sink->out_block_items * in_width));
+            }
+            w->read_spans++;
+            if (got != (int)(sink->out_block_items * in_width)) {
+                w->status = storage_error(&w->error, ME_ERR_EVAL, "Storage block decode failed");
+                return -1;
+            }
+            w->decodes++;
+            w->decoded_bytes += sink->out_block_items * in_width;
+            if (padded) {
+                block_compact_or_scatter(ndim, out->blockshape, valid, in_width,
+                                         w->in_buf[i], w->in_buf[i], true);
+            }
+        } else if (sink->is_reader[i]) {
+            me_status st = storage_read_box(&w->states[i], origin, valid, w->in_buf[i], &w->error);
+            if (st != ME_SUCCESS) {
+                w->status = st;
+                return -1;
+            }
+            w->gathered_bytes += live_bytes;
+        } else {
+            b2nd_exec_gather_box(sink->schedule, i, &sink->bound_views[i], origin, valid,
+                                 w->in_buf[i]);
+            w->gathered_bytes += live_bytes;
+        }
+        spans[i] = (me_buffer){w->in_buf[i], live_bytes};
+    }
+
+    void *eval_dst = padded ? w->map_buf : p->output;
+    if (sink->plan_info.identity) {
+        memcpy(eval_dst, spans[sink->direct_slot].data, valid_nitems * out_width);
+        w->direct_tiles++;
+    } else {
+        me_block block = ME_BLOCK_INITIALIZER;
+        block.nitems = valid_nitems;
+        me_fp_status fp = {0};
+        me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
+        options.fp_status = &fp;
+        options.raise_mask = 0;
+        me_execution_backend backend = ME_BACKEND_NONE;
+        me_status st = me_eval_block_backend(
+            sink->kernel, spans, sink->ninputs,
+            (me_mut_buffer){eval_dst, valid_nitems * out_width}, &block, &options,
+            &backend, &w->error);
+        w->interpreter_calls += backend == ME_BACKEND_INTERPRETER;
+        w->jit_calls += backend == ME_BACKEND_JIT;
+        w->fp.flags |= fp.flags;
+        w->fp.supported = w->fp_seen ? (w->fp.supported && fp.supported) : fp.supported;
+        w->fp_seen = true;
+        if (st != ME_SUCCESS) {
+            w->status = st;
+            return -1;
+        }
+        w->map_calls++;
+    }
+    if (padded) {
+        memset(p->output, 0, (size_t)p->output_size);
+        block_compact_or_scatter(ndim, out->blockshape, valid, out_width,
+                                 p->output, eval_dst, false);
+    }
+    w->tiles++;
+    return 0;
+}
+
+me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
+                                     const b2nd_array_t *const *arrays,
+                                     const b2nd_exec_view *views, size_t ninputs,
+                                     b2nd_array_t *output, unsigned raise_mask,
+                                     size_t max_decode_bytes, size_t max_gather_bytes,
+                                     const b2nd_exec_jobs *jobs,
+                                     b2nd_exec_storage_report *report, me_error *error) {
+    if (report) *report = (b2nd_exec_storage_report){0};
+    if (error) *error = (me_error){0};
+    b2nd_exec_plan_info plan_info = {0};
+    b2nd_exec_schedule_info sched_info = {0};
+    uint32_t direct_slot = 0;
+    const me_kernel *kernel = b2nd_exec_schedule_kernel(
+        schedule, &plan_info, &sched_info, &direct_slot);
+    if (!schedule || !plan_info.ninputs || (!arrays && !views) || !output || !report ||
+        ninputs != plan_info.ninputs || ninputs > B2ND_EXEC_MAX_INPUTS ||
+        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
+        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid compressed sink bindings");
+    }
+    if (plan_info.reduction) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Compressed sinks require an elementwise map");
+    }
+    if (jobs && jobs->workers > 1 && !plan_info.partitionable) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Unproven kernels require serial execution");
+    }
+    size_t out_width = plan_info.itemsize;
+    if (!output->sc || output->ndim < 1 || output->ndim > B2ND_EXEC_MAX_RANK ||
+        (size_t)output->ndim != sched_info.output_ndim || !out_width || out_width > 8 ||
+        output->dtype_format != DTYPE_NUMPY_FORMAT ||
+        !storage_dtype_matches(output->dtype, plan_info.dtype, out_width) ||
+        output->sc->typesize != (int32_t)out_width || output->sc->frame || !output->sc->cctx) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported compressed sink destination");
+    }
+    blosc2_cparams cparams;
+    if (blosc2_ctx_get_cparams(output->sc->cctx, &cparams) < 0 || cparams.prefilter != NULL ||
+        cparams.use_dict != 0 || cparams.compcode > BLOSC_ZSTD) {
+        return storage_error(error, ME_ERR_UNSUPPORTED, "Unsupported compressed sink compression parameters");
+    }
+    for (size_t f = 0; f < BLOSC2_MAX_FILTERS; f++) {
+        if (cparams.filters[f] > BLOSC_DELTA) {
+            return storage_error(error, ME_ERR_UNSUPPORTED, "Sink plugin filters are not admitted");
+        }
+    }
+
+    size_t out_items = 1, out_chunks = 1, out_physical = 1, out_block_items = 1, out_chunk_items = 1;
+    size_t out_chunk_grid[B2ND_EXEC_MAX_RANK] = {0};
+    size_t out_block_grid[B2ND_EXEC_MAX_RANK] = {0};
+    bool has_padding = false;
+    for (int d = 0; d < output->ndim; d++) {
+        if (output->shape[d] < 0 || output->shape[d] != sched_info.output_shape[d] ||
+            output->chunkshape[d] <= 0 || output->blockshape[d] <= 0) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Sink shape does not match schedule");
+        }
+        size_t s = (size_t)output->shape[d];
+        size_t c = (size_t)output->chunkshape[d];
+        size_t b = (size_t)output->blockshape[d];
+        if ((s % c) != 0 || (c % b) != 0) has_padding = true;
+        out_chunk_grid[d] = s / c + (s % c != 0);
+        out_block_grid[d] = c / b + (c % b != 0);
+        if (!storage_product(&out_items, s) ||
+            !storage_product(&out_chunks, out_chunk_grid[d]) ||
+            !storage_product(&out_physical, out_block_grid[d]) ||
+            !storage_product(&out_physical, b) ||
+            !storage_product(&out_block_items, b) ||
+            !storage_product(&out_chunk_items, c)) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Sink geometry overflow");
+        }
+    }
+    if (out_physical > (size_t)INT32_MAX / out_width ||
+        output->extchunknitems != (int64_t)out_physical ||
+        output->blocknitems != (int64_t)out_block_items ||
+        output->chunknitems != (int64_t)out_chunk_items ||
+        output->nitems != (int64_t)out_items ||
+        output->sc->nchunks != (int64_t)out_chunks ||
+        (out_chunks && output->sc->chunksize != (int32_t)(out_physical * out_width))) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Inconsistent sink storage geometry");
+    }
+
+    sink_context sink = {
+        .schedule = schedule, .kernel = kernel, .plan_info = plan_info, .sched_info = sched_info,
+        .direct_slot = direct_slot, .ninputs = ninputs, .arrays = arrays, .output = output,
+        .out_block_items = out_block_items};
+    memcpy(sink.out_chunk_grid, out_chunk_grid, sizeof(out_chunk_grid));
+    memcpy(sink.out_block_grid, out_block_grid, sizeof(out_block_grid));
+
+    storage_input base_states[B2ND_EXEC_MAX_INPUTS] = {0};
+    me_status status = ME_SUCCESS;
+    size_t per_worker_decode = 0, per_worker_gather = 0;
+    for (size_t i = 0; i < ninputs; i++) {
+        b2nd_exec_input_meta meta;
+        if (b2nd_exec_schedule_input(schedule, i, &meta) != ME_SUCCESS) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Sink input count mismatch");
+        }
+        sink.needed[i] = !plan_info.identity || i == direct_slot;
+        const b2nd_array_t *arr = arrays ? arrays[i] : NULL;
+        if (arr) {
+            if (arr == output || arr->sc == output->sc) {
+                return storage_error(error, ME_ERR_UNSUPPORTED, "Aliased compressed storage output");
+            }
+            if ((size_t)arr->ndim != sched_info.ndim) {
+                return storage_error(error, ME_ERR_UNSUPPORTED,
+                                     "Compressed sink does not broadcast compressed inputs");
+            }
+            for (int d = 0; d < arr->ndim; d++) {
+                if (arr->shape[d] != output->shape[d]) {
+                    return storage_error(error, ME_ERR_UNSUPPORTED,
+                                         "Compressed sink requires matching shape for compressed inputs");
+                }
+            }
+            sink.is_reader[i] = true;
+            base_states[i].array = arr;
+            status = storage_validate(&base_states[i], &meta, error);
+            if (status != ME_SUCCESS) return status;
+            status = storage_validate_chunks(&base_states[i], NULL, error);
+            if (status != ME_SUCCESS) return status;
+            bool match = true;
+            for (int d = 0; d < arr->ndim; d++) {
+                if (arr->chunkshape[d] != output->chunkshape[d] ||
+                    arr->blockshape[d] != output->blockshape[d]) {
+                    match = false;
+                    break;
+                }
+            }
+            sink.matched_layout[i] = match;
+            if (sink.needed[i] && out_chunks) {
+                size_t d_need = match ? out_block_items * meta.itemsize : base_states[i].bytes;
+                if (d_need > max_decode_bytes - per_worker_decode) {
+                    return storage_error(error, ME_ERR_INVALID_ARG, "Storage decode budget exceeded");
+                }
+                per_worker_decode += d_need;
+                if (!match) {
+                    size_t g_need = out_block_items * meta.itemsize;
+                    if (g_need > max_gather_bytes - per_worker_gather) {
+                        return storage_error(error, ME_ERR_INVALID_ARG, "Execution gather scratch budget exceeded");
+                    }
+                    per_worker_gather += g_need;
+                }
+            }
+        } else if (views) {
+            status = b2nd_exec_validate_view(schedule, i, &views[i], error);
+            if (status != ME_SUCCESS) return status;
+            if (views[i].capacity && output->sc->data) {
+                for (int64_t c = 0; c < output->sc->nchunks; c++) {
+                    const uint8_t *chunk = output->sc->data[c];
+                    int32_t nb = 0, cb = 0, bs = 0;
+                    if (chunk && blosc2_cbuffer_sizes(chunk, &nb, &cb, &bs) == 0 && cb > 0 &&
+                        (size_t)cb <= UINTPTR_MAX - (uintptr_t)chunk &&
+                        (uintptr_t)chunk < (uintptr_t)views[i].base + views[i].capacity &&
+                        (uintptr_t)views[i].base < (uintptr_t)chunk + (size_t)cb) {
+                        return storage_error(error, ME_ERR_UNSUPPORTED,
+                                             "Aliased compressed storage output");
+                    }
+                }
+            }
+            sink.bound_views[i] = views[i];
+            if (sink.needed[i] && out_chunks) {
+                size_t g_need = out_block_items * meta.itemsize;
+                if (g_need > max_gather_bytes - per_worker_gather) {
+                    return storage_error(error, ME_ERR_INVALID_ARG, "Execution gather scratch budget exceeded");
+                }
+                per_worker_gather += g_need;
+            }
+        } else {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Invalid storage input binding");
+        }
+    }
+
+    size_t per_worker_mapped = (out_chunks && has_padding) ? out_block_items * out_width : 0;
+    size_t per_worker_scratch = per_worker_mapped + per_worker_gather;
+    if (per_worker_decode > max_decode_bytes) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Storage decode budget exceeded");
+    }
+    if (per_worker_gather > max_gather_bytes) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Execution gather scratch budget exceeded");
+    }
+    if (jobs && jobs->max_worker_scratch && per_worker_scratch > jobs->max_worker_scratch) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Execution worker scratch budget exceeded");
+    }
+    me_fp_status probe_fp = {0};
+    if (raise_mask != 0) {
+        me_fp_scope probe_scope;
+        status = me_fp_scope_begin(&probe_scope, &probe_fp, error);
+        if (status != ME_SUCCESS) return status;
+        me_fp_scope_end(&probe_scope, NULL);
+        if (!probe_fp.supported) {
+            return storage_error(error, ME_ERR_UNSUPPORTED,
+                                 "Floating exception reporting is unavailable");
+        }
+    }
+    if (!out_items || !out_chunks) {
+        if (raise_mask != 0) report->execution.fp.supported = probe_fp.supported;
+        return ME_SUCCESS;
+    }
+
+    size_t nworkers = jobs ? jobs->workers : 1;
+#ifdef _WIN32
+    nworkers = 1;
+#endif
+    size_t out_nblocks = out_physical / out_block_items;
+    if (nworkers > B2ND_EXEC_MAX_TASKS) nworkers = B2ND_EXEC_MAX_TASKS;
+    if (out_nblocks && nworkers > out_nblocks) nworkers = out_nblocks;
+    if (per_worker_decode) {
+        size_t fit = max_decode_bytes / per_worker_decode;
+        if (nworkers > fit) nworkers = fit;
+    }
+    if (jobs && jobs->max_worker_scratch && per_worker_scratch) {
+        size_t fit = jobs->max_worker_scratch / per_worker_scratch;
+        if (nworkers > fit) nworkers = fit;
+    }
+    if (!nworkers) nworkers = 1;
+
+    sink.nworkers = nworkers;
+    sink.workers = calloc(nworkers, sizeof(*sink.workers));
+    if (!sink.workers) {
+        return storage_error(error, ME_ERR_OOM, "Cannot allocate sink worker metadata");
+    }
+    report->storage_metadata_bytes = nworkers * sizeof(*sink.workers);
+    report->execution.mapped_bytes = per_worker_mapped;
+    report->execution.gather_bytes = per_worker_gather;
+    report->execution.worker_bytes = nworkers * per_worker_scratch;
+
+    for (size_t w = 0; status == ME_SUCCESS && w < nworkers; w++) {
+        sink_worker *sw = &sink.workers[w];
+        if (has_padding) {
+            sw->map_buf = malloc(per_worker_mapped);
+            if (!sw->map_buf) {
+                status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink map workspace");
+                break;
+            }
+        }
+        for (size_t i = 0; i < ninputs; i++) {
+            b2nd_exec_input_meta meta;
+            b2nd_exec_schedule_input(schedule, i, &meta);
+            sw->states[i] = base_states[i];
+            sw->states[i].dctx = NULL;
+            sw->states[i].decoded = NULL;
+            sw->states[i].itemsize = meta.itemsize;
+            if (!sink.needed[i]) continue;
+            size_t in_buf_bytes = out_block_items * meta.itemsize;
+            sw->in_buf[i] = in_buf_bytes ? malloc(in_buf_bytes) : NULL;
+            if (in_buf_bytes && !sw->in_buf[i]) {
+                status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink input buffer");
+                break;
+            }
+            if (sink.is_reader[i] && sink.matched_layout[i]) {
+                blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+                dp.nthreads = 1;
+                sw->dctx[i] = blosc2_create_dctx(dp);
+                if (!sw->dctx[i]) {
+                    status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink decode context");
+                    break;
+                }
+                report->decode_bytes += in_buf_bytes;
+            } else if (sink.is_reader[i]) {
+                sw->states[i].decoded = sw->states[i].bytes ? malloc(sw->states[i].bytes) : NULL;
+                if (sw->states[i].decoded) report->decode_bytes += sw->states[i].bytes;
+                blosc2_dparams dp = BLOSC2_DPARAMS_DEFAULTS;
+                dp.nthreads = 1;
+                sw->states[i].dctx = blosc2_create_dctx(dp);
+                if ((sw->states[i].bytes && !sw->states[i].decoded) || !sw->states[i].dctx) {
+                    status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink decode workspace");
+                    break;
+                }
+            }
+        }
+    }
+
+    size_t chunk_bytes = (size_t)output->sc->chunksize;
+    uint8_t *dummy = NULL, *chunk_buf = NULL;
+    blosc2_context *compressor = NULL;
+    if (status == ME_SUCCESS) {
+        dummy = calloc(1, chunk_bytes);
+        chunk_buf = malloc(chunk_bytes + BLOSC2_MAX_OVERHEAD);
+        if (!dummy || !chunk_buf) {
+            status = storage_error(error, ME_ERR_OOM, "Cannot allocate sink chunk buffer");
+        }
+    }
+    if (status == ME_SUCCESS) {
+        blosc2_cparams cp = cparams;
+        blosc2_prefilter_params pre = {.user_data = &sink};
+        cp.prefilter = sink_prefilter;
+        cp.preparams = &pre;
+        cp.schunk = NULL;
+        cp.nthreads = (int16_t)nworkers;
+        compressor = blosc2_create_cctx(cp);
+        if (!compressor || blosc2_set_prefilter_full_write(compressor, true) < 0) {
+            status = storage_error(error, ME_ERR_OOM, "Cannot create sink compression context");
+        }
+    }
+    for (int64_t c = 0; status == ME_SUCCESS && c < output->sc->nchunks; c++) {
+        sink.current_chunk = c;
+        int cbytes = blosc2_compress_ctx(compressor, dummy, (int32_t)chunk_bytes,
+                                         chunk_buf, (int32_t)(chunk_bytes + BLOSC2_MAX_OVERHEAD));
+        if (cbytes <= 0) {
+            for (size_t w = 0; w < nworkers; w++) {
+                if (sink.workers[w].status != ME_SUCCESS) {
+                    status = sink.workers[w].status;
+                    if (error) *error = sink.workers[w].error;
+                    break;
+                }
+            }
+            if (status == ME_SUCCESS) {
+                status = storage_error(error, ME_ERR_EVAL, "Compressed sink chunk write failed");
+            }
+            break;
+        }
+        if (blosc2_schunk_update_chunk(output->sc, c, chunk_buf, true) < 0) {
+            status = storage_error(error, ME_ERR_EVAL, "Compressed sink chunk update failed");
+            break;
+        }
+    }
+    if (compressor) blosc2_free_ctx(compressor);
+    free(dummy);
+    free(chunk_buf);
+
+    bool any_fp = false;
+    bool all_supported = true;
+    for (size_t w = 0; w < nworkers; w++) {
+        sink_worker *sw = &sink.workers[w];
+        report->execution.tiles += sw->tiles;
+        report->execution.map_calls += sw->map_calls;
+        report->execution.direct_tiles += sw->direct_tiles;
+        report->execution.gathered_bytes += sw->gathered_bytes;
+        report->execution.jit_calls += sw->jit_calls;
+        report->execution.interpreter_calls += sw->interpreter_calls;
+        report->execution.tasks += sw->entered;
+        report->decodes += sw->decodes;
+        report->decoded_bytes += sw->decoded_bytes;
+        report->cache_hits += sw->cache_hits;
+        report->read_spans += sw->read_spans;
+        if (sw->fp_seen) {
+            report->execution.fp.flags |= sw->fp.flags;
+            all_supported = all_supported && sw->fp.supported;
+            any_fp = true;
+        }
+        for (size_t i = 0; i < ninputs; i++) {
+            report->decodes += sw->states[i].decodes;
+            report->decoded_bytes += sw->states[i].decoded_bytes;
+            report->cache_hits += sw->states[i].cache_hits;
+            report->read_spans += sw->states[i].read_spans;
+            if (sw->dctx[i]) blosc2_free_ctx(sw->dctx[i]);
+            if (sw->states[i].dctx) blosc2_free_ctx(sw->states[i].dctx);
+            free(sw->states[i].decoded);
+            free(sw->in_buf[i]);
+        }
+        free(sw->map_buf);
+    }
+    free(sink.workers);
+    if (any_fp) {
+        report->execution.fp.supported = all_supported;
+    } else if (raise_mask != 0) {
+        report->execution.fp.supported = probe_fp.supported;
+    }
+    if (status == ME_SUCCESS && (report->execution.fp.flags & raise_mask)) {
+        return storage_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
+    }
+    return status;
 }

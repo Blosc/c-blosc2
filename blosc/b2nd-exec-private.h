@@ -36,4 +36,13 @@ me_status b2nd_exec_execute_readers_ex(const b2nd_exec_schedule *schedule,
                                       unsigned raise_mask, size_t max_gather_bytes,
                                       const b2nd_exec_jobs *jobs,
                                       b2nd_exec_report *report, me_error *error);
+const me_kernel *b2nd_exec_schedule_kernel(const b2nd_exec_schedule *schedule,
+                                           b2nd_exec_plan_info *plan_out,
+                                           b2nd_exec_schedule_info *sched_out,
+                                           uint32_t *direct_slot_out);
+me_status b2nd_exec_validate_view(const b2nd_exec_schedule *schedule, size_t slot,
+                                   const b2nd_exec_view *view, me_error *error);
+void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,
+                          const b2nd_exec_view *view, const size_t *origin,
+                          const size_t *extent, unsigned char *dst);
 #endif
