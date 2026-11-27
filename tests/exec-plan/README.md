@@ -59,6 +59,12 @@ the optional backend fixture. Prepared `has_jit` availability and actual
 increments neither call counter. Backend counters record entered map routes
 even on failure, whereas `map_calls` counts successful calls. Task-start fault
 injection verifies joins, no reduction publication and recovery without replay.
+The compiler is selected through typed preparation options, not the process
+environment. Compiler and mathematical policy pass unchanged to miniexpr;
+unsupported requested policies fail preparation without execution replay.
+An explicit job scratch budget is enforced even for a single worker. NULL jobs
+retains the unbudgeted serial entry contract (individual mapped/gather limits
+still apply).
 
 Use a Debug build (the fixtures use assertions). The installed-miniexpr suite
 also links this fixture against the actual C-Blosc2 static library.

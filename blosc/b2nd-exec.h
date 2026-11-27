@@ -28,6 +28,9 @@
 #ifndef ME_KERNEL_BACKEND_INFO_API
 #error "The typed executor requires miniexpr invocation backend reporting"
 #endif
+#ifndef ME_KERNEL_PREPARE_POLICY_API
+#error "The typed executor requires miniexpr compiler/math preparation policy"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
@@ -91,10 +94,13 @@ typedef struct {
     bool inherit_environment;
     bool integer_powers;
     me_casting casting;
+    me_math_backend math_backend;
+    me_jit_compiler jit_compiler;
 } b2nd_exec_options;
 
 #define B2ND_EXEC_OPTIONS_INITIALIZER \
-    {sizeof(b2nd_exec_options), ME_EXEC_INTERPRET, false, false, ME_CAST_UNSAFE}
+    {sizeof(b2nd_exec_options), ME_EXEC_INTERPRET, false, false, ME_CAST_UNSAFE, \
+     ME_MATH_DEFAULT, ME_COMPILER_DEFAULT}
 
 typedef struct b2nd_exec_plan b2nd_exec_plan;
 typedef struct b2nd_exec_schedule b2nd_exec_schedule;

@@ -299,7 +299,9 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     }
     if (!out || options->struct_size != sizeof(*options) ||
         options->execution < ME_EXEC_INTERPRET || options->execution > ME_EXEC_REQUIRE_JIT ||
-        options->casting < ME_CAST_UNSAFE || options->casting > ME_CAST_SAFE) {
+        options->casting < ME_CAST_UNSAFE || options->casting > ME_CAST_SAFE ||
+        options->math_backend < ME_MATH_DEFAULT || options->math_backend > ME_MATH_SCALAR ||
+        options->jit_compiler < ME_COMPILER_DEFAULT || options->jit_compiler > ME_COMPILER_CC) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution preparation options");
     }
     me_status status = validate(d, error);
@@ -401,6 +403,8 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     signature.integer_powers = options->integer_powers;
     me_prepare_options policy = ME_PREPARE_OPTIONS_INITIALIZER;
     policy.execution = options->execution;
+    policy.math_backend = options->math_backend;
+    policy.jit_compiler = options->jit_compiler;
     policy.inherit_environment = options->inherit_environment;
     policy.menudet_forbidden_features = ME_MENUDET_FEATURE_BLOCK_REDUCTIONS |
         ME_MENUDET_FEATURE_CONTROL_FLOW | ME_MENUDET_FEATURE_FIXED_STRINGS;
@@ -1382,7 +1386,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_INVALID_ARG, "Aggregate worker scratch size overflow");
     }
     size_t per_job_total = per_job_mapped + per_job_gather;
-    if (ntasks > 1 && per_job_total) {
+    if (jobs && per_job_total) {
         /* Cap the job count to the aggregate budget; a budget that cannot hold
          * even one job is a rejected request, not a silent serial fallback. */
         size_t fit = jobs->max_worker_scratch / per_job_total;

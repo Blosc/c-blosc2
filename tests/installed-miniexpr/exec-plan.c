@@ -49,6 +49,8 @@ static void backend_contracts(bool require_jit) {
          policy <= (require_jit ? ME_EXEC_REQUIRE_JIT : ME_EXEC_PREFER_JIT); policy++) {
         b2nd_exec_options options = B2ND_EXEC_OPTIONS_INITIALIZER;
         options.execution = (me_execution_policy)policy;
+        options.jit_compiler = ME_COMPILER_CC;
+        options.math_backend = ME_MATH_SYSTEM;
         b2nd_exec_plan *plan = NULL;
         b2nd_exec_schedule *schedule = NULL;
         b2nd_exec_plan_info info;
@@ -69,6 +71,28 @@ static void backend_contracts(bool require_jit) {
         assert(result == -16 && report.map_calls == 5);
         assert(report.jit_calls == (info.has_jit ? 5u : 0u));
         assert(report.interpreter_calls == (info.has_jit ? 0u : 5u));
+#ifndef __EMSCRIPTEN__
+        uint64_t snan = UINT64_C(0x7ff0000000000001);
+        memcpy(&values[16], &snan, sizeof(snan));
+        result = 99;
+        assert(b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){&result, sizeof(result)}, ME_FP_INVALID,
+            &jobs, &report, &error) == ME_ERR_EVAL);
+        assert(result == 99 && report.fp.supported && (report.fp.flags & ME_FP_INVALID));
+        assert(report.map_calls == 5);
+        assert(report.jit_calls == (info.has_jit ? 5u : 0u));
+        assert(report.interpreter_calls == (info.has_jit ? 0u : 5u));
+        values[16] = 16;
+#endif
+        jobs.workers = 1;
+        jobs.max_worker_scratch = 31;
+        result = 99;
+        assert(b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){&result, sizeof(result)}, 0, &jobs, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(result == 99 && !report.tasks && !report.tiles && !report.jit_calls &&
+               !report.interpreter_calls);
+        jobs.workers = 3;
+        jobs.max_worker_scratch = 96;
         /* Identity traversal must not claim JIT use merely because its
          * prepared numerical kernel has generated code available. */
         b2nd_exec_schedule_free(schedule);
