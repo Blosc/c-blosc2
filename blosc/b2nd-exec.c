@@ -418,6 +418,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
             status = exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution map result");
         }
         result_info(&plan->info, &info);
+        plan->info.partitionable &= me_kernel_is_partitionable(plan->kernel);
     }
     if (status == ME_SUCCESS && plan->info.reduction) {
         const b2nd_exec_node *root_node = &d->nodes[d->root];
@@ -489,7 +490,8 @@ me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer
     plan->info.ninputs = count;
     plan->info.reducer = reducer;
     plan->info.reduction = reducer != ME_REDUCTION_NONE;
-    plan->info.partitionable = false;
+    plan->info.partitionable = reducer != ME_REDUCTION_SUM && reducer != ME_REDUCTION_PROD &&
+        me_kernel_is_partitionable(*kernel);
     result_info(&plan->info, &info);
     /* Direct complex/string kernels remain inspectable, not resident-admitted. */
     if (reducer == ME_REDUCTION_NONE) {

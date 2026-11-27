@@ -111,6 +111,39 @@ static void backend_contracts(bool require_jit) {
         descriptor.root = 2;
         descriptor.nnodes = 3;
     }
+    /* Lane locality alone is not a proof: weak narrow-integer conversion can
+     * fail. Reject partitioning before reads or destination writes. */
+    nodes[0].dtype = ME_UINT8;
+    nodes[0].itemsize = 1;
+    nodes[1] = node(1, B2ND_EXEC_CAPTURE);
+    nodes[1].dtype = ME_INT64;
+    nodes[1].itemsize = nodes[1].scalar_size = 8;
+    nodes[1].category = ME_CAPTURE_WEAK;
+    int64_t capture = 300;
+    memcpy(nodes[1].scalar, &capture, sizeof(capture));
+    nodes[2] = node(2, B2ND_EXEC_ADD);
+    nodes[2].nargs = 2;
+    nodes[2].args[1] = 1;
+    b2nd_exec_plan *plan = NULL;
+    b2nd_exec_schedule *schedule = NULL;
+    b2nd_exec_plan_info info;
+    b2nd_exec_report report;
+    me_error error;
+    assert(b2nd_exec_prepare(&descriptor, NULL, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && !info.partitionable);
+    meta.dtype = ME_UINT8;
+    meta.itemsize = 1;
+    meta.shape[0] = 4;
+    assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+    uint8_t data[4] = {0}, output[4] = {55, 55, 55, 55};
+    input = (me_buffer){data, sizeof(data)};
+    b2nd_exec_jobs jobs = {sizeof(jobs), 2, 0};
+    assert(b2nd_exec_execute(schedule, &input, 1,
+        (me_mut_buffer){output, sizeof(output)}, 0, &jobs, &report, &error) == ME_ERR_UNSUPPORTED);
+    assert(!report.tasks && !report.tiles && !report.map_calls);
+    assert(output[0] == 55 && output[3] == 55);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
 }
 
 int main(int argc, char **argv) {
@@ -501,14 +534,14 @@ int main(int argc, char **argv) {
     assert(kernel);
     assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_NONE, &plan, &error) == ME_SUCCESS);
     assert(!kernel);
-    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && !info.partitionable);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.partitionable);
     b2nd_exec_input_meta direct_meta = {ME_INT64, 8, 1, {3}};
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
     int64_t direct_input[] = {7, -2, 5}, direct_output[3];
     me_buffer direct_buffer = {direct_input, sizeof(direct_input)};
     b2nd_exec_jobs direct_jobs = {sizeof(direct_jobs), 2, 0};
     assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
-        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &direct_jobs, &report, &error) == ME_ERR_UNSUPPORTED);
+        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &direct_jobs, &report, &error) == ME_SUCCESS);
     assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
         (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
     assert(direct_output[0] == 14 && direct_output[1] == -4 && direct_output[2] == 10);

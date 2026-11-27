@@ -79,3 +79,11 @@ reductions, identity reductions and disjoint map tiles partition. Partials
 combine by logical task ID, never completion order, and every started thread is
 joined before return, including on a start failure. Windows currently uses the
 serial path only.
+
+Partitionability requires the core's `me_kernel_is_partitionable` proof as well
+as an order-independent host reducer. Lane locality alone does not prove that
+weak-scalar conversions cannot fail. Unproven narrow weak conversions retain
+serial execution, even when a particular capture fits; explicit partitioning
+requests fail before reads/writes. Proven straight-line authored kernels use
+the same job path, while control-flow/context/block-scalar kernels remain
+unproven or unadmitted.

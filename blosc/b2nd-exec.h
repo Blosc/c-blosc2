@@ -31,6 +31,9 @@
 #ifndef ME_KERNEL_PREPARE_POLICY_API
 #error "The typed executor requires miniexpr compiler/math preparation policy"
 #endif
+#ifndef ME_KERNEL_PARTITION_INFO_API
+#error "The typed executor requires miniexpr conservative partitionability facts"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
