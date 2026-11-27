@@ -2,7 +2,8 @@
   Copyright (c) 2026 Blosc Development Team
   License: BSD 3-Clause (see LICENSE.txt)
 **********************************************************************/
-#include "b2nd-exec.h"
+#include "b2nd-exec-private.h"
+#include "b2nd-exec-launch.h"
 #include "miniexpr_reduce.h"
 
 #include <stdio.h>
@@ -942,7 +943,26 @@ typedef struct {
     bool fp_scoped;
     me_status status;
     me_error error;
+    const b2nd_exec_reader *readers;
+    bool entered; /* Written only by this job, inspected after synchronous drain. */
 } exec_job;
+
+static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_idx,
+                             const b2nd_exec_view *view, size_t group, size_t pos,
+                             size_t count, unsigned char *dst);
+
+static bool exec_gather_tile(exec_job *job, size_t slot, size_t group,
+                             size_t pos, size_t count) {
+    if (job->readers && job->readers[slot].read) {
+        size_t width = job->schedule->inputs[slot].itemsize;
+        job->status = job->readers[slot].read(job->readers[slot].context, pos, count,
+            (me_mut_buffer){job->gather_slots[slot], count * width}, &job->error);
+        return job->status == ME_SUCCESS;
+    }
+    view_gather_tile(job->schedule, slot, &job->views[slot], group, pos, count,
+                     job->gather_slots[slot]);
+    return true;
+}
 
 static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_idx,
                              const b2nd_exec_view *view, size_t group, size_t pos,
@@ -1078,8 +1098,7 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
             values = (const unsigned char *)job->views[direct_slot].base +
                 job->views[direct_slot].offset + linear * map_width;
         } else {
-            view_gather_tile(schedule, direct_slot, &job->views[direct_slot],
-                             group, pos, count, job->gather_slots[direct_slot]);
+            if (!exec_gather_tile(job, direct_slot, group, pos, count)) return;
             job->gathered_bytes += count * map_width;
             values = job->gather_slots[direct_slot];
         }
@@ -1106,8 +1125,7 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
                     job->views[i].offset + linear * input_width,
                 count * input_width};
         } else {
-            view_gather_tile(schedule, i, &job->views[i],
-                             group, pos, count, job->gather_slots[i]);
+            if (!exec_gather_tile(job, i, group, pos, count)) return;
             job->gathered_bytes += count * input_width;
             spans[i] = (me_buffer){job->gather_slots[i], count * input_width};
         }
@@ -1265,15 +1283,53 @@ static void exec_run(exec_job *job) {
     }
 }
 
+static void exec_run_job(void *data) {
+    exec_job *job = data;
+    job->entered = true;
+    exec_run(job);
+}
+
+#if defined(B2ND_EXEC_LAUNCH_OVERRIDE)
+#define exec_launch B2ND_EXEC_LAUNCH_OVERRIDE
+#elif defined(BLOSC2_HAVE_MINIEXPR)
+#define exec_launch b2nd_exec_launch_host
+#else
 #if !defined(_WIN32)
 #include <pthread.h>
 typedef struct {
-    exec_job *job;
+    b2nd_exec_run_job run;
+    void *data;
     pthread_t thread;
 } exec_thread;
 static void *exec_thread_main(void *argument) {
-    exec_run(((exec_thread *)argument)->job);
+    exec_thread *thread = argument;
+    thread->run(thread->data);
     return NULL;
+}
+#endif
+
+/* Standalone numerical-owner fixture needs no codec library or host runtime. */
+static me_status exec_launch(b2nd_exec_run_job run, size_t count, size_t stride,
+                             void *data, me_error *error) {
+#if !defined(_WIN32)
+    exec_thread *threads = calloc(count, sizeof(*threads));
+    if (!threads) return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
+    size_t started = 0;
+    for (; started < count; started++) {
+        threads[started].run = run;
+        threads[started].data = (unsigned char *)data + started * stride;
+        if (pthread_create(&threads[started].thread, NULL, exec_thread_main, &threads[started]) != 0) break;
+    }
+    for (size_t i = 0; i < started; i++) pthread_join(threads[i].thread, NULL);
+    free(threads);
+    return started == count ? ME_SUCCESS :
+        exec_error(error, ME_ERR_UNSUPPORTED, "Cannot start all execution jobs");
+#else
+    if (count != 1) return exec_error(error, ME_ERR_UNSUPPORTED, "Standalone parallel launch unavailable");
+    (void)stride;
+    run(data);
+    return ME_SUCCESS;
+#endif
 }
 #endif
 
@@ -1310,12 +1366,12 @@ static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t 
     }
 }
 
-me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
-                                 const b2nd_exec_view *inputs, size_t ninputs,
-                                 const b2nd_exec_output_view *output,
-                                 unsigned raise_mask, size_t max_gather_bytes,
-                                 const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
-                                 me_error *error) {
+static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
+                                  const b2nd_exec_view *inputs, size_t ninputs,
+                                  const b2nd_exec_output_view *output,
+                                  unsigned raise_mask, size_t max_gather_bytes,
+                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                  me_error *error, const b2nd_exec_reader *readers) {
     if (report) {
         *report = (b2nd_exec_report){0};
     }
@@ -1328,6 +1384,11 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
     }
     const b2nd_exec_plan *plan = schedule->plan;
+    if (readers && (jobs || (plan->info.reduction &&
+        (schedule->info.output_items != 1 ||
+         (plan->info.has_axes && plan->info.naxes != schedule->info.ndim))))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require serial whole-domain execution");
+    }
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
     size_t output_items = schedule->info.output_items;
@@ -1340,6 +1401,18 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
     size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
     size_t per_job_gather = 0;
     for (size_t i = 0; i < ninputs; i++) {
+        if (readers && readers[i].read) {
+            if (!schedule->matches_shape[i]) {
+                return exec_error(error, ME_ERR_UNSUPPORTED, "Storage readers require same-shape operands");
+            }
+            size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
+            if (per_job_gather > SIZE_MAX - tile_bytes) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
+            }
+            gather_offsets[i] = per_job_gather;
+            per_job_gather += tile_bytes;
+            continue;
+        }
         if (!view_valid(&inputs[i], &schedule->inputs[i])) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
         }
@@ -1452,22 +1525,10 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
     unsigned char *mapped = mapped_bytes ? malloc(mapped_bytes) : NULL;
     unsigned char *gather = gather_bytes ? malloc(gather_bytes) : NULL;
     exec_job *parts = calloc(ntasks, sizeof(*parts));
-#if !defined(_WIN32)
-    exec_thread *threads = ntasks > 1 ? calloc(ntasks, sizeof(*threads)) : NULL;
-    if (ntasks > 1 && !threads) {
-        free(mapped);
-        free(gather);
-        free(parts);
-        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
-    }
-#endif
     if (!parts || (mapped_bytes && !mapped) || (gather_bytes && !gather)) {
         free(mapped);
         free(gather);
         free(parts);
-#if !defined(_WIN32)
-        free(threads);
-#endif
         return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
     }
     bool single_group_acc = plan->info.reduction && groups == 1 && ntasks == 1;
@@ -1482,7 +1543,7 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
             single_group_acc && (plan->info.has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
             single_group_acc ? initial_val : identity_val,
-            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}};
+            0, 0, 0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}, readers, false};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {
@@ -1495,45 +1556,17 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
         cursor += count;
     }
     me_status status = ME_SUCCESS;
-#if !defined(_WIN32)
     if (ntasks > 1) {
-        size_t started = 0;
-        for (; started < ntasks; started++) {
-            threads[started].job = &parts[started];
-            if (pthread_create(&threads[started].thread, NULL, exec_thread_main,
-                               &threads[started]) != 0) {
-                break;
-            }
-        }
-        if (started != ntasks) {
-            /* Join every started task before returning; no retry/replay. */
-            for (size_t i = 0; i < started; i++) {
-                pthread_join(threads[i].thread, NULL);
-            }
-            exec_combine(report, parts, started);
-            exec_merge_init_fp(report, parts, started, init_fp_seen, init_fp);
-            report->tasks = started;
-            report->worker_bytes = worker_bytes;
-            report->mapped_bytes = per_job_mapped;
-            report->gather_bytes = per_job_gather;
-            free(threads);
-            free(mapped);
-            free(gather);
-            free(parts);
-            return exec_error(error, ME_ERR_UNSUPPORTED, "Cannot start all execution jobs");
-        }
-        for (size_t i = 0; i < ntasks; i++) {
-            pthread_join(threads[i].thread, NULL);
-        }
-        free(threads);
-    } else
-#endif
-    {
-        exec_run(&parts[0]);
+        status = exec_launch(exec_run_job, ntasks, sizeof(*parts), parts, error);
+    } else {
+        exec_run_job(&parts[0]);
     }
     exec_combine(report, parts, ntasks);
     exec_merge_init_fp(report, parts, ntasks, init_fp_seen, init_fp);
-    report->tasks = ntasks;
+    for (size_t i = 0; i < ntasks; i++) report->tasks += parts[i].entered;
+    if (status == ME_SUCCESS && report->tasks != ntasks) {
+        status = exec_error(error, ME_ERR_UNSUPPORTED, "Execution launcher did not run all jobs");
+    }
     report->worker_bytes = worker_bytes;
     report->mapped_bytes = per_job_mapped;
     report->gather_bytes = per_job_gather;
@@ -1608,6 +1641,43 @@ me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
     free(gather);
     free(parts);
     return status;
+}
+
+me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
+                                 const b2nd_exec_view *inputs, size_t ninputs,
+                                 const b2nd_exec_output_view *output,
+                                 unsigned raise_mask, size_t max_gather_bytes,
+                                 const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                 me_error *error) {
+    return exec_execute_into(schedule, inputs, ninputs, output, raise_mask,
+                             max_gather_bytes, jobs, report, error, NULL);
+}
+
+me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t slot,
+                                  b2nd_exec_input_meta *out) {
+    if (!schedule || !out || slot >= schedule->plan->info.ninputs) return ME_ERR_INVALID_ARG;
+    *out = schedule->inputs[slot];
+    return ME_SUCCESS;
+}
+
+me_status b2nd_exec_execute_readers(const b2nd_exec_schedule *schedule,
+                                   const b2nd_exec_view *views,
+                                   const b2nd_exec_reader *readers, size_t ninputs,
+                                   me_mut_buffer output, unsigned raise_mask,
+                                   size_t max_gather_bytes, b2nd_exec_report *report,
+                                   me_error *error) {
+    if (!schedule || !readers) {
+        if (report) *report = (b2nd_exec_report){0};
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid storage reader bindings");
+    }
+    b2nd_exec_output_view out = {sizeof(out), output.data, output.capacity, 0, {0}};
+    size_t stride = schedule->plan->info.itemsize;
+    for (size_t a = schedule->info.output_ndim; a-- > 0;) {
+        out.strides[a] = (int64_t)stride;
+        stride *= (size_t)schedule->info.output_shape[a];
+    }
+    return exec_execute_into(schedule, views, ninputs, &out, raise_mask,
+                             max_gather_bytes, NULL, report, error, readers);
 }
 
 me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,

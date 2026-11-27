@@ -80,6 +80,21 @@ combine by logical task ID, never completion order, and every started thread is
 joined before return, including on a start failure. Windows currently uses the
 serial path only.
 
+Parallel transport is behind `b2nd-exec-launch.h`. Full library builds select
+`b2nd_exec_launch_host`, which honors the preconfigured Blosc2 thread callback
+or portable dispatcher. Without a callback this still creates threads per call;
+it is not persistent-pool reuse. Nested executor launches execute their existing
+logical jobs inline before submitting anything, avoiding recursive pool waits.
+Windows admission remains serial pending numerical/FP qualification.
+
+Standalone fixtures retain a codec-independent launcher. `launch.c` supplies a
+deterministic compile-time override and checks reversed order, non-prefix partial
+launch, incomplete success, worker error, exact entered-job counts, no replay and
+recovery. `host-launch.c` checks transport allocation/submission errors and nested
+launches both on the calling thread and from a worker thread. There is no mutable
+global executor launcher setter. The installed consumer separately checks the
+actual archive's configured thread-callback integration and nesting.
+
 Partitionability requires the core's `me_kernel_is_partitionable` proof as well
 as an order-independent host reducer. Lane locality alone does not prove that
 weak-scalar conversions cannot fail. Unproven narrow weak conversions retain

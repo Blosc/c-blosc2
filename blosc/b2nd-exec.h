@@ -159,7 +159,7 @@ typedef struct {
     size_t direct_tiles;
     size_t mapped_bytes;
     me_fp_status fp;
-    size_t tasks;        /* Started jobs, including a serial fallback. */
+    size_t tasks;        /* Callbacks actually entered, including serial execution. */
     size_t worker_bytes; /* Aggregate mapped + gather scratch actually held this call. */
     size_t gather_bytes; /* Per-job gather scratch allocation. */
     size_t gathered_bytes;

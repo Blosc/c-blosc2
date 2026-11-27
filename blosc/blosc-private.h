@@ -14,6 +14,7 @@
 
 #include "blosc2/blosc2-common.h"
 #include "blosc2.h"
+#include "blosc-parallel.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
@@ -29,8 +30,6 @@
 int blosc2_decompress_block_ctx(blosc2_context* context, const void* src,
                                 int32_t srcsize, int32_t nblock, void* dest,
                                 int32_t destsize);
-int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
-                        size_t jobdata_elsize, void *jobdata);
 
 #define to_little(dest, src, itemsize)    endian_handler(true, dest, src, itemsize)
 #define from_little(dest, src, itemsize)  endian_handler(true, dest, src, itemsize)
