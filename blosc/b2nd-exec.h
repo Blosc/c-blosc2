@@ -6,11 +6,15 @@
 #define BLOSC_B2ND_EXEC_H
 
 #include "miniexpr_kernel.h"
+#include "miniexpr_reduce.h"
 #ifndef ME_FP_SCOPE_API
 #error "The typed executor requires the miniexpr shared FP scope API"
 #endif
 #ifndef ME_KERNEL_INPUT_INFO_API
 #error "The typed executor requires miniexpr runtime-slot introspection"
+#endif
+#ifndef ME_SERIAL_REDUCE_API
+#error "The typed executor requires miniexpr serial reduction primitives"
 #endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
@@ -29,7 +33,10 @@ typedef enum {
     B2ND_EXEC_SUBTRACT,
     B2ND_EXEC_MULTIPLY,
     B2ND_EXEC_NEGATE,
-    B2ND_EXEC_MIN
+    B2ND_EXEC_MIN,
+    B2ND_EXEC_SUM,
+    B2ND_EXEC_PROD,
+    B2ND_EXEC_MAX
 } b2nd_exec_op;
 
 typedef struct {
@@ -83,6 +90,9 @@ typedef struct {
     bool identity;
     me_cardinality cardinality;
     int context_ndim;
+    me_dtype map_dtype;
+    size_t map_itemsize;
+    me_reduction_kind reducer;
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -112,7 +122,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *descriptor,
  * Failure leaves the caller's kernel intact. Captures/policy stay in the
  * prepared kernel. Context/block-scalar plans can be inspected but require a
  * future logical-group schedule; resident specialization rejects them. */
-me_status b2nd_exec_prepare_kernel(me_kernel **kernel, bool minimum,
+me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer,
                                   b2nd_exec_plan **out, me_error *error);
 me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *out);
 me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,

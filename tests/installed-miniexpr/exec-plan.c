@@ -14,6 +14,19 @@ static b2nd_exec_node node(uint32_t id, b2nd_exec_op op) {
     return n;
 }
 
+static double scalar_value(me_dtype dtype, uint64_t bits) {
+    if (dtype == ME_INT16) {
+        int16_t value; memcpy(&value, &bits, sizeof(value)); return value;
+    }
+    if (dtype == ME_INT64) {
+        int64_t value; memcpy(&value, &bits, sizeof(value)); return (double)value;
+    }
+    if (dtype == ME_FLOAT32) {
+        float value; memcpy(&value, &bits, sizeof(value)); return value;
+    }
+    double value; memcpy(&value, &bits, sizeof(value)); return value;
+}
+
 int main(void) {
     /* The shared scope restores caller rounding/flags and nests collectors. */
 #ifndef __EMSCRIPTEN__
@@ -223,6 +236,49 @@ int main(void) {
         }
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
+        b2nd_exec_op reducers[] = {B2ND_EXEC_SUM, B2ND_EXEC_PROD, B2ND_EXEC_MAX};
+        double expected[] = {30, -1890, 21};
+        f32[2] = 5;
+        for (size_t r = 0; r < 3; r++) {
+            nodes[3].op = reducers[r];
+            d.nnodes = 4;
+            d.root = 3;
+            meta.shape[0] = 3;
+            assert(b2nd_exec_prepare(&d, NULL, &plan, &error) == ME_SUCCESS);
+            assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
+            assert(info.map_dtype == dtype && info.map_itemsize == width);
+            assert(info.dtype == (kind == 0 && r < 2 ? ME_INT64 : dtype));
+            assert(b2nd_exec_specialize(plan, &meta, 1, 2, 16, &schedule, &error) == ME_SUCCESS);
+            uint64_t scalar = 0;
+            assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
+                0, &report, &error) == ME_SUCCESS);
+            assert(scalar_value(info.dtype, scalar) == expected[r]);
+            assert(report.mapped_bytes == 2 * width);
+            b2nd_exec_schedule_free(schedule);
+            if (r < 2) {
+                meta.shape[0] = 0;
+                assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+                me_buffer empty = {NULL, 0};
+                assert(b2nd_exec_execute(schedule, &empty, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
+                    0, &report, &error) == ME_SUCCESS);
+                assert(scalar_value(info.dtype, scalar) == (r == 0 ? 0 : 1));
+                assert(!report.tiles && !report.map_calls);
+                b2nd_exec_schedule_free(schedule);
+            }
+            b2nd_exec_plan_free(plan);
+            nodes[3].args[0] = 0;
+            meta.shape[0] = 3;
+            assert(b2nd_exec_prepare(&d, NULL, &plan, &error) == ME_SUCCESS);
+            assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.identity);
+            assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+            assert(b2nd_exec_execute(schedule, &input, 1, (me_mut_buffer){&scalar, sizeof(scalar)},
+                0, &report, &error) == ME_SUCCESS);
+            assert(scalar_value(info.dtype, scalar) == (r == 0 ? 10 : r == 1 ? -70 : 7));
+            assert(!report.map_calls && !report.mapped_bytes && report.direct_tiles == 2);
+            b2nd_exec_schedule_free(schedule);
+            b2nd_exec_plan_free(plan);
+            nodes[3].args[0] = 2;
+        }
         d.nnodes = 3;
         d.root = 2;
         assert(b2nd_exec_prepare(&d, NULL, &plan, &error) == ME_SUCCESS);
@@ -254,9 +310,9 @@ int main(void) {
     assert(me_describe_input(kernel, 0, &described) == ME_SUCCESS);
     assert(!described.name && described.dtype == ME_INT64 && described.itemsize == 8);
     assert(me_describe_input(kernel, 1, &described) == ME_ERR_INVALID_ARG);
-    assert(b2nd_exec_prepare_kernel(&kernel, false, NULL, &error) == ME_ERR_INVALID_ARG);
+    assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_NONE, NULL, &error) == ME_ERR_INVALID_ARG);
     assert(kernel);
-    assert(b2nd_exec_prepare_kernel(&kernel, false, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_NONE, &plan, &error) == ME_SUCCESS);
     assert(!kernel);
     b2nd_exec_input_meta direct_meta = {ME_INT64, 8, 1, {3}};
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
@@ -288,9 +344,9 @@ int main(void) {
     signature.cardinality = ME_BLOCK_SCALAR;
     assert(me_prepare_menudet("0.2", "def group(x):\n    return block_sum(x)\n",
         &signature, NULL, &kernel, &error) == ME_SUCCESS);
-    assert(b2nd_exec_prepare_kernel(&kernel, true, &plan, &error) == ME_ERR_UNSUPPORTED);
+    assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_MIN, &plan, &error) == ME_ERR_UNSUPPORTED);
     assert(kernel && !plan);
-    assert(b2nd_exec_prepare_kernel(&kernel, false, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_prepare_kernel(&kernel, ME_REDUCTION_NONE, &plan, &error) == ME_SUCCESS);
     assert(!kernel);
     assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.cardinality == ME_BLOCK_SCALAR);
     assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_ERR_UNSUPPORTED);

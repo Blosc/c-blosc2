@@ -40,6 +40,25 @@ static size_t numeric_width(me_dtype dtype) {
     return me_extrema_itemsize(dtype);
 }
 
+static me_reduction_kind reduction_kind(b2nd_exec_op op) {
+    switch (op) {
+        case B2ND_EXEC_MIN: return ME_REDUCTION_MIN;
+        case B2ND_EXEC_MAX: return ME_REDUCTION_MAX;
+        case B2ND_EXEC_SUM: return ME_REDUCTION_SUM;
+        case B2ND_EXEC_PROD: return ME_REDUCTION_PROD;
+        default: return ME_REDUCTION_NONE;
+    }
+}
+
+static void result_info(b2nd_exec_plan_info *out, const me_kernel_info *map) {
+    out->map_dtype = map->output_dtype;
+    out->map_itemsize = map->output_itemsize;
+    out->dtype = me_reduce_accumulator_dtype(map->output_dtype, out->reducer, ME_AUTO);
+    out->itemsize = numeric_width(out->dtype);
+    out->cardinality = map->cardinality;
+    out->context_ndim = map->context_ndim;
+}
+
 static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
     if (!d || d->struct_size != sizeof(*d) || !d->nodes ||
         !d->nnodes || d->nnodes > B2ND_EXEC_MAX_NODES ||
@@ -57,7 +76,8 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         size_t arity;
         switch (n->op) {
             case B2ND_EXEC_INPUT: case B2ND_EXEC_CAPTURE: arity = 0; break;
-            case B2ND_EXEC_NEGATE: case B2ND_EXEC_MIN: arity = 1; break;
+            case B2ND_EXEC_NEGATE: case B2ND_EXEC_MIN: case B2ND_EXEC_MAX:
+            case B2ND_EXEC_SUM: case B2ND_EXEC_PROD: arity = 1; break;
             case B2ND_EXEC_ADD: case B2ND_EXEC_SUBTRACT: case B2ND_EXEC_MULTIPLY: arity = 2; break;
             default: return exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution operation");
         }
@@ -66,7 +86,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         }
         depth[i] = 1;
         for (size_t a = 0; a < n->nargs; a++) {
-            if (n->args[a] >= i || d->nodes[n->args[a]].op == B2ND_EXEC_MIN) {
+            if (n->args[a] >= i || reduction_kind(d->nodes[n->args[a]].op) != ME_REDUCTION_NONE) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Forward, cyclic or nested reduction reference");
             }
             unsigned next = depth[n->args[a]] + 1;
@@ -98,7 +118,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         } else if (n->dtype != ME_AUTO || n->itemsize || n->scalar_size) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Operation dtype constraints are not yet supported");
         }
-        if (n->op == B2ND_EXEC_MIN && i != d->root) {
+        if (reduction_kind(n->op) != ME_REDUCTION_NONE && i != d->root) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
         }
     }
@@ -188,7 +208,8 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     plan->nnodes = d->nnodes;
     plan->root = d->root;
     plan->info.ninputs = d->ninputs;
-    plan->info.reduction = d->nodes[d->root].op == B2ND_EXEC_MIN;
+    plan->info.reducer = reduction_kind(d->nodes[d->root].op);
+    plan->info.reduction = plan->info.reducer != ME_REDUCTION_NONE;
     uint32_t map = plan->info.reduction ? d->nodes[d->root].args[0] : d->root;
     plan->info.identity = d->nodes[map].op == B2ND_EXEC_INPUT;
     plan->direct_slot = plan->info.identity ? d->nodes[map].slot : 0;
@@ -278,10 +299,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
             info.cardinality != ME_ELEMENTWISE || info.context_ndim)) {
             status = exec_error(error, ME_ERR_UNSUPPORTED, "Unsupported execution map result");
         }
-        plan->info.dtype = info.output_dtype;
-        plan->info.itemsize = info.output_itemsize;
-        plan->info.cardinality = info.cardinality;
-        plan->info.context_ndim = info.context_ndim;
+        result_info(&plan->info, &info);
     }
     if (status != ME_SUCCESS) {
         b2nd_exec_plan_free(plan);
@@ -291,7 +309,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     return ME_SUCCESS;
 }
 
-me_status b2nd_exec_prepare_kernel(me_kernel **kernel, bool minimum,
+me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer,
                                   b2nd_exec_plan **out, me_error *error) {
     if (out) {
         *out = NULL;
@@ -306,16 +324,24 @@ me_status b2nd_exec_prepare_kernel(me_kernel **kernel, bool minimum,
         count > B2ND_EXEC_MAX_INPUTS || !info.output_itemsize) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid direct kernel metadata");
     }
-    if (minimum && (info.cardinality != ME_ELEMENTWISE || !numeric_width(info.output_dtype))) {
-        return exec_error(error, ME_ERR_UNSUPPORTED, "Direct kernel is not an elementwise minimum map");
+    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_MAX ||
+        (reducer != ME_REDUCTION_NONE &&
+         (info.cardinality != ME_ELEMENTWISE || !numeric_width(info.output_dtype)))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Direct kernel cannot feed this reducer");
     }
     b2nd_exec_plan *plan = calloc(1, sizeof(*plan));
     if (!plan) {
         return exec_error(error, ME_ERR_OOM, "Cannot allocate direct execution plan");
     }
-    plan->info = (b2nd_exec_plan_info){
-        info.output_dtype, info.output_itemsize, count, minimum, false,
-        info.cardinality, info.context_ndim};
+    plan->info.ninputs = count;
+    plan->info.reducer = reducer;
+    plan->info.reduction = reducer != ME_REDUCTION_NONE;
+    result_info(&plan->info, &info);
+    /* Direct complex/string kernels remain inspectable, not resident-admitted. */
+    if (reducer == ME_REDUCTION_NONE) {
+        plan->info.dtype = info.output_dtype;
+        plan->info.itemsize = info.output_itemsize;
+    }
     for (size_t i = 0; i < count; i++) {
         me_input_spec input;
         if (me_describe_input(*kernel, i, &input) != ME_SUCCESS) {
@@ -349,7 +375,8 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     if (!out || !plan || !inputs || ninputs != plan->info.ninputs || !tile_items) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution specialization");
     }
-    if (!ninputs || plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim) {
+    if (!ninputs || plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim ||
+        !numeric_width(plan->info.map_dtype)) {
         return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
     }
     size_t items = 1;
@@ -364,6 +391,9 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
         items *= (size_t)extent;
     }
     for (size_t i = 0; i < ninputs; i++) {
+        if (!numeric_width(inputs[i].dtype)) {
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires real numeric inputs");
+        }
         if (inputs[i].dtype != plan->inputs[i].dtype ||
             inputs[i].itemsize != plan->inputs[i].itemsize ||
             inputs[i].ndim != inputs[0].ndim ||
@@ -374,8 +404,8 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
             return exec_error(error, ME_ERR_INVALID_ARG, "Execution input byte size overflow");
         }
     }
-    if (plan->info.reduction && !items) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Minimum of an empty execution domain");
+    if (!items && (plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Extremum of an empty execution domain");
     }
     if (items > SIZE_MAX / plan->info.itemsize) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution output byte size overflow");
@@ -384,7 +414,10 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     if (!plan->info.identity && lanes > INT_MAX) {
         return exec_error(error, ME_ERR_UNSUPPORTED, "Execution tile exceeds the core lane limit");
     }
-    size_t mapped = plan->info.identity || !plan->info.reduction ? 0 : lanes * plan->info.itemsize;
+    if (lanes > SIZE_MAX / plan->info.map_itemsize) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Execution map tile size overflow");
+    }
+    size_t mapped = plan->info.identity || !plan->info.reduction ? 0 : lanes * plan->info.map_itemsize;
     if (mapped > max_mapped_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");
     }
@@ -435,6 +468,7 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
     const b2nd_exec_plan *plan = schedule->plan;
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
+    size_t map_width = plan->info.map_itemsize;
     size_t output_bytes = schedule->info.output_items * width;
     if (!valid_extent(output.data, output.capacity, output_bytes, width)) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent or alignment");
@@ -457,11 +491,14 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
     report->mapped_bytes = schedule->info.mapped_bytes;
     uint32_t direct_slot = plan->direct_slot;
     uint64_t best = 0;
+    if (plan->info.reducer == ME_REDUCTION_SUM || plan->info.reducer == ME_REDUCTION_PROD) {
+        me_reduce_identity(plan->info.reducer, plan->info.dtype, &best);
+    }
     me_status status = ME_SUCCESS;
     /* Only floating reduction arithmetic needs a host FP scope. Integer
      * identity reductions deliberately avoid probing floating-point status. */
     bool floating = plan->info.reduction &&
-        (plan->info.dtype == ME_FLOAT32 || plan->info.dtype == ME_FLOAT64);
+        (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
     bool scoped = floating || raise_mask != 0;
     me_fp_scope scope;
     me_fp_status reducer_fp = {0};
@@ -483,7 +520,7 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
             items - pos : schedule->info.tile_items;
         const void *values;
         if (plan->info.identity) {
-            values = (const unsigned char *)inputs[direct_slot].data + pos * width;
+            values = (const unsigned char *)inputs[direct_slot].data + pos * map_width;
             report->direct_tiles++;
         } else {
             me_buffer spans[B2ND_EXEC_MAX_INPUTS];
@@ -503,7 +540,7 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
             void *target = plan->info.reduction ? mapped :
                 (unsigned char *)output.data + pos * width;
             status = me_eval_block(plan->kernel, spans, ninputs,
-                (me_mut_buffer){target, count * width}, &block, &options, error);
+                (me_mut_buffer){target, count * map_width}, &block, &options, error);
             report->fp.flags |= fp.flags;
             report->fp.supported = fp_seen ? report->fp.supported && fp.supported : fp.supported;
             fp_seen = true;
@@ -514,8 +551,17 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
             values = target;
         }
         if (plan->info.reduction) {
-            if (!me_extrema_span(plan->info.dtype, values, count, best, pos != 0, true, &best)) {
-                status = exec_error(error, ME_ERR_EVAL, "Execution minimum failed");
+            bool success;
+            if (plan->info.reducer == ME_REDUCTION_SUM) {
+                success = me_sum_span(plan->info.map_dtype, values, count, best, false, &best);
+            } else if (plan->info.reducer == ME_REDUCTION_PROD) {
+                success = me_prod_span(plan->info.map_dtype, values, count, best, false, &best);
+            } else {
+                success = me_extrema_span(plan->info.map_dtype, values, count, best, pos != 0,
+                    plan->info.reducer == ME_REDUCTION_MIN, &best);
+            }
+            if (!success) {
+                status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
                 break;
             }
         } else if (plan->info.identity) {
