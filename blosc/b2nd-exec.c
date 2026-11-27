@@ -5,7 +5,6 @@
 #include "b2nd-exec.h"
 #include "miniexpr_reduce.h"
 
-#include <fenv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +15,7 @@ struct b2nd_exec_plan {
     b2nd_exec_node *nodes;
     size_t nnodes;
     uint32_t root;
+    uint32_t direct_slot;
     b2nd_exec_input_meta inputs[B2ND_EXEC_MAX_INPUTS];
 };
 
@@ -191,6 +191,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     plan->info.reduction = d->nodes[d->root].op == B2ND_EXEC_MIN;
     uint32_t map = plan->info.reduction ? d->nodes[d->root].args[0] : d->root;
     plan->info.identity = d->nodes[map].op == B2ND_EXEC_INPUT;
+    plan->direct_slot = plan->info.identity ? d->nodes[map].slot : 0;
     bool reachable[B2ND_EXEC_MAX_NODES] = {0};
     unsigned uses[B2ND_EXEC_MAX_NODES] = {0};
     reachable[map] = true;
@@ -216,7 +217,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     char input_names[B2ND_EXEC_MAX_INPUTS][24];
     char capture_names[B2ND_EXEC_MAX_CAPTURES][24];
     size_t ncaptures = 0;
-    size_t used = (size_t)snprintf(source, capacity, "def mapped(");
+    size_t used = (size_t)snprintf(source, capacity, "# me:fp=strict\ndef mapped(");
     for (size_t slot = 0; slot < d->ninputs; slot++) {
         snprintf(input_names[slot], sizeof(input_names[slot]), "i%zu", slot);
         used += (size_t)snprintf(source + used, capacity - used, "%si%zu", slot ? ", " : "", slot);
@@ -279,11 +280,53 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         }
         plan->info.dtype = info.output_dtype;
         plan->info.itemsize = info.output_itemsize;
+        plan->info.cardinality = info.cardinality;
+        plan->info.context_ndim = info.context_ndim;
     }
     if (status != ME_SUCCESS) {
         b2nd_exec_plan_free(plan);
         return status;
     }
+    *out = plan;
+    return ME_SUCCESS;
+}
+
+me_status b2nd_exec_prepare_kernel(me_kernel **kernel, bool minimum,
+                                  b2nd_exec_plan **out, me_error *error) {
+    if (out) {
+        *out = NULL;
+    }
+    if (!kernel || !*kernel || !out) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid direct execution kernel");
+    }
+    me_kernel_info info = ME_KERNEL_INFO_INITIALIZER;
+    size_t count = 0;
+    if (me_describe(*kernel, &info) != ME_SUCCESS ||
+        me_describe_input_count(*kernel, &count) != ME_SUCCESS ||
+        count > B2ND_EXEC_MAX_INPUTS || !info.output_itemsize) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid direct kernel metadata");
+    }
+    if (minimum && (info.cardinality != ME_ELEMENTWISE || !numeric_width(info.output_dtype))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Direct kernel is not an elementwise minimum map");
+    }
+    b2nd_exec_plan *plan = calloc(1, sizeof(*plan));
+    if (!plan) {
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate direct execution plan");
+    }
+    plan->info = (b2nd_exec_plan_info){
+        info.output_dtype, info.output_itemsize, count, minimum, false,
+        info.cardinality, info.context_ndim};
+    for (size_t i = 0; i < count; i++) {
+        me_input_spec input;
+        if (me_describe_input(*kernel, i, &input) != ME_SUCCESS) {
+            free(plan);
+            return exec_error(error, ME_ERR_INVALID_ARG, "Cannot describe direct kernel input");
+        }
+        plan->inputs[i].dtype = input.dtype;
+        plan->inputs[i].itemsize = input.itemsize;
+    }
+    plan->kernel = *kernel;
+    *kernel = NULL;
     *out = plan;
     return ME_SUCCESS;
 }
@@ -305,6 +348,9 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     }
     if (!out || !plan || !inputs || ninputs != plan->info.ninputs || !tile_items) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution specialization");
+    }
+    if (!ninputs || plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
     }
     size_t items = 1;
     if (!inputs[0].ndim || inputs[0].ndim > B2ND_EXEC_MAX_RANK) {
@@ -335,7 +381,7 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution output byte size overflow");
     }
     size_t lanes = items < tile_items ? items : tile_items;
-    size_t mapped = plan->info.identity ? 0 : lanes * plan->info.itemsize;
+    size_t mapped = plan->info.identity || !plan->info.reduction ? 0 : lanes * plan->info.itemsize;
     if (mapped > max_mapped_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");
     }
@@ -367,14 +413,6 @@ void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule) {
 static bool valid_extent(const void *data, size_t capacity, size_t bytes, size_t alignment) {
     return capacity >= bytes && (!bytes ||
         (data && (uintptr_t)data % alignment == 0 && (uintptr_t)data <= UINTPTR_MAX - bytes));
-}
-
-static unsigned fp_flags(void) {
-    int flags = fetestexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW | FE_UNDERFLOW);
-    return ((flags & FE_INVALID) ? ME_FP_INVALID : 0) |
-        ((flags & FE_DIVBYZERO) ? ME_FP_DIVIDE : 0) |
-        ((flags & FE_OVERFLOW) ? ME_FP_OVERFLOW : 0) |
-        ((flags & FE_UNDERFLOW) ? ME_FP_UNDERFLOW : 0);
 }
 
 me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
@@ -414,19 +452,27 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_OOM, "Cannot allocate execution mapped tile");
     }
     report->mapped_bytes = schedule->info.mapped_bytes;
-    uint32_t map = plan->info.reduction ? plan->nodes[plan->root].args[0] : plan->root;
-    uint32_t direct_slot = plan->info.identity ? plan->nodes[map].slot : 0;
+    uint32_t direct_slot = plan->direct_slot;
     uint64_t best = 0;
     me_status status = ME_SUCCESS;
     /* Only floating reduction arithmetic needs a host FP scope. Integer
      * identity reductions deliberately avoid probing floating-point status. */
     bool floating = plan->info.reduction &&
         (plan->info.dtype == ME_FLOAT32 || plan->info.dtype == ME_FLOAT64);
-    fenv_t saved;
-    bool scoped = floating && feholdexcept(&saved) == 0;
-    if (floating && !scoped) {
-        free(mapped);
-        return exec_error(error, ME_ERR_UNSUPPORTED, "Cannot isolate execution floating-point status");
+    bool scoped = floating || raise_mask != 0;
+    me_fp_scope scope;
+    me_fp_status reducer_fp = {0};
+    if (scoped) {
+        status = me_fp_scope_begin(&scope, &reducer_fp, error);
+        if (status != ME_SUCCESS) {
+            free(mapped);
+            return status;
+        }
+        if (raise_mask && !reducer_fp.supported) {
+            me_fp_scope_end(&scope, NULL);
+            free(mapped);
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Floating exception reporting is unavailable");
+        }
     }
     bool fp_seen = false;
     for (size_t pos = 0; pos < items;) {
@@ -448,9 +494,13 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
             me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
             me_fp_status fp = {0};
             options.fp_status = &fp;
-            options.raise_mask = raise_mask;
+            /* The graph adapter checks the union after traversal, including
+             * reducer flags. A raise mask must not truncate later tiles. */
+            options.raise_mask = 0;
+            void *target = plan->info.reduction ? mapped :
+                (unsigned char *)output.data + pos * width;
             status = me_eval_block(plan->kernel, spans, ninputs,
-                (me_mut_buffer){mapped, schedule->info.mapped_bytes}, &block, &options, error);
+                (me_mut_buffer){target, count * width}, &block, &options, error);
             report->fp.flags |= fp.flags;
             report->fp.supported = fp_seen ? report->fp.supported && fp.supported : fp.supported;
             fp_seen = true;
@@ -458,24 +508,25 @@ me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
                 break;
             }
             report->map_calls++;
-            values = mapped;
+            values = target;
         }
         if (plan->info.reduction) {
             if (!me_extrema_span(plan->info.dtype, values, count, best, pos != 0, true, &best)) {
                 status = exec_error(error, ME_ERR_EVAL, "Execution minimum failed");
                 break;
             }
-        } else {
+        } else if (plan->info.identity) {
             memcpy((unsigned char *)output.data + pos * width, values, count * width);
         }
         report->tiles++;
         pos += count;
     }
     if (scoped) {
-        report->fp.flags |= fp_flags();
-        report->fp.supported = fp_seen ? report->fp.supported : true;
-        if (fesetenv(&saved) != 0 && status == ME_SUCCESS) {
-            status = exec_error(error, ME_ERR_UNSUPPORTED, "Cannot restore execution floating-point status");
+        me_status restored = me_fp_scope_end(&scope, status == ME_SUCCESS ? error : NULL);
+        report->fp.flags |= reducer_fp.flags;
+        report->fp.supported = fp_seen ? report->fp.supported && reducer_fp.supported : reducer_fp.supported;
+        if (status == ME_SUCCESS) {
+            status = restored;
         }
     }
     free(mapped);

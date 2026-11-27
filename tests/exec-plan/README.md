@@ -15,13 +15,18 @@ The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
 The serial executor binds native aligned contiguous buffers in slot order.
-Computed maps use one bounded mapped tile; proven identity maps read their
+Computed maps feeding a reducer use one bounded mapped tile; disjoint pure maps
+evaluate directly into the destination with zero mapped scratch. Proven identity maps read their
 declared input slot directly without a kernel call. Minimum results publish
 only after success. Map results may contain completed tiles after a later
-failure. Buffer capacities, pointer overflow and output disjointness are
+failure, and a failed map call may partially write its tile. Buffer capacities, pointer overflow and output disjointness are
 validated before allocation/evaluation. Reports distinguish traversal tiles,
 map calls, identity tiles, mapped scratch and reducer state; compiler/core
 allocation is not included in the mapped-tile bound.
+Host reducer arithmetic uses miniexpr's shared strict FP scope, including
+nearest rounding, gradual-underflow validation and caller-state restoration.
+Raise masks check the final map/reducer flag union after traversal, matching
+the comparison graph executor rather than changing failure timing per tile.
 
 Build/install miniexpr with `MINIEXPR_BUILD_ARTIFACT=OFF`, then:
 

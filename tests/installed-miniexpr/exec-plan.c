@@ -15,6 +15,27 @@ static b2nd_exec_node node(uint32_t id, b2nd_exec_op op) {
 }
 
 int main(void) {
+    /* The shared scope restores caller rounding/flags and nests collectors. */
+    int rounding = fegetround();
+    assert(fesetround(FE_DOWNWARD) == 0);
+    feclearexcept(FE_ALL_EXCEPT);
+    feraiseexcept(FE_DIVBYZERO);
+    me_fp_scope outer, inner;
+    me_fp_status outer_status, inner_status;
+    me_error scope_error;
+    assert(me_fp_scope_begin(&outer, &outer_status, &scope_error) == ME_SUCCESS);
+    assert(fegetround() == FE_TONEAREST);
+    feraiseexcept(FE_OVERFLOW);
+    assert(me_fp_scope_begin(&inner, &inner_status, &scope_error) == ME_SUCCESS);
+    feraiseexcept(FE_INVALID);
+    assert(me_fp_scope_end(&inner, &scope_error) == ME_SUCCESS);
+    assert(inner_status.supported && inner_status.flags == ME_FP_INVALID);
+    assert(me_fp_scope_end(&outer, &scope_error) == ME_SUCCESS);
+    assert(outer_status.flags == ME_FP_OVERFLOW);
+    assert(fegetround() == FE_DOWNWARD);
+    assert(fetestexcept(FE_ALL_EXCEPT) == FE_DIVBYZERO);
+    assert(fesetround(rounding) == 0);
+    feclearexcept(FE_ALL_EXCEPT);
     b2nd_exec_node nodes[7];
     nodes[0] = node(0, B2ND_EXEC_INPUT);
     nodes[0].dtype = ME_INT64;
@@ -182,6 +203,7 @@ int main(void) {
             assert(b2nd_exec_execute(schedule, &input, 1, output, ME_FP_OVERFLOW,
                 &report, &error) == ME_ERR_EVAL);
             assert(out32 == 11 && (report.fp.flags & ME_FP_OVERFLOW));
+            assert(report.tiles == 2 && report.map_calls == 2);
             assert(fetestexcept(FE_ALL_EXCEPT) == FE_DIVBYZERO);
             feclearexcept(FE_ALL_EXCEPT);
         }
@@ -190,7 +212,7 @@ int main(void) {
         d.nnodes = 3;
         d.root = 2;
         assert(b2nd_exec_prepare(&d, NULL, &plan, &error) == ME_SUCCESS);
-        assert(b2nd_exec_specialize(plan, &meta, 1, 2, 16, &schedule, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(plan, &meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
         int16_t map16[3];
         float map32[3];
         double map64[3];
@@ -200,9 +222,50 @@ int main(void) {
         assert(b2nd_exec_execute(schedule, &input, 1, output, 0, &report, &error) == ME_SUCCESS);
         assert(kind == 0 ? map16[2] == 15 : kind == 1 ? map32[2] == 15 : map64[2] == 15);
         assert(report.map_calls == 2);
+        assert(report.mapped_bytes == 0);
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
     }
+    /* Authored formula kernels share the executor; no Menudet substitution. */
+    me_input_spec slot = {"x", ME_INT64, 8};
+    me_signature signature = ME_SIGNATURE_INITIALIZER;
+    signature.inputs = &slot;
+    signature.ninputs = 1;
+    signature.cardinality = ME_ELEMENTWISE;
+    me_kernel *kernel = NULL;
+    assert(me_prepare_formula("x * 2", &signature, NULL, &kernel, &error) == ME_SUCCESS);
+    size_t slots = 0;
+    me_input_spec described;
+    assert(me_describe_input_count(kernel, &slots) == ME_SUCCESS && slots == 1);
+    assert(me_describe_input(kernel, 0, &described) == ME_SUCCESS);
+    assert(!described.name && described.dtype == ME_INT64 && described.itemsize == 8);
+    assert(me_describe_input(kernel, 1, &described) == ME_ERR_INVALID_ARG);
+    assert(b2nd_exec_prepare_kernel(&kernel, false, NULL, &error) == ME_ERR_INVALID_ARG);
+    assert(kernel);
+    assert(b2nd_exec_prepare_kernel(&kernel, false, &plan, &error) == ME_SUCCESS);
+    assert(!kernel);
+    b2nd_exec_input_meta direct_meta = {ME_INT64, 8, 1, {3}};
+    assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_SUCCESS);
+    int64_t direct_input[] = {7, -2, 5}, direct_output[3];
+    me_buffer direct_buffer = {direct_input, sizeof(direct_input)};
+    assert(b2nd_exec_execute(schedule, &direct_buffer, 1,
+        (me_mut_buffer){direct_output, sizeof(direct_output)}, 0, &report, &error) == ME_SUCCESS);
+    assert(direct_output[0] == 14 && direct_output[1] == -4 && direct_output[2] == 10);
+    assert(report.map_calls == 2 && !report.mapped_bytes);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
+
+    signature.cardinality = ME_BLOCK_SCALAR;
+    assert(me_prepare_menudet("0.2", "def group(x):\n    return block_sum(x)\n",
+        &signature, NULL, &kernel, &error) == ME_SUCCESS);
+    assert(b2nd_exec_prepare_kernel(&kernel, true, &plan, &error) == ME_ERR_UNSUPPORTED);
+    assert(kernel && !plan);
+    assert(b2nd_exec_prepare_kernel(&kernel, false, &plan, &error) == ME_SUCCESS);
+    assert(!kernel);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS && info.cardinality == ME_BLOCK_SCALAR);
+    assert(b2nd_exec_specialize(plan, &direct_meta, 1, 2, 0, &schedule, &error) == ME_ERR_UNSUPPORTED);
+    assert(!schedule);
+    b2nd_exec_plan_free(plan);
     b2nd_exec_plan_free(NULL);
     b2nd_exec_schedule_free(NULL);
     return 0;

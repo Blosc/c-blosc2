@@ -6,6 +6,12 @@
 #define BLOSC_B2ND_EXEC_H
 
 #include "miniexpr_kernel.h"
+#ifndef ME_FP_SCOPE_API
+#error "The typed executor requires the miniexpr shared FP scope API"
+#endif
+#ifndef ME_KERNEL_INPUT_INFO_API
+#error "The typed executor requires miniexpr runtime-slot introspection"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
@@ -75,6 +81,8 @@ typedef struct {
     size_t ninputs;
     bool reduction;
     bool identity;
+    me_cardinality cardinality;
+    int context_ndim;
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -99,6 +107,13 @@ typedef struct {
 me_status b2nd_exec_prepare(const b2nd_exec_descriptor *descriptor,
                            const b2nd_exec_options *options,
                            b2nd_exec_plan **out, me_error *error);
+/* Authored kernels enter the SAME scheduler without a graph/source rewrite.
+ * Success transfers *kernel to the plan and clears the caller's pointer.
+ * Failure leaves the caller's kernel intact. Captures/policy stay in the
+ * prepared kernel. Context/block-scalar plans can be inspected but require a
+ * future logical-group schedule; resident specialization rejects them. */
+me_status b2nd_exec_prepare_kernel(me_kernel **kernel, bool minimum,
+                                  b2nd_exec_plan **out, me_error *error);
 me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *out);
 me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
                               const b2nd_exec_input_meta *inputs, size_t ninputs,
@@ -108,7 +123,9 @@ me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule,
                                      b2nd_exec_schedule_info *out);
 /* Native, aligned, contiguous, disjoint buffers in slot order. Reduction
  * output is published only on success; map output may contain earlier tiles
- * on failure. Buffers/report/options are invocation-local and never retained.
+ * and a partially written failing tile on failure. FP raise masks apply after
+ * successful traversal, as in the graph adapter. Buffers/report/options are
+ * invocation-local and never retained.
  * mapped_bytes excludes core evaluation/compiler allocation. */
 me_status b2nd_exec_execute(const b2nd_exec_schedule *schedule,
                             const me_buffer *inputs, size_t ninputs,
