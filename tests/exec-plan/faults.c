@@ -85,5 +85,32 @@ int main(void) {
     b2nd_exec_schedule_free(strided_schedule);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
+
+    /* Inject OOM for strided output scatter map and alias staging buffer. */
+    b2nd_exec_node neg[2] = {node, {0}};
+    neg[1].struct_size = sizeof(node);
+    neg[1].id = 1;
+    neg[1].op = B2ND_EXEC_NEGATE;
+    neg[1].nargs = 1;
+    b2nd_exec_descriptor map_d = {sizeof(map_d), neg, 2, 1, 1};
+    fail_at = 0;
+    assert(b2nd_exec_prepare(&map_d, NULL, &plan, &error) == ME_SUCCESS);
+    b2nd_exec_input_meta map_meta = {ME_INT64, 8, 1, {4}};
+    assert(b2nd_exec_specialize(plan, &map_meta, 1, 4, 32, &schedule, &error) == ME_SUCCESS);
+    int64_t map_in[4] = {1, 2, 3, 4};
+    int64_t map_out[8];
+    memset(map_out, 0x55, sizeof(map_out));
+    b2nd_exec_view map_vin = {sizeof(map_vin), map_in, sizeof(map_in), 0, {8}, 0};
+    b2nd_exec_output_view map_vout = {sizeof(map_vout), map_out, sizeof(map_out), 0, {16}};
+    allocations = 0;
+    fail_at = 1;
+    assert(b2nd_exec_execute_into(schedule, &map_vin, 1, &map_vout, 0, 0, NULL, &report, &error) == ME_ERR_OOM);
+    assert(!report.tiles && ((unsigned char *)map_out)[0] == 0x55);
+    allocations = 0;
+    fail_at = 1;
+    assert(b2nd_exec_execute_alias(schedule, &map_vin, 1, &map_vout, 32, 0, 0, NULL, &report, &error) == ME_ERR_OOM);
+    assert(!report.tiles && ((unsigned char *)map_out)[0] == 0x55);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
     return 0;
 }

@@ -22,6 +22,9 @@
 #ifndef ME_REDUCE_STORE_SCALAR_API
 #error "The typed executor requires miniexpr scalar store primitives"
 #endif
+#ifndef ME_PAIRWISE_SUM_API
+#error "The typed executor requires miniexpr pairwise sum primitives"
+#endif
 
 /* Experimental internal boundary, not an installed ABI or interchange format.
  * IDs are array indices. Slots, unlike diagnostic names, bind runtime inputs.
@@ -60,6 +63,15 @@ typedef struct {
     uint8_t scalar[16]; /* Exact native bytes, never normalized through double. */
     size_t scalar_size;
     me_capture_category category;
+    bool has_axes; /* False: all axes (whole-domain). True: axes[0..naxes-1]. */
+    size_t naxes;
+    int axes[B2ND_EXEC_MAX_RANK];
+    bool keepdims;
+    bool has_initial;
+    me_dtype initial_dtype;
+    me_capture_category initial_category;
+    uint8_t initial_scalar[16];
+    size_t initial_size;
 } b2nd_exec_node;
 
 typedef struct {
@@ -104,6 +116,11 @@ typedef struct {
     size_t map_itemsize;
     me_reduction_kind reducer;
     size_t plan_metadata_bytes; /* Excludes kernel/compiler allocations. */
+    bool has_axes;
+    size_t naxes;
+    int axes[B2ND_EXEC_MAX_RANK];
+    bool keepdims;
+    bool has_initial;
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -116,6 +133,11 @@ typedef struct {
     size_t ndim;
     int64_t shape[B2ND_EXEC_MAX_RANK];
     size_t broadcast_gather_bytes;
+    size_t output_ndim;
+    int64_t output_shape[B2ND_EXEC_MAX_RANK];
+    size_t reduction_groups;
+    size_t reduction_lanes;
+    bool pairwise_sum;
 } b2nd_exec_schedule_info;
 
 typedef struct {
@@ -128,7 +150,17 @@ typedef struct {
     size_t worker_bytes; /* Aggregate mapped + gather scratch actually held this call. */
     size_t gather_bytes; /* Per-job gather scratch allocation. */
     size_t gathered_bytes;
+    size_t staging_bytes; /* Separate transactional alias staging buffer, if used. */
 } b2nd_exec_report;
+
+/* Writable, native-endian, provably injective destination view. */
+typedef struct {
+    size_t struct_size;
+    void *base;
+    size_t capacity;
+    size_t offset;
+    int64_t strides[B2ND_EXEC_MAX_RANK];
+} b2nd_exec_output_view;
 
 /* Borrowed resident array view. `base` and `capacity` describe the entire
  * owning allocation; `offset` is the byte offset of element [0, ..., 0]
@@ -173,6 +205,11 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
                               const b2nd_exec_input_meta *inputs, size_t ninputs,
                               size_t tile_items, size_t max_mapped_bytes,
                               b2nd_exec_schedule **out, me_error *error);
+me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
+                                 const b2nd_exec_input_meta *inputs, size_t ninputs,
+                                 size_t tile_items, size_t max_mapped_bytes,
+                                 bool pairwise_sum,
+                                 b2nd_exec_schedule **out, me_error *error);
 me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule,
                                      b2nd_exec_schedule_info *out);
 /* Native, aligned, contiguous, disjoint buffers in slot order. Reduction
@@ -193,6 +230,24 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
                                   const b2nd_exec_view *inputs, size_t ninputs,
                                   me_mut_buffer output, unsigned raise_mask,
                                   size_t max_gather_bytes,
+                                  const b2nd_exec_jobs *jobs,
+                                  b2nd_exec_report *report, me_error *error);
+/* Descriptor-output variant supporting disjoint strided/reversed/transposed
+ * destinations without changing logical evaluation or reduction order. */
+me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
+                                 const b2nd_exec_view *inputs, size_t ninputs,
+                                 const b2nd_exec_output_view *output,
+                                 unsigned raise_mask, size_t max_gather_bytes,
+                                 const b2nd_exec_jobs *jobs,
+                                 b2nd_exec_report *report, me_error *error);
+/* Transactional alias adapter: evaluates into a separate staging buffer
+ * bounded by `staging_budget`, then commits to `output` only on success.
+ * Failure leaves the final destination unchanged. */
+me_status b2nd_exec_execute_alias(const b2nd_exec_schedule *schedule,
+                                  const b2nd_exec_view *inputs, size_t ninputs,
+                                  const b2nd_exec_output_view *output,
+                                  size_t staging_budget,
+                                  unsigned raise_mask, size_t max_gather_bytes,
                                   const b2nd_exec_jobs *jobs,
                                   b2nd_exec_report *report, me_error *error);
 void b2nd_exec_schedule_free(b2nd_exec_schedule *schedule);

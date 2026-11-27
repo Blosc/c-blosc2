@@ -685,6 +685,268 @@ int main(void) {
         b2nd_exec_plan_free(plan);
     }
 
+    {
+        /* Reduction axes, keepdims, initial conversion, pairwise sum, strided output and alias staging. */
+        b2nd_exec_node ax[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        ax[0].dtype = ME_INT16;
+        ax[0].itemsize = 2;
+        ax[1].nargs = 1;
+        ax[1].args[0] = 0;
+        ax[1].has_axes = true;
+        ax[1].naxes = 1;
+        ax[1].axes[0] = 1;
+        ax[1].keepdims = true;
+        ax[1].has_initial = true;
+        ax[1].initial_dtype = ME_FLOAT32;
+        ax[1].initial_category = ME_CAPTURE_TYPED;
+        float init_f32 = 1e38f;
+        memcpy(ax[1].initial_scalar, &init_f32, 4);
+        ax[1].initial_size = 4;
+        b2nd_exec_descriptor ax_d = {sizeof(ax_d), ax, 2, 1, 1};
+        assert(b2nd_exec_prepare(&ax_d, NULL, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
+        assert(info.has_axes && info.naxes == 1 && info.axes[0] == 1 && info.keepdims && info.has_initial);
+        assert(info.dtype == ME_INT64 && info.itemsize == 8);
+
+        /* Invalid/duplicate axis and initial on truth reductions must fail cleanly. */
+        b2nd_exec_node bad_init[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_ANY)};
+        bad_init[0].dtype = ME_INT32;
+        bad_init[0].itemsize = 4;
+        bad_init[1].nargs = 1;
+        bad_init[1].args[0] = 0;
+        bad_init[1].has_initial = true;
+        bad_init[1].initial_dtype = ME_BOOL;
+        bad_init[1].initial_category = ME_CAPTURE_TYPED;
+        bad_init[1].initial_scalar[0] = 1;
+        bad_init[1].initial_size = 1;
+        b2nd_exec_descriptor bad_d = {sizeof(bad_d), bad_init, 2, 1, 1};
+        b2nd_exec_plan *bad_plan = NULL;
+        assert(b2nd_exec_prepare(&bad_d, NULL, &bad_plan, &error) == ME_ERR_INVALID_ARG && !bad_plan);
+
+        b2nd_exec_input_meta dup_meta = {ME_INT16, 2, 2, {2, 3}};
+        ax[1].naxes = 2;
+        ax[1].axes[0] = 1;
+        ax[1].axes[1] = -1;
+        assert(b2nd_exec_prepare(&ax_d, NULL, &bad_plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(bad_plan, &dup_meta, 1, 4, 32, &schedule, &error) == ME_ERR_INVALID_ARG);
+        assert(!schedule);
+        dup_meta.shape[1] = 2;
+        assert(b2nd_exec_specialize(bad_plan, &dup_meta, 1, 4, 32, &schedule, &error) == ME_ERR_INVALID_ARG);
+        b2nd_exec_plan_free(bad_plan);
+
+        /* Initial value conversion overflows int64 and surfaces ME_FP_INVALID / overflow. */
+        b2nd_exec_input_meta m2d = {ME_INT16, 2, 2, {2, 3}};
+        assert(b2nd_exec_specialize(plan, &m2d, 1, 2, 16, &schedule, &error) == ME_SUCCESS);
+        b2nd_exec_schedule_info g2d;
+        assert(b2nd_exec_describe_schedule(schedule, &g2d) == ME_SUCCESS);
+        assert(g2d.output_ndim == 2 && g2d.output_shape[0] == 2 && g2d.output_shape[1] == 1);
+        assert(g2d.reduction_groups == 2 && g2d.reduction_lanes == 3 && !g2d.pairwise_sum);
+        int16_t a2d[6] = {1, 2, 3, 4, 5, 6};
+        int64_t o2d[2] = {0};
+        b2nd_exec_view v2d = {sizeof(v2d), a2d, sizeof(a2d), 0, {6, 2}, 0};
+        b2nd_exec_output_view ov2d = {sizeof(ov2d), o2d, sizeof(o2d), 0, {8, 8}};
+        assert(b2nd_exec_execute_into(schedule, &v2d, 1, &ov2d, 0, 16,
+            NULL, &report, &error) == ME_ERR_EVAL && !report.fp.flags);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Float64 -> float32 overflowing initial raises ME_FP_OVERFLOW. */
+        b2nd_exec_node ax_f32[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        ax_f32[0].dtype = ME_FLOAT32;
+        ax_f32[0].itemsize = 4;
+        ax_f32[1].nargs = 1;
+        ax_f32[1].args[0] = 0;
+        ax_f32[1].has_initial = true;
+        ax_f32[1].initial_dtype = ME_FLOAT64;
+        ax_f32[1].initial_category = ME_CAPTURE_TYPED;
+        double init_huge = 1e308;
+        memcpy(ax_f32[1].initial_scalar, &init_huge, 8);
+        ax_f32[1].initial_size = 8;
+        b2nd_exec_descriptor ax_f32_d = {sizeof(ax_f32_d), ax_f32, 2, 1, 1};
+        assert(b2nd_exec_prepare(&ax_f32_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m_f32 = {ME_FLOAT32, 4, 1, {2}};
+        assert(b2nd_exec_specialize(plan, &m_f32, 1, 2, 8, &schedule, &error) == ME_SUCCESS);
+        float in_f32[2] = {1.0f, 2.0f};
+        float out_f32 = 0.0f;
+        b2nd_exec_view v_f32 = {sizeof(v_f32), in_f32, sizeof(in_f32), 0, {4}, 0};
+        b2nd_exec_output_view ov_f32 = {sizeof(ov_f32), &out_f32, sizeof(out_f32), 0, {0}};
+        assert(b2nd_exec_execute_into(schedule, &v_f32, 1, &ov_f32, ME_FP_OVERFLOW, 8,
+            NULL, &report, &error) == ME_ERR_EVAL && (report.fp.flags & ME_FP_OVERFLOW));
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Non-suffix axis=0 and negative axis=-1 with normal int64 initial and strided output. */
+        b2nd_exec_node ax0[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        ax0[0].dtype = ME_INT32;
+        ax0[0].itemsize = 4;
+        ax0[1].nargs = 1;
+        ax0[1].args[0] = 0;
+        ax0[1].has_axes = true;
+        ax0[1].naxes = 1;
+        ax0[1].axes[0] = 0;
+        ax0[1].has_initial = true;
+        ax0[1].initial_dtype = ME_INT16;
+        ax0[1].initial_category = ME_CAPTURE_TYPED;
+        int16_t init10 = 10;
+        memcpy(ax0[1].initial_scalar, &init10, 2);
+        ax0[1].initial_size = 2;
+        b2nd_exec_descriptor ax0_d = {sizeof(ax0_d), ax0, 2, 1, 1};
+        assert(b2nd_exec_prepare(&ax0_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m3 = {ME_INT32, 4, 2, {2, 3}};
+        assert(b2nd_exec_specialize(plan, &m3, 1, 2, 32, &schedule, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe_schedule(schedule, &g2d) == ME_SUCCESS);
+        assert(g2d.output_ndim == 1 && g2d.output_shape[0] == 3 &&
+               g2d.reduction_groups == 3 && g2d.reduction_lanes == 2);
+        int32_t in3[6] = {1, 2, 3, 4, 5, 6};
+        int64_t strided_out[6] = {99, 99, 99, 99, 99, 99};
+        b2nd_exec_view vin3 = {sizeof(vin3), in3, sizeof(in3), 0, {12, 4}, 0};
+        /* Reverse strided output: indices 0,1,2 land at strided_out[4, 2, 0]. */
+        b2nd_exec_output_view ov_rev = {sizeof(ov_rev), strided_out, sizeof(strided_out), 4 * 8, {-16}};
+        assert(b2nd_exec_execute_into(schedule, &vin3, 1, &ov_rev, 0, 32, NULL, &report, &error) == ME_SUCCESS);
+        assert(strided_out[4] == 15 && strided_out[2] == 17 && strided_out[0] == 19);
+        assert(strided_out[1] == 99 && strided_out[3] == 99 && strided_out[5] == 99);
+        /* Overlapping output view (stride 0) must fail before touching output. */
+        b2nd_exec_output_view ov_zero = {sizeof(ov_zero), strided_out, sizeof(strided_out), 0, {0}};
+        assert(b2nd_exec_execute_into(schedule, &vin3, 1, &ov_zero, 0, 32, NULL, &report, &error) == ME_ERR_INVALID_ARG);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Multi-axis (0, 2) on 3D and empty axis=() reduction = map semantics. */
+        b2nd_exec_node ax_empty[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        ax_empty[0].dtype = ME_INT32;
+        ax_empty[0].itemsize = 4;
+        ax_empty[1].nargs = 1;
+        ax_empty[1].args[0] = 0;
+        ax_empty[1].has_axes = true;
+        ax_empty[1].naxes = 0;
+        b2nd_exec_descriptor axe_d = {sizeof(axe_d), ax_empty, 2, 1, 1};
+        assert(b2nd_exec_prepare(&axe_d, NULL, &plan, &error) == ME_SUCCESS);
+        assert(b2nd_exec_specialize(plan, &m3, 1, 3, 32, &schedule, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe_schedule(schedule, &g2d) == ME_SUCCESS);
+        assert(g2d.output_ndim == 2 && g2d.reduction_groups == 6 && g2d.reduction_lanes == 1);
+        int64_t map_red_out[6] = {0};
+        b2nd_exec_output_view ov_map_red = {sizeof(ov_map_red), map_red_out, sizeof(map_red_out), 0, {24, 8}};
+        assert(b2nd_exec_execute_into(schedule, &vin3, 1, &ov_map_red, 0, 32, NULL, &report, &error) == ME_SUCCESS);
+        for (int i = 0; i < 6; i++) {
+            assert(map_red_out[i] == in3[i]);
+        }
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        b2nd_exec_node ax3d[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        ax3d[0].dtype = ME_INT32;
+        ax3d[0].itemsize = 4;
+        ax3d[1].nargs = 1;
+        ax3d[1].args[0] = 0;
+        ax3d[1].has_axes = true;
+        ax3d[1].naxes = 2;
+        ax3d[1].axes[0] = 0;
+        ax3d[1].axes[1] = 2;
+        b2nd_exec_descriptor ax3d_d = {sizeof(ax3d_d), ax3d, 2, 1, 1};
+        assert(b2nd_exec_prepare(&ax3d_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m_empty_red = {ME_INT32, 4, 3, {0, 3, 2}};
+        assert(b2nd_exec_specialize(plan, &m_empty_red, 1, 4, 32, &schedule, &error) == ME_SUCCESS);
+        assert(b2nd_exec_describe_schedule(schedule, &g2d) == ME_SUCCESS);
+        assert(g2d.output_ndim == 1 && g2d.output_shape[0] == 3 &&
+               g2d.reduction_groups == 3 && g2d.reduction_lanes == 0);
+        int64_t empty_group_out[3] = {9, 9, 9};
+        b2nd_exec_view v_empty_red = {sizeof(v_empty_red), in3, 0, 0, {24, 8, 4}, 0};
+        b2nd_exec_output_view ov_empty_group = {sizeof(ov_empty_group), empty_group_out, sizeof(empty_group_out), 0, {8}};
+        assert(b2nd_exec_execute_into(schedule, &v_empty_red, 1, &ov_empty_group, 0, 0, NULL, &report, &error) == ME_SUCCESS);
+        assert(empty_group_out[0] == 0 && empty_group_out[1] == 0 && empty_group_out[2] == 0);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Pairwise sum invariance across tile sizes (1, 7, 128, 300) with and without initial. */
+        b2nd_exec_node pw[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_SUM)};
+        pw[0].dtype = ME_FLOAT64;
+        pw[0].itemsize = 8;
+        pw[1].nargs = 1;
+        pw[1].args[0] = 0;
+        pw[1].has_initial = true;
+        pw[1].initial_dtype = ME_FLOAT64;
+        pw[1].initial_category = ME_CAPTURE_TYPED;
+        double pw_init = 0.25;
+        memcpy(pw[1].initial_scalar, &pw_init, 8);
+        pw[1].initial_size = 8;
+        b2nd_exec_descriptor pw_d = {sizeof(pw_d), pw, 2, 1, 1};
+        assert(b2nd_exec_prepare(&pw_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m_pw = {ME_FLOAT64, 8, 1, {300}};
+        double pw_data[300];
+        for (size_t i = 0; i < 300; i++) {
+            pw_data[i] = (double)(i + 1) * 0.1 + 1e-7;
+        }
+        size_t tiles[4] = {1, 7, 128, 300};
+        double pw_ref = 0.0;
+        for (size_t t = 0; t < 4; t++) {
+            assert(b2nd_exec_specialize_ex(plan, &m_pw, 1, tiles[t], tiles[t] * 8, true, &schedule, &error) == ME_SUCCESS);
+            assert(b2nd_exec_describe_schedule(schedule, &g2d) == ME_SUCCESS && g2d.pairwise_sum);
+            me_buffer pw_buf = {pw_data, sizeof(pw_data)};
+            double got = 0.0;
+            assert(b2nd_exec_execute(schedule, &pw_buf, 1, (me_mut_buffer){&got, sizeof(got)},
+                0, NULL, &report, &error) == ME_SUCCESS);
+            if (t == 0) {
+                pw_ref = got;
+            } else {
+                assert(memcmp(&got, &pw_ref, sizeof(got)) == 0);
+            }
+            b2nd_exec_schedule_free(schedule);
+        }
+        b2nd_exec_plan_free(plan);
+
+        /* Aliasing staging adapter: exact reverse in-place, over-budget rejection, raise_mask unchanged. */
+        b2nd_exec_node rev[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_ADD)};
+        rev[0].dtype = ME_FLOAT64;
+        rev[0].itemsize = 8;
+        rev[1].nargs = 2;
+        rev[1].args[0] = 0;
+        rev[1].args[1] = 0;
+        b2nd_exec_descriptor rev_d = {sizeof(rev_d), rev, 2, 1, 1};
+        assert(b2nd_exec_prepare(&rev_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m_rev = {ME_FLOAT64, 8, 1, {5}};
+        assert(b2nd_exec_specialize(plan, &m_rev, 1, 2, 32, &schedule, &error) == ME_SUCCESS);
+        double alias_buf[5] = {1.0, 2.0, 3.0, 4.0, 5.0};
+        b2nd_exec_view v_alias = {sizeof(v_alias), alias_buf, sizeof(alias_buf), 0, {8}, 0};
+        /* Write in reverse into alias_buf: out[0..4] = alias_buf[4..0]. */
+        b2nd_exec_output_view ov_alias = {sizeof(ov_alias), alias_buf, sizeof(alias_buf), 4 * 8, {-8}};
+        assert(b2nd_exec_execute_into(schedule, &v_alias, 1, &ov_alias, 0, 16, NULL, &report, &error) == ME_ERR_UNSUPPORTED);
+        assert(alias_buf[0] == 1.0 && alias_buf[4] == 5.0);
+        assert(b2nd_exec_execute_alias(schedule, &v_alias, 1, &ov_alias, 39, 0, 16, NULL, &report, &error) == ME_ERR_INVALID_ARG);
+        assert(alias_buf[0] == 1.0 && alias_buf[4] == 5.0);
+        assert(b2nd_exec_execute_alias(schedule, &v_alias, 1, &ov_alias, 40, 0, 16, NULL, &report, &error) == ME_SUCCESS);
+        assert(report.staging_bytes == 40);
+        assert(alias_buf[4] == 2.0 && alias_buf[3] == 4.0 && alias_buf[2] == 6.0 &&
+               alias_buf[1] == 8.0 && alias_buf[0] == 10.0);
+        /* FP exception in alias mode leaves destination completely untouched. */
+        alias_buf[0] = DBL_MAX;
+        alias_buf[4] = -5.0;
+        assert(b2nd_exec_execute_alias(schedule, &v_alias, 1, &ov_alias, 40, ME_FP_OVERFLOW, 16,
+            NULL, &report, &error) == ME_ERR_EVAL && (report.fp.flags & ME_FP_OVERFLOW));
+        assert(alias_buf[0] == DBL_MAX && alias_buf[4] == -5.0);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+
+        /* Multi-worker B2ND_EXEC_ALL initializes each worker partial to identity true. */
+        b2nd_exec_node all_n[2] = {node(0, B2ND_EXEC_INPUT), node(1, B2ND_EXEC_ALL)};
+        all_n[0].dtype = ME_INT32;
+        all_n[0].itemsize = 4;
+        all_n[1].nargs = 1;
+        all_n[1].args[0] = 0;
+        b2nd_exec_descriptor all_d = {sizeof(all_d), all_n, 2, 1, 1};
+        assert(b2nd_exec_prepare(&all_d, NULL, &plan, &error) == ME_SUCCESS);
+        b2nd_exec_input_meta m_all = {ME_INT32, 4, 1, {6}};
+        assert(b2nd_exec_specialize(plan, &m_all, 1, 2, 16, &schedule, &error) == ME_SUCCESS);
+        int32_t all_vals[6] = {1, 2, 3, 4, 5, 6};
+        me_buffer all_buf = {all_vals, sizeof(all_vals)};
+        uint8_t all_out = 0;
+        b2nd_exec_jobs all_jobs = {sizeof(all_jobs), 3, 128};
+        assert(b2nd_exec_execute(schedule, &all_buf, 1, (me_mut_buffer){&all_out, 1}, 0,
+            &all_jobs, &report, &error) == ME_SUCCESS);
+        assert(all_out == 1);
+        b2nd_exec_schedule_free(schedule);
+        b2nd_exec_plan_free(plan);
+    }
+
     direct_meta = (b2nd_exec_input_meta){ME_INT64, 8, 1, {3}};
     signature.cardinality = ME_BLOCK_SCALAR;
     assert(me_prepare_menudet("0.2", "def group(x):\n    return block_sum(x)\n",

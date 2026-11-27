@@ -11,6 +11,8 @@
 
 struct b2nd_exec_plan {
     me_kernel *kernel;
+    me_kernel *initial_kernel;
+    uint64_t initial_value;
     b2nd_exec_plan_info info;
     b2nd_exec_node *nodes;
     size_t nnodes;
@@ -24,6 +26,9 @@ struct b2nd_exec_schedule {
     b2nd_exec_schedule_info info;
     b2nd_exec_input_meta inputs[B2ND_EXEC_MAX_INPUTS];
     bool matches_shape[B2ND_EXEC_MAX_INPUTS];
+    bool reduced_axis[B2ND_EXEC_MAX_RANK];
+    bool suffix_reduction;
+    size_t max_mapped_bytes;
 };
 
 static me_status exec_error(me_error *error, me_status status, const char *message) {
@@ -60,6 +65,76 @@ static void result_info(b2nd_exec_plan_info *out, const me_kernel_info *map) {
     out->itemsize = numeric_width(out->dtype);
     out->cardinality = map->cardinality;
     out->context_ndim = map->context_ndim;
+}
+
+static bool load_scalar_u64(me_dtype dtype, const void *src, uint64_t *out) {
+    size_t width = numeric_width(dtype);
+    if (!width || !src || !out) {
+        return false;
+    }
+    if (dtype == ME_FLOAT32 || dtype == ME_FLOAT64) {
+        *out = 0;
+        memcpy(out, src, width);
+        return true;
+    }
+    switch (dtype) {
+        case ME_BOOL: {
+            uint8_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = v ? 1 : 0;
+            return true;
+        }
+        case ME_INT8: {
+            int8_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = (uint64_t)(int64_t)v;
+            return true;
+        }
+        case ME_INT16: {
+            int16_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = (uint64_t)(int64_t)v;
+            return true;
+        }
+        case ME_INT32: {
+            int32_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = (uint64_t)(int64_t)v;
+            return true;
+        }
+        case ME_INT64: {
+            int64_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = (uint64_t)v;
+            return true;
+        }
+        case ME_UINT8: {
+            uint8_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = v;
+            return true;
+        }
+        case ME_UINT16: {
+            uint16_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = v;
+            return true;
+        }
+        case ME_UINT32: {
+            uint32_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = v;
+            return true;
+        }
+        case ME_UINT64: {
+            uint64_t v;
+            memcpy(&v, src, sizeof(v));
+            *out = v;
+            return true;
+        }
+        default:
+            return false;
+    }
 }
 
 static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
@@ -122,8 +197,39 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         } else if (n->dtype != ME_AUTO || n->itemsize || n->scalar_size) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Operation dtype constraints are not yet supported");
         }
-        if (reduction_kind(n->op) != ME_REDUCTION_NONE && i != d->root) {
-            return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
+        if (reduction_kind(n->op) != ME_REDUCTION_NONE) {
+            if (i != d->root) {
+                return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
+            }
+            if ((!n->has_axes && n->naxes) || n->naxes > B2ND_EXEC_MAX_RANK) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution reduction axes");
+            }
+            for (size_t k = 0; k < n->naxes; k++) {
+                if (n->axes[k] < -B2ND_EXEC_MAX_RANK || n->axes[k] >= B2ND_EXEC_MAX_RANK) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Reduction axis exceeds maximum rank");
+                }
+            }
+            if (n->has_initial) {
+                if (n->op == B2ND_EXEC_ANY || n->op == B2ND_EXEC_ALL) {
+                    return exec_error(error, ME_ERR_INVALID_ARG,
+                                      "Truth reductions do not accept initial values");
+                }
+                size_t iw = numeric_width(n->initial_dtype);
+                if (!iw || n->initial_size != iw ||
+                    (n->initial_category != ME_CAPTURE_TYPED &&
+                     n->initial_category != ME_CAPTURE_WEAK) ||
+                    (n->initial_dtype == ME_BOOL && n->initial_scalar[0] > 1)) {
+                    return exec_error(error, ME_ERR_INVALID_ARG,
+                                      "Malformed execution reduction initial scalar");
+                }
+            } else if (n->initial_size || n->initial_dtype != ME_AUTO) {
+                return exec_error(error, ME_ERR_INVALID_ARG,
+                                  "Unexpected initial payload without has_initial");
+            }
+        } else if (n->has_axes || n->naxes || n->keepdims || n->has_initial ||
+                   n->initial_size || n->initial_dtype != ME_AUTO) {
+            return exec_error(error, ME_ERR_INVALID_ARG,
+                              "Unexpected reduction options on non-reduction node");
         }
     }
     if (inputs != d->ninputs) {
@@ -173,6 +279,7 @@ static bool emit_map(char *source, size_t capacity, size_t *used,
 void b2nd_exec_plan_free(b2nd_exec_plan *plan) {
     if (plan) {
         me_kernel_free(plan->kernel);
+        me_kernel_free(plan->initial_kernel);
         free(plan->nodes);
         free(plan);
     }
@@ -308,6 +415,40 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         }
         result_info(&plan->info, &info);
     }
+    if (status == ME_SUCCESS && plan->info.reduction) {
+        const b2nd_exec_node *root_node = &d->nodes[d->root];
+        plan->info.has_axes = root_node->has_axes;
+        plan->info.naxes = root_node->naxes;
+        if (root_node->naxes) {
+            memcpy(plan->info.axes, root_node->axes, root_node->naxes * sizeof(int));
+        }
+        plan->info.keepdims = root_node->keepdims;
+        plan->info.has_initial = root_node->has_initial;
+        if (root_node->has_initial) {
+            if (root_node->initial_dtype == plan->info.dtype) {
+                if (!load_scalar_u64(plan->info.dtype, root_node->initial_scalar,
+                                     &plan->initial_value)) {
+                    status = exec_error(error, ME_ERR_INVALID_ARG,
+                                        "Invalid reduction initial scalar");
+                }
+            } else {
+                me_capture init_capture = {
+                    {"initial", root_node->initial_dtype, root_node->initial_size},
+                    root_node->initial_scalar, root_node->initial_category};
+                me_signature init_sig = ME_SIGNATURE_INITIALIZER;
+                init_sig.captures = &init_capture;
+                init_sig.ncaptures = 1;
+                init_sig.output_dtype = plan->info.dtype;
+                init_sig.cardinality = ME_ELEMENTWISE;
+                init_sig.casting = ME_CAST_UNSAFE;
+                me_prepare_options init_policy = ME_PREPARE_OPTIONS_INITIALIZER;
+                init_policy.execution = ME_EXEC_INTERPRET;
+                status = me_prepare_menudet(
+                    "0.2", "# me:fp=strict\ndef convert(initial):\n    return initial\n",
+                    &init_sig, &init_policy, &plan->initial_kernel, error);
+            }
+        }
+    }
     if (status != ME_SUCCESS) {
         b2nd_exec_plan_free(plan);
         return status;
@@ -375,10 +516,11 @@ me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *ou
     return ME_SUCCESS;
 }
 
-me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
-                              const b2nd_exec_input_meta *inputs, size_t ninputs,
-                              size_t tile_items, size_t max_mapped_bytes,
-                              b2nd_exec_schedule **out, me_error *error) {
+me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
+                                 const b2nd_exec_input_meta *inputs, size_t ninputs,
+                                 size_t tile_items, size_t max_mapped_bytes,
+                                 bool pairwise_sum,
+                                 b2nd_exec_schedule **out, me_error *error) {
     if (out) {
         *out = NULL;
     }
@@ -388,6 +530,13 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     if (!ninputs || plan->info.cardinality != ME_ELEMENTWISE || plan->info.context_ndim ||
         !numeric_width(plan->info.map_dtype)) {
         return exec_error(error, ME_ERR_UNSUPPORTED, "Resident execution requires a context-free elementwise domain");
+    }
+    if (pairwise_sum &&
+        (plan->info.reducer != ME_REDUCTION_SUM ||
+         (plan->info.map_dtype != ME_FLOAT32 && plan->info.map_dtype != ME_FLOAT64) ||
+         plan->info.dtype != plan->info.map_dtype)) {
+        return exec_error(error, ME_ERR_UNSUPPORTED,
+                          "Pairwise sum requires matching floating map and accumulator dtypes");
     }
     size_t out_ndim = 0;
     for (size_t i = 0; i < ninputs; i++) {
@@ -438,20 +587,74 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
         }
         items *= (size_t)extent;
     }
-    if (!items && (plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX)) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Extremum of an empty execution domain");
+    bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
+    bool suffix = true;
+    size_t output_ndim = out_ndim;
+    int64_t output_shape[B2ND_EXEC_MAX_RANK] = {0};
+    size_t groups = 1;
+    size_t red_count = items;
+    size_t output_items = items;
+    if (plan->info.reduction) {
+        if (!plan->info.has_axes) {
+            for (size_t a = 0; a < out_ndim; a++) {
+                reduced_axis[a] = true;
+            }
+        } else {
+            if (plan->info.naxes > out_ndim) {
+                return exec_error(error, ME_ERR_INVALID_ARG, "Reduction axis out of range");
+            }
+            for (size_t k = 0; k < plan->info.naxes; k++) {
+                int axis = plan->info.axes[k] < 0 ?
+                    plan->info.axes[k] + (int)out_ndim : plan->info.axes[k];
+                if (axis < 0 || (size_t)axis >= out_ndim || reduced_axis[axis]) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Invalid or duplicate reduction axis");
+                }
+                reduced_axis[axis] = true;
+            }
+        }
+        bool seen_reduced = false;
+        output_ndim = 0;
+        red_count = 1;
+        for (size_t a = 0; a < out_ndim; a++) {
+            if (reduced_axis[a]) {
+                seen_reduced = true;
+                if (out_shape[a] && red_count > SIZE_MAX / (uint64_t)out_shape[a]) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Execution reduction size overflow");
+                }
+                red_count *= (size_t)out_shape[a];
+            } else if (seen_reduced) {
+                suffix = false;
+            }
+            if (!reduced_axis[a] || plan->info.keepdims) {
+                int64_t extent = reduced_axis[a] ? 1 : out_shape[a];
+                output_shape[output_ndim++] = extent;
+                if (extent && groups > SIZE_MAX / (uint64_t)extent) {
+                    return exec_error(error, ME_ERR_INVALID_ARG, "Execution output size overflow");
+                }
+                groups *= (size_t)extent;
+            }
+        }
+        output_items = groups;
+        if ((plan->info.reducer == ME_REDUCTION_MIN || plan->info.reducer == ME_REDUCTION_MAX) &&
+            !plan->info.has_initial && !red_count && groups) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Extremum of an empty execution domain");
+        }
+    } else if (out_ndim) {
+        memcpy(output_shape, out_shape, out_ndim * sizeof(int64_t));
     }
-    if (items > SIZE_MAX / plan->info.itemsize) {
+    if (output_items > SIZE_MAX / plan->info.itemsize) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution output byte size overflow");
     }
-    size_t lanes = items < tile_items ? items : tile_items;
+    size_t group_lanes = plan->info.reduction ? red_count : items;
+    size_t lanes = !items ? 0 : (group_lanes < tile_items ? group_lanes : tile_items);
     if (!plan->info.identity && lanes > INT_MAX) {
         return exec_error(error, ME_ERR_UNSUPPORTED, "Execution tile exceeds the core lane limit");
     }
     if (lanes > SIZE_MAX / plan->info.map_itemsize) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution map tile size overflow");
     }
-    size_t mapped = plan->info.identity || !plan->info.reduction ? 0 : lanes * plan->info.map_itemsize;
+    size_t mapped = (plan->info.identity || !plan->info.reduction || !lanes) ?
+        0 : lanes * plan->info.map_itemsize;
     if (mapped > max_mapped_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");
     }
@@ -460,7 +663,7 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     for (size_t i = 0; i < ninputs; i++) {
         matches[i] = inputs[i].ndim == out_ndim &&
             (!out_ndim || memcmp(inputs[i].shape, out_shape, out_ndim * sizeof(int64_t)) == 0);
-        if (!matches[i] && (!plan->info.identity || i == plan->direct_slot)) {
+        if (lanes && (!matches[i] || !suffix) && (!plan->info.identity || i == plan->direct_slot)) {
             if (lanes > SIZE_MAX / inputs[i].itemsize) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Execution broadcast gather size overflow");
             }
@@ -477,16 +680,32 @@ me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
     }
     schedule->plan = plan;
     schedule->info = (b2nd_exec_schedule_info){
-        items, lanes, mapped, plan->info.reduction ? sizeof(uint64_t) : 0,
-        plan->info.reduction ? 1 : items, sizeof(*schedule),
-        out_ndim, {0}, broadcast_gather};
+        items, lanes, mapped,
+        pairwise_sum ? sizeof(me_pairwise_sum_state) : (plan->info.reduction ? sizeof(uint64_t) : 0),
+        output_items, sizeof(*schedule),
+        out_ndim, {0}, broadcast_gather,
+        output_ndim, {0}, groups, red_count, pairwise_sum};
     if (out_ndim) {
         memcpy(schedule->info.shape, out_shape, out_ndim * sizeof(int64_t));
     }
+    if (output_ndim) {
+        memcpy(schedule->info.output_shape, output_shape, output_ndim * sizeof(int64_t));
+    }
     memcpy(schedule->inputs, inputs, ninputs * sizeof(*inputs));
     memcpy(schedule->matches_shape, matches, ninputs * sizeof(bool));
+    memcpy(schedule->reduced_axis, reduced_axis, sizeof(reduced_axis));
+    schedule->suffix_reduction = suffix;
+    schedule->max_mapped_bytes = max_mapped_bytes;
     *out = schedule;
     return ME_SUCCESS;
+}
+
+me_status b2nd_exec_specialize(const b2nd_exec_plan *plan,
+                              const b2nd_exec_input_meta *inputs, size_t ninputs,
+                              size_t tile_items, size_t max_mapped_bytes,
+                              b2nd_exec_schedule **out, me_error *error) {
+    return b2nd_exec_specialize_ex(plan, inputs, ninputs, tile_items, max_mapped_bytes,
+                                   false, out, error);
 }
 
 me_status b2nd_exec_describe_schedule(const b2nd_exec_schedule *schedule, b2nd_exec_schedule_info *out) {
@@ -581,17 +800,133 @@ static void view_load(const b2nd_exec_view *v, size_t offset, void *dst, size_t 
     }
 }
 
+static bool output_valid(const b2nd_exec_output_view *out, size_t ndim,
+                         const int64_t *shape, size_t width, size_t nitems) {
+    if (!out || out->struct_size != sizeof(*out) || out->offset > out->capacity) {
+        return false;
+    }
+    if (out->capacity && (!out->base || (uintptr_t)out->base > UINTPTR_MAX - out->capacity)) {
+        return false;
+    }
+    if (!nitems) {
+        return true;
+    }
+    size_t low = out->offset, high = out->offset;
+    for (size_t i = 0; i < ndim; i++) {
+        if (!view_add(out->strides[i] < 0 ? low : high, out->strides[i],
+                      (uint64_t)shape[i] - 1, out->strides[i] < 0 ? &low : &high)) {
+            return false;
+        }
+    }
+    if (!out->base || high > out->capacity || width > out->capacity - high ||
+        ((uintptr_t)out->base + out->offset) % width != 0) {
+        return false;
+    }
+    uint64_t strides[B2ND_EXEC_MAX_RANK], extents[B2ND_EXEC_MAX_RANK];
+    size_t axes = 0;
+    for (size_t i = 0; i < ndim; i++) {
+        if (shape[i] > 1) {
+            int64_t stride = out->strides[i];
+            uint64_t magnitude = stride < 0 ? (uint64_t)(-(stride + 1)) + 1 : (uint64_t)stride;
+            if (!magnitude || magnitude % width) {
+                return false;
+            }
+            size_t j = axes++;
+            while (j && strides[j - 1] > magnitude) {
+                strides[j] = strides[j - 1];
+                extents[j] = extents[j - 1];
+                j--;
+            }
+            strides[j] = magnitude;
+            extents[j] = (uint64_t)shape[i];
+        }
+    }
+    size_t span = width;
+    for (size_t i = 0; i < axes; i++) {
+        if (strides[i] < span || strides[i] > SIZE_MAX ||
+            extents[i] - 1 > (SIZE_MAX - span) / strides[i]) {
+            return false;
+        }
+        span += (size_t)((extents[i] - 1) * strides[i]);
+    }
+    return true;
+}
+
+static bool output_contiguous(const b2nd_exec_output_view *out, size_t ndim,
+                              const int64_t *shape, size_t width) {
+    size_t stride = width;
+    for (size_t i = ndim; i-- > 0;) {
+        if (shape[i] > 1 && (out->strides[i] < 0 || (uint64_t)out->strides[i] != stride)) {
+            return false;
+        }
+        if (shape[i] && stride > INT64_MAX / (uint64_t)shape[i]) {
+            return false;
+        }
+        stride *= (size_t)shape[i];
+    }
+    return true;
+}
+
+static size_t output_offset(const b2nd_exec_output_view *out, size_t ndim,
+                            const int64_t *shape, size_t linear_index) {
+    int64_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    size_t tmp = linear_index;
+    for (size_t a = ndim; a-- > 0;) {
+        size_t ext = (size_t)shape[a];
+        coords[a] = (int64_t)(tmp % ext);
+        tmp /= ext;
+    }
+    size_t offset = out->offset;
+    for (size_t a = 0; a < ndim; a++) {
+        if (shape[a] != 1) {
+            view_add(offset, out->strides[a], (uint64_t)coords[a], &offset);
+        }
+    }
+    return offset;
+}
+
+static void output_scatter_tile(const b2nd_exec_output_view *out, size_t ndim,
+                                const int64_t *shape, size_t pos, size_t count,
+                                const unsigned char *src, size_t width) {
+    int64_t coords[B2ND_EXEC_MAX_RANK] = {0};
+    size_t tmp = pos;
+    for (size_t a = ndim; a-- > 0;) {
+        size_t ext = (size_t)shape[a];
+        coords[a] = (int64_t)(tmp % ext);
+        tmp /= ext;
+    }
+    for (size_t lane = 0; lane < count; lane++) {
+        size_t offset = out->offset;
+        for (size_t a = 0; a < ndim; a++) {
+            if (shape[a] != 1) {
+                view_add(offset, out->strides[a], (uint64_t)coords[a], &offset);
+            }
+        }
+        memcpy((unsigned char *)out->base + offset, src + lane * width, width);
+        for (size_t a = ndim; a-- > 0;) {
+            if (++coords[a] < shape[a]) {
+                break;
+            }
+            coords[a] = 0;
+        }
+    }
+}
+
 typedef struct {
     const b2nd_exec_schedule *schedule;
     const b2nd_exec_view *views;
     const bool *direct;
     size_t ninputs;
-    me_mut_buffer output;
+    const b2nd_exec_output_view *out_view;
+    bool scatter;
     unsigned raise_mask;
     unsigned char *mapped; /* This job's mapped tile, already bounded by the caller. */
     unsigned char *gather_slots[B2ND_EXEC_MAX_INPUTS];
-    size_t tile;           /* Global first tile index. */
-    size_t end;            /* Global past-last tile index. */
+    size_t start;          /* First tile (groups <= 1) or first group (groups > 1). */
+    size_t end;            /* Past-last tile or group. */
+    bool has_initial;
+    uint64_t initial_val;
+    bool has_init_state;
     uint64_t partial;
     size_t tiles, map_calls, direct_tiles, gathered_bytes;
     me_fp_status fp;
@@ -602,15 +937,17 @@ typedef struct {
 } exec_job;
 
 static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_idx,
-                             const b2nd_exec_view *view, size_t pos, size_t count,
-                             unsigned char *dst) {
+                             const b2nd_exec_view *view, size_t group, size_t pos,
+                             size_t count, unsigned char *dst) {
+    const b2nd_exec_plan *plan = schedule->plan;
     const b2nd_exec_input_meta *meta = &schedule->inputs[input_idx];
     size_t width = meta->itemsize;
     size_t out_ndim = schedule->info.ndim;
     const int64_t *out_shape = schedule->info.shape;
-    if (schedule->matches_shape[input_idx] && out_ndim == 1) {
+    if (schedule->suffix_reduction && schedule->matches_shape[input_idx] && out_ndim == 1) {
+        size_t linear = group * schedule->info.reduction_lanes + pos;
         size_t offset = view->offset;
-        view_add(offset, view->strides[0], (uint64_t)pos, &offset);
+        view_add(offset, view->strides[0], (uint64_t)linear, &offset);
         for (size_t lane = 0; lane < count; lane++) {
             view_load(view, offset, dst + lane * width, width);
             if (lane + 1 < count) {
@@ -620,11 +957,12 @@ static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_id
         return;
     }
     int64_t coords[B2ND_EXEC_MAX_RANK] = {0};
-    size_t tmp = pos;
+    size_t g_rem = group;
+    size_t l_rem = pos;
     for (size_t a = out_ndim; a-- > 0;) {
-        size_t ext = (size_t)out_shape[a];
-        coords[a] = (int64_t)(tmp % ext);
-        tmp /= ext;
+        size_t *idx = (plan->info.reduction && !schedule->reduced_axis[a]) ? &g_rem : &l_rem;
+        coords[a] = (int64_t)(*idx % (size_t)out_shape[a]);
+        *idx /= (size_t)out_shape[a];
     }
     size_t shift = out_ndim - meta->ndim;
     for (size_t lane = 0; lane < count; lane++) {
@@ -635,36 +973,41 @@ static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_id
             }
         }
         view_load(view, offset, dst + lane * width, width);
-        for (size_t a = out_ndim; a-- > 0;) {
-            if (++coords[a] < out_shape[a]) {
-                break;
+        if (lane + 1 < count) {
+            for (size_t a = out_ndim; a-- > 0;) {
+                if (plan->info.reduction && !schedule->reduced_axis[a]) {
+                    continue;
+                }
+                if (++coords[a] < out_shape[a]) {
+                    break;
+                }
+                coords[a] = 0;
             }
-            coords[a] = 0;
         }
     }
 }
 
-static void exec_reduce(exec_job *job, const void *values, size_t count) {
-    const b2nd_exec_plan *plan = job->schedule->plan;
+static void exec_reduce_values(const b2nd_exec_plan *plan, const void *values, size_t count,
+                               uint64_t *acc, bool initialized, me_error *error, me_status *status) {
     if (plan->info.reducer == ME_REDUCTION_SUM) {
-        if (!me_sum_span(plan->info.map_dtype, values, count, job->partial, false, &job->partial)) {
-            job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+        if (!me_sum_span(plan->info.map_dtype, values, count, *acc, false, acc)) {
+            *status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
         }
     } else if (plan->info.reducer == ME_REDUCTION_PROD) {
-        if (!me_prod_span(plan->info.map_dtype, values, count, job->partial, false, &job->partial)) {
-            job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+        if (!me_prod_span(plan->info.map_dtype, values, count, *acc, false, acc)) {
+            *status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
         }
     } else if (plan->info.reducer == ME_REDUCTION_ANY || plan->info.reducer == ME_REDUCTION_ALL) {
         bool truth = false;
-        if (!me_truth_span(plan->info.map_dtype, values, count, job->partial != 0,
+        if (!me_truth_span(plan->info.map_dtype, values, count, *acc != 0,
                            plan->info.reducer == ME_REDUCTION_ALL, &truth)) {
-            job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+            *status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
         } else {
-            job->partial = truth ? 1 : 0;
+            *acc = truth ? 1 : 0;
         }
-    } else if (!me_extrema_span(plan->info.map_dtype, values, count, job->partial, job->tiles != 0,
-                                plan->info.reducer == ME_REDUCTION_MIN, &job->partial)) {
-        job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution reduction failed");
+    } else if (!me_extrema_span(plan->info.map_dtype, values, count, *acc, initialized,
+                                plan->info.reducer == ME_REDUCTION_MIN, acc)) {
+        *status = exec_error(error, ME_ERR_EVAL, "Execution reduction failed");
     }
 }
 
@@ -685,15 +1028,117 @@ static bool exec_combine_partial(me_reduction_kind reducer, me_dtype dtype,
     return me_extrema_span(dtype, buf, 1, *acc, initialized, reducer == ME_REDUCTION_MIN, acc);
 }
 
-/* Traverse this job's logical tile range. Each job owns its mapped tile, gather
- * scratch and FP scope, so jobs may run on different host threads. Counters stay
- * per job and are combined in task order afterwards. */
-static void exec_run(exec_job *job) {
-    const b2nd_exec_plan *plan = job->schedule->plan;
-    size_t items = job->schedule->info.nitems;
+static uint64_t exec_pairwise_finish(me_dtype dtype, me_pairwise_sum_state *pw,
+                                     bool has_initial, uint64_t initial_val, bool has_any) {
+    if (!has_any) {
+        return has_initial ? initial_val : 0;
+    }
+    uint64_t tail = 0;
+    me_pairwise_sum_finish(pw, &tail);
+    if (!has_initial) {
+        return tail;
+    }
+    uint64_t out = 0;
+    if (dtype == ME_FLOAT32) {
+        float a, b;
+        memcpy(&a, &initial_val, sizeof(a));
+        memcpy(&b, &tail, sizeof(b));
+        float sum = a + b;
+        memcpy(&out, &sum, sizeof(sum));
+    } else {
+        double a, b;
+        memcpy(&a, &initial_val, sizeof(a));
+        memcpy(&b, &tail, sizeof(b));
+        double sum = a + b;
+        memcpy(&out, &sum, sizeof(sum));
+    }
+    return out;
+}
+
+static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count,
+                           void *direct_out, const void **out_values) {
+    const b2nd_exec_schedule *schedule = job->schedule;
+    const b2nd_exec_plan *plan = schedule->plan;
     size_t width = plan->info.itemsize;
     size_t map_width = plan->info.map_itemsize;
-    size_t tile_items = job->schedule->info.tile_items;
+    size_t red_count = schedule->info.reduction_lanes;
+    uint32_t direct_slot = plan->direct_slot;
+    const void *values;
+    if (plan->info.identity) {
+        if (job->direct[direct_slot]) {
+            size_t linear = group * red_count + pos;
+            values = (const unsigned char *)job->views[direct_slot].base +
+                job->views[direct_slot].offset + linear * map_width;
+        } else {
+            view_gather_tile(schedule, direct_slot, &job->views[direct_slot],
+                             group, pos, count, job->gather_slots[direct_slot]);
+            job->gathered_bytes += count * map_width;
+            values = job->gather_slots[direct_slot];
+        }
+        job->direct_tiles++;
+        if (!plan->info.reduction) {
+            if (job->scatter) {
+                output_scatter_tile(job->out_view, schedule->info.output_ndim,
+                                    schedule->info.output_shape, pos, count,
+                                    (const unsigned char *)values, width);
+            } else {
+                memcpy(direct_out, values, count * width);
+            }
+        }
+        *out_values = values;
+        return;
+    }
+    me_buffer spans[B2ND_EXEC_MAX_INPUTS];
+    for (size_t i = 0; i < job->ninputs; i++) {
+        size_t input_width = schedule->inputs[i].itemsize;
+        if (job->direct[i]) {
+            size_t linear = group * red_count + pos;
+            spans[i] = (me_buffer){
+                (const unsigned char *)job->views[i].base +
+                    job->views[i].offset + linear * input_width,
+                count * input_width};
+        } else {
+            view_gather_tile(schedule, i, &job->views[i],
+                             group, pos, count, job->gather_slots[i]);
+            job->gathered_bytes += count * input_width;
+            spans[i] = (me_buffer){job->gather_slots[i], count * input_width};
+        }
+    }
+    me_block block = ME_BLOCK_INITIALIZER;
+    block.nitems = count;
+    me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
+    me_fp_status fp = {0};
+    options.fp_status = &fp;
+    /* The graph adapter checks the union after traversal, including
+     * reducer flags. A raise mask must not truncate later tiles. */
+    options.raise_mask = 0;
+    void *target = (plan->info.reduction || job->scatter) ? job->mapped : direct_out;
+    job->status = me_eval_block(plan->kernel, spans, job->ninputs,
+        (me_mut_buffer){target, count * map_width}, &block, &options, &job->error);
+    job->fp.flags |= fp.flags;
+    job->fp.supported = job->fp_seen ? job->fp.supported && fp.supported : fp.supported;
+    job->fp_seen = true;
+    if (job->status == ME_SUCCESS) {
+        job->map_calls++;
+        if (!plan->info.reduction && job->scatter) {
+            output_scatter_tile(job->out_view, schedule->info.output_ndim,
+                                schedule->info.output_shape, pos, count,
+                                (const unsigned char *)target, width);
+        }
+    }
+    *out_values = target;
+}
+
+/* Traverse this job's tile or group range. Each job owns its mapped tile,
+ * gather scratch and FP scope, so jobs may run on different host threads. */
+static void exec_run(exec_job *job) {
+    const b2nd_exec_schedule *schedule = job->schedule;
+    const b2nd_exec_plan *plan = schedule->plan;
+    size_t width = plan->info.itemsize;
+    size_t tile_items = schedule->info.tile_items;
+    size_t groups = schedule->info.reduction_groups;
+    size_t red_count = schedule->info.reduction_lanes;
+    bool pairwise = schedule->info.pairwise_sum;
     bool floating = plan->info.reduction &&
         (plan->info.map_dtype == ME_FLOAT32 || plan->info.map_dtype == ME_FLOAT64);
     bool scoped = floating || job->raise_mask != 0;
@@ -712,66 +1157,89 @@ static void exec_run(exec_job *job) {
             return;
         }
     }
-    uint32_t direct_slot = plan->direct_slot;
-    for (size_t t = job->tile; t < job->end && job->status == ME_SUCCESS; t++) {
-        size_t pos = t * tile_items;
-        size_t count = items - pos < tile_items ? items - pos : tile_items;
-        const void *values;
-        if (plan->info.identity) {
-            if (job->direct[direct_slot]) {
-                values = (const unsigned char *)job->views[direct_slot].base +
-                    job->views[direct_slot].offset + pos * map_width;
-            } else {
-                view_gather_tile(job->schedule, direct_slot, &job->views[direct_slot],
-                                 pos, count, job->gather_slots[direct_slot]);
-                job->gathered_bytes += count * map_width;
-                values = job->gather_slots[direct_slot];
+    if (plan->info.reduction && groups > 1) {
+        size_t tiles_g = (red_count && tile_items) ?
+            (red_count + tile_items - 1) / tile_items : 0;
+        for (size_t g = job->start; g < job->end && job->status == ME_SUCCESS; g++) {
+            uint64_t acc = job->initial_val;
+            bool acc_init = job->has_initial ||
+                (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX);
+            me_pairwise_sum_state pw;
+            if (pairwise && me_pairwise_sum_init(&pw, plan->info.dtype) != ME_PAIRWISE_SUM_SUCCESS) {
+                job->status = exec_error(&job->error, ME_ERR_EVAL, "Cannot initialize pairwise sum");
+                break;
             }
-            job->direct_tiles++;
-        } else {
-            me_buffer spans[B2ND_EXEC_MAX_INPUTS];
-            for (size_t i = 0; i < job->ninputs; i++) {
-                size_t input_width = job->schedule->inputs[i].itemsize;
-                if (job->direct[i]) {
-                    spans[i] = (me_buffer){
-                        (const unsigned char *)job->views[i].base +
-                            job->views[i].offset + pos * input_width,
-                        count * input_width};
+            for (size_t t = 0; t < tiles_g && job->status == ME_SUCCESS; t++) {
+                size_t pos = t * tile_items;
+                size_t count = red_count - pos < tile_items ? red_count - pos : tile_items;
+                const void *values = NULL;
+                exec_eval_tile(job, g, pos, count, NULL, &values);
+                if (job->status != ME_SUCCESS) {
+                    break;
+                }
+                if (pairwise) {
+                    if (me_pairwise_sum_update(&pw, values, count) != ME_PAIRWISE_SUM_SUCCESS) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL, "Pairwise sum update failed");
+                        break;
+                    }
                 } else {
-                    view_gather_tile(job->schedule, i, &job->views[i],
-                                     pos, count, job->gather_slots[i]);
-                    job->gathered_bytes += count * input_width;
-                    spans[i] = (me_buffer){job->gather_slots[i], count * input_width};
+                    exec_reduce_values(plan, values, count, &acc, acc_init, &job->error, &job->status);
+                    acc_init = true;
+                }
+                if (job->status == ME_SUCCESS) {
+                    job->tiles++;
                 }
             }
-            me_block block = ME_BLOCK_INITIALIZER;
-            block.nitems = count;
-            me_run_options options = ME_RUN_OPTIONS_INITIALIZER;
-            me_fp_status fp = {0};
-            options.fp_status = &fp;
-            /* The graph adapter checks the union after traversal, including
-             * reducer flags. A raise mask must not truncate later tiles. */
-            options.raise_mask = 0;
-            void *target = plan->info.reduction ? job->mapped :
-                (unsigned char *)job->output.data + pos * width;
-            job->status = me_eval_block(plan->kernel, spans, job->ninputs,
-                (me_mut_buffer){target, count * map_width}, &block, &options, &job->error);
-            job->fp.flags |= fp.flags;
-            job->fp.supported = job->fp_seen ? job->fp.supported && fp.supported : fp.supported;
-            job->fp_seen = true;
+            if (job->status == ME_SUCCESS) {
+                if (pairwise) {
+                    acc = exec_pairwise_finish(plan->info.dtype, &pw, job->has_initial,
+                                               job->initial_val, red_count > 0);
+                }
+                size_t out_off = job->scatter ?
+                    output_offset(job->out_view, schedule->info.output_ndim,
+                                  schedule->info.output_shape, g) :
+                    job->out_view->offset + g * width;
+                if (!me_reduce_store_scalar(plan->info.dtype, acc,
+                                            (unsigned char *)job->out_view->base + out_off)) {
+                    job->status = exec_error(&job->error, ME_ERR_EVAL, "Execution scalar store failed");
+                }
+            }
+        }
+    } else {
+        size_t domain_lanes = plan->info.reduction ? red_count : schedule->info.nitems;
+        me_pairwise_sum_state pw;
+        if (pairwise && me_pairwise_sum_init(&pw, plan->info.dtype) != ME_PAIRWISE_SUM_SUCCESS) {
+            job->status = exec_error(&job->error, ME_ERR_EVAL, "Cannot initialize pairwise sum");
+        }
+        for (size_t t = job->start; t < job->end && job->status == ME_SUCCESS; t++) {
+            size_t pos = t * tile_items;
+            size_t count = domain_lanes - pos < tile_items ? domain_lanes - pos : tile_items;
+            void *direct_out = (!plan->info.reduction && !job->scatter) ?
+                ((unsigned char *)job->out_view->base + job->out_view->offset + pos * width) : NULL;
+            const void *values = NULL;
+            exec_eval_tile(job, 0, pos, count, direct_out, &values);
             if (job->status != ME_SUCCESS) {
                 break;
             }
-            job->map_calls++;
-            values = target;
+            if (plan->info.reduction) {
+                if (pairwise) {
+                    if (me_pairwise_sum_update(&pw, values, count) != ME_PAIRWISE_SUM_SUCCESS) {
+                        job->status = exec_error(&job->error, ME_ERR_EVAL, "Pairwise sum update failed");
+                        break;
+                    }
+                } else {
+                    exec_reduce_values(plan, values, count, &job->partial,
+                                       job->has_init_state, &job->error, &job->status);
+                    job->has_init_state = true;
+                }
+            }
+            if (job->status == ME_SUCCESS) {
+                job->tiles++;
+            }
         }
-        if (plan->info.reduction) {
-            exec_reduce(job, values, count);
-        } else if (plan->info.identity) {
-            memcpy((unsigned char *)job->output.data + pos * width, values, count * width);
-        }
-        if (job->status == ME_SUCCESS) {
-            job->tiles++;
+        if (job->status == ME_SUCCESS && pairwise) {
+            job->partial = exec_pairwise_finish(plan->info.dtype, &pw, job->has_initial,
+                                                job->initial_val, domain_lanes > 0);
         }
     }
     if (scoped) {
@@ -816,19 +1284,19 @@ static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t 
     }
 }
 
-me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
-                                  const b2nd_exec_view *inputs, size_t ninputs,
-                                  me_mut_buffer output, unsigned raise_mask,
-                                  size_t max_gather_bytes,
-                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
-                                  me_error *error) {
+me_status b2nd_exec_execute_into(const b2nd_exec_schedule *schedule,
+                                 const b2nd_exec_view *inputs, size_t ninputs,
+                                 const b2nd_exec_output_view *output,
+                                 unsigned raise_mask, size_t max_gather_bytes,
+                                 const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                 me_error *error) {
     if (report) {
         *report = (b2nd_exec_report){0};
     }
     if (error) {
         *error = (me_error){0};
     }
-    if (!schedule || !inputs || !report || ninputs != schedule->plan->info.ninputs ||
+    if (!schedule || !inputs || !output || !report || ninputs != schedule->plan->info.ninputs ||
         (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
         (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
@@ -836,9 +1304,11 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
     const b2nd_exec_plan *plan = schedule->plan;
     size_t items = schedule->info.nitems;
     size_t width = plan->info.itemsize;
-    size_t output_bytes = schedule->info.output_items * width;
-    if (!valid_extent(output.data, output.capacity, output_bytes, width)) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent or alignment");
+    size_t output_items = schedule->info.output_items;
+    size_t output_bytes = output_items * width;
+    if (!output_valid(output, schedule->info.output_ndim, schedule->info.output_shape,
+                      width, output_items)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent, alignment or strides");
     }
     bool direct[B2ND_EXEC_MAX_INPUTS] = {0};
     size_t gather_offsets[B2ND_EXEC_MAX_INPUTS] = {0};
@@ -847,16 +1317,16 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
         if (!view_valid(&inputs[i], &schedule->inputs[i])) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
         }
-        if (inputs[i].capacity && output_bytes &&
-            (uintptr_t)inputs[i].base < (uintptr_t)output.data + output_bytes &&
-            (uintptr_t)output.data < (uintptr_t)inputs[i].base + inputs[i].capacity) {
+        if (inputs[i].capacity && output_bytes && output->capacity &&
+            (uintptr_t)inputs[i].base < (uintptr_t)output->base + output->capacity &&
+            (uintptr_t)output->base < (uintptr_t)inputs[i].base + inputs[i].capacity) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Aliased execution output is not yet supported");
         }
         bool needed = !plan->info.identity || i == plan->direct_slot;
-        direct[i] = schedule->matches_shape[i] && view_native(&inputs[i]) &&
-            view_contiguous(&inputs[i], &schedule->inputs[i]) &&
+        direct[i] = schedule->suffix_reduction && schedule->matches_shape[i] &&
+            view_native(&inputs[i]) && view_contiguous(&inputs[i], &schedule->inputs[i]) &&
             (!items || ((uintptr_t)inputs[i].base + inputs[i].offset) % schedule->inputs[i].itemsize == 0);
-        if (needed && !direct[i] && items) {
+        if (needed && !direct[i] && items && schedule->info.tile_items) {
             size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
             if (per_job_gather > SIZE_MAX - tile_bytes) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer size overflow");
@@ -868,14 +1338,28 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
     if (per_job_gather > max_gather_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer budget exceeded");
     }
-    size_t tiles = schedule->info.tile_items ?
-        (items + schedule->info.tile_items - 1) / schedule->info.tile_items : 0;
+    bool scatter = !output_contiguous(output, schedule->info.output_ndim,
+                                      schedule->info.output_shape, width);
+    size_t per_job_mapped = schedule->info.mapped_bytes;
+    if (!plan->info.reduction && scatter && !plan->info.identity && items) {
+        per_job_mapped = schedule->info.tile_items * width;
+        if (per_job_mapped > schedule->max_mapped_bytes) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");
+        }
+    }
+    size_t groups = schedule->info.reduction_groups;
+    size_t red_count = schedule->info.reduction_lanes;
+    size_t work_items = (plan->info.reduction && groups > 1) ? groups :
+        ((plan->info.reduction && !groups) ? 0 :
+         (schedule->info.tile_items ?
+          ((plan->info.reduction ? red_count : items) + schedule->info.tile_items - 1) /
+          schedule->info.tile_items : 0));
     size_t ntasks = jobs ? jobs->workers : 1;
     if (ntasks > B2ND_EXEC_MAX_TASKS) {
         ntasks = B2ND_EXEC_MAX_TASKS;
     }
-    if (ntasks > tiles) {
-        ntasks = tiles ? tiles : 1;
+    if (ntasks > work_items) {
+        ntasks = work_items ? work_items : 1;
     }
     if (ntasks > 1 && (plan->info.reducer == ME_REDUCTION_SUM ||
                        plan->info.reducer == ME_REDUCTION_PROD)) {
@@ -887,7 +1371,6 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_UNSUPPORTED,
                           "Execution plan is not proven partitionable");
     }
-    size_t per_job_mapped = schedule->info.mapped_bytes;
     if (per_job_mapped > SIZE_MAX - per_job_gather) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Aggregate worker scratch size overflow");
     }
@@ -906,6 +1389,37 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
 #ifdef _WIN32
     ntasks = 1;
 #endif
+    uint64_t identity_val = 0;
+    if (plan->info.reduction &&
+        (plan->info.reducer == ME_REDUCTION_SUM || plan->info.reducer == ME_REDUCTION_PROD ||
+         plan->info.reducer == ME_REDUCTION_ANY || plan->info.reducer == ME_REDUCTION_ALL)) {
+        me_reduce_identity(plan->info.reducer, plan->info.dtype, &identity_val);
+    }
+    uint64_t initial_val = identity_val;
+    me_fp_status init_fp = {0};
+    bool init_fp_seen = false;
+    if (plan->info.has_initial) {
+        if (plan->initial_kernel) {
+            uint64_t init_buf[2] = {0};
+            me_block init_block = ME_BLOCK_INITIALIZER;
+            init_block.nitems = 1;
+            me_run_options init_opts = ME_RUN_OPTIONS_INITIALIZER;
+            init_opts.fp_status = &init_fp;
+            me_status init_status = me_eval_block(
+                plan->initial_kernel, NULL, 0,
+                (me_mut_buffer){init_buf, width}, &init_block, &init_opts, error);
+            init_fp_seen = true;
+            if (init_status != ME_SUCCESS) {
+                report->fp = init_fp;
+                return init_status;
+            }
+            if (!load_scalar_u64(plan->info.dtype, init_buf, &initial_val)) {
+                return exec_error(error, ME_ERR_EVAL, "Cannot decode converted initial scalar");
+            }
+        } else {
+            initial_val = plan->initial_value;
+        }
+    }
     size_t mapped_bytes = per_job_mapped ? per_job_mapped * ntasks : 0;
     size_t gather_bytes = per_job_gather ? per_job_gather * ntasks : 0;
     size_t worker_bytes = per_job_total ? per_job_total * ntasks : 0;
@@ -930,24 +1444,24 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
 #endif
         return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
     }
-    uint64_t identity = 0;
-    if (plan->info.reducer == ME_REDUCTION_SUM || plan->info.reducer == ME_REDUCTION_PROD ||
-        plan->info.reducer == ME_REDUCTION_ANY || plan->info.reducer == ME_REDUCTION_ALL) {
-        me_reduce_identity(plan->info.reducer, plan->info.dtype, &identity);
-    }
-    size_t per_task = tiles / ntasks, extra = tiles % ntasks, cursor = 0;
+    bool single_group_acc = plan->info.reduction && groups == 1 && ntasks == 1;
+    size_t per_task = work_items / ntasks, extra = work_items % ntasks, cursor = 0;
     for (size_t i = 0; i < ntasks; i++) {
         size_t count = per_task + (i < extra ? 1 : 0);
         parts[i] = (exec_job){
-            schedule, inputs, direct, ninputs, output, raise_mask,
+            schedule, inputs, direct, ninputs, output, scatter, raise_mask,
             mapped ? mapped + i * per_job_mapped : NULL, {0},
-            cursor, cursor + count, identity,
+            cursor, cursor + count,
+            plan->info.has_initial, initial_val,
+            single_group_acc && (plan->info.has_initial ||
+                (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),
+            single_group_acc ? initial_val : identity_val,
             0, 0, 0, 0, {0}, false, false, ME_SUCCESS, {0}};
         if (gather) {
             unsigned char *base = gather + i * per_job_gather;
             for (size_t s = 0; s < ninputs; s++) {
                 bool needed = !plan->info.identity || s == plan->direct_slot;
-                if (needed && !direct[s] && items) {
+                if (needed && !direct[s] && items && schedule->info.tile_items) {
                     parts[i].gather_slots[s] = base + gather_offsets[s];
                 }
             }
@@ -971,9 +1485,14 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
                 pthread_join(threads[i].thread, NULL);
             }
             exec_combine(report, parts, started);
+            if (init_fp_seen) {
+                report->fp.flags |= init_fp.flags;
+                report->fp.supported = report->tiles ?
+                    (report->fp.supported && init_fp.supported) : init_fp.supported;
+            }
             report->tasks = started;
             report->worker_bytes = worker_bytes;
-            report->mapped_bytes = schedule->info.mapped_bytes;
+            report->mapped_bytes = per_job_mapped;
             report->gather_bytes = per_job_gather;
             free(threads);
             free(mapped);
@@ -991,9 +1510,17 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
         exec_run(&parts[0]);
     }
     exec_combine(report, parts, ntasks);
+    if (init_fp_seen) {
+        bool any_fp = false;
+        for (size_t i = 0; i < ntasks; i++) {
+            any_fp |= parts[i].fp_seen || parts[i].fp_scoped;
+        }
+        report->fp.flags |= init_fp.flags;
+        report->fp.supported = any_fp ? (report->fp.supported && init_fp.supported) : init_fp.supported;
+    }
     report->tasks = ntasks;
     report->worker_bytes = worker_bytes;
-    report->mapped_bytes = schedule->info.mapped_bytes;
+    report->mapped_bytes = per_job_mapped;
     report->gather_bytes = per_job_gather;
     for (size_t i = 0; i < ntasks; i++) {
         if (parts[i].status != ME_SUCCESS) {
@@ -1005,8 +1532,8 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
             }
         }
     }
-    if (status == ME_SUCCESS && plan->info.reduction) {
-        uint64_t result = identity;
+    if (status == ME_SUCCESS && plan->info.reduction && groups == 1) {
+        uint64_t result = initial_val;
         if (ntasks == 1) {
             if (parts[0].tiles) {
                 result = parts[0].partial;
@@ -1027,7 +1554,7 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
                 }
             }
             if (status == ME_SUCCESS) {
-                bool initialized = false;
+                bool initialized = plan->info.has_initial;
                 for (size_t i = 0; i < ntasks; i++) {
                     if (!parts[i].tiles) {
                         continue; /* An empty domain contributes no value, not an identity. */
@@ -1054,7 +1581,9 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
         if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
             status = exec_error(error, ME_ERR_EVAL, "Execution raised floating-point status");
         }
-        if (status == ME_SUCCESS && !me_reduce_store_scalar(plan->info.dtype, result, output.data)) {
+        if (status == ME_SUCCESS &&
+            !me_reduce_store_scalar(plan->info.dtype, result,
+                                    (unsigned char *)output->base + output->offset)) {
             status = exec_error(error, ME_ERR_EVAL, "Execution scalar store failed");
         }
     } else if (status == ME_SUCCESS && (report->fp.flags & raise_mask)) {
@@ -1063,6 +1592,100 @@ me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
     free(mapped);
     free(gather);
     free(parts);
+    return status;
+}
+
+me_status b2nd_exec_execute_views(const b2nd_exec_schedule *schedule,
+                                  const b2nd_exec_view *inputs, size_t ninputs,
+                                  me_mut_buffer output, unsigned raise_mask,
+                                  size_t max_gather_bytes,
+                                  const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                  me_error *error) {
+    if (report) {
+        *report = (b2nd_exec_report){0};
+    }
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!schedule || !inputs || !report) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
+    }
+    const b2nd_exec_plan *plan = schedule->plan;
+    size_t width = plan->info.itemsize;
+    size_t output_bytes = schedule->info.output_items * width;
+    if (!valid_extent(output.data, output.capacity, output_bytes, width)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent or alignment");
+    }
+    b2nd_exec_output_view out_view = {sizeof(out_view), output.data, output.capacity, 0, {0}};
+    size_t stride = width;
+    for (size_t a = schedule->info.output_ndim; a-- > 0;) {
+        out_view.strides[a] = (int64_t)stride;
+        if (schedule->info.output_shape[a]) {
+            stride *= (size_t)schedule->info.output_shape[a];
+        }
+    }
+    return b2nd_exec_execute_into(schedule, inputs, ninputs, &out_view, raise_mask,
+                                  max_gather_bytes, jobs, report, error);
+}
+
+me_status b2nd_exec_execute_alias(const b2nd_exec_schedule *schedule,
+                                   const b2nd_exec_view *inputs, size_t ninputs,
+                                   const b2nd_exec_output_view *output,
+                                   size_t staging_budget,
+                                   unsigned raise_mask, size_t max_gather_bytes,
+                                   const b2nd_exec_jobs *jobs, b2nd_exec_report *report,
+                                   me_error *error) {
+    if (report) {
+        *report = (b2nd_exec_report){0};
+    }
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!schedule || !inputs || !output || !report || ninputs != schedule->plan->info.ninputs ||
+        (raise_mask & ~(ME_FP_INVALID | ME_FP_DIVIDE | ME_FP_OVERFLOW | ME_FP_UNDERFLOW)) ||
+        (jobs && (jobs->struct_size != sizeof(*jobs) || !jobs->workers))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution bindings or FP mask");
+    }
+    size_t width = schedule->plan->info.itemsize;
+    size_t output_items = schedule->info.output_items;
+    size_t output_bytes = output_items * width;
+    if (!output_valid(output, schedule->info.output_ndim, schedule->info.output_shape,
+                      width, output_items)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent, alignment or strides");
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        if (!view_valid(&inputs[i], &schedule->inputs[i])) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
+        }
+    }
+    if (output_bytes > staging_budget) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Execution alias staging budget exceeded");
+    }
+    unsigned char *staging = output_bytes ? malloc(output_bytes) : NULL;
+    if (output_bytes && !staging) {
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution alias staging buffer");
+    }
+    b2nd_exec_output_view staged_view = {sizeof(staged_view), staging, output_bytes, 0, {0}};
+    size_t stride = width;
+    for (size_t a = schedule->info.output_ndim; a-- > 0;) {
+        staged_view.strides[a] = (int64_t)stride;
+        if (schedule->info.output_shape[a]) {
+            stride *= (size_t)schedule->info.output_shape[a];
+        }
+    }
+    me_status status = b2nd_exec_execute_into(
+        schedule, inputs, ninputs, &staged_view, raise_mask, max_gather_bytes, jobs, report, error);
+    report->staging_bytes = output_bytes;
+    if (status == ME_SUCCESS && output_bytes) {
+        if (output_contiguous(output, schedule->info.output_ndim,
+                              schedule->info.output_shape, width)) {
+            memcpy((unsigned char *)output->base + output->offset, staging, output_bytes);
+        } else {
+            output_scatter_tile(output, schedule->info.output_ndim,
+                                schedule->info.output_shape, 0, output_items, staging, width);
+        }
+    }
+    free(staging);
     return status;
 }
 

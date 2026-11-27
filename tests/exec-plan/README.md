@@ -15,17 +15,23 @@ The initial boundary does not qualify broadcasting, strided inputs, axes,
 masks, other reducers, aliases, storage adapters, jobs or stages.
 
 The executor binds native aligned contiguous buffers in slot order, or
-resident views (`b2nd_exec_execute_views`) supporting N-D right-aligned NumPy
-broadcasting, signed byte strides, unaligned offsets and non-native byte order
-via bounded per-job gather scratch. Same-shape metadata includes rank-zero
-scalars and ranked empty map domains; empty min/max remains an error. No
-arbitrary output strides or aliases are admitted yet.
-Default whole-domain sum/product/min/max/any/all use shared core primitives and
-accumulator typing. Serial sums/products carry accumulator state across tiles;
-tiles are not independently reduced. Narrow integer sums/products return the
+resident views (`b2nd_exec_execute_views`, `b2nd_exec_execute_into`, and
+`b2nd_exec_execute_alias`) supporting N-D right-aligned NumPy broadcasting,
+signed byte strides, unaligned offsets and non-native byte order via bounded
+per-job gather scratch. Disjoint strided/transposed/reversed writable destinations
+are supported by `b2nd_exec_execute_into`, and separately budgeted
+transactional staging for aliased destinations is provided by
+`b2nd_exec_execute_alias`. Same-shape metadata includes rank-zero scalars and
+ranked empty map domains; empty min/max remains an error.
+Whole-domain and partial-axis reductions (`axes`, `keepdims`, `initial`, and
+opt-in fixed-leaf `pairwise_sum` via `b2nd_exec_specialize_ex`) use shared core
+primitives and accumulator typing. Serial sums/products carry accumulator state
+across tiles; tiles are not independently reduced except when fixed-leaf
+`pairwise_sum` is requested on `sum`. Narrow integer sums/products return the
 core-resolved 64-bit accumulator dtype while mapped scratch retains map width.
-Empty sum/product/any/all identities come from the core. Explicit accumulator
-conversions, axes, masks, initial values and pairwise sums remain unadmitted.
+Empty sum/product/any/all identities and initial scalar conversions come from
+the core. Explicit accumulator `dtype` overrides and `where` masks remain
+unadmitted.
 Computed maps feeding a reducer use one bounded mapped tile; disjoint pure maps
 evaluate directly into the destination with zero mapped scratch. Proven identity maps read their
 declared input slot directly without a kernel call. Minimum results publish
