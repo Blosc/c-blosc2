@@ -3,6 +3,11 @@
 #define B2ND_EXEC_PRIVATE_H
 #include "b2nd-exec.h"
 
+/* Shared descriptor validation; staged admission additionally validates its
+ * supported region topology before preparing any child kernels. */
+me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *descriptor,
+                                       bool allow_stages, me_error *error);
+
 typedef struct {
     void *context;
     me_status (*read)(void *context, size_t group, size_t pos, size_t count,
@@ -22,6 +27,16 @@ me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
                                  me_mut_buffer output, size_t max_gather_bytes,
                                  const b2nd_exec_jobs *jobs,
                                  size_t *out_tasks, me_error *error);
+/* Stage-owned contiguous native allocations have validated shapes/strides but
+ * no address yet. Only the planner may defer these two address checks; all
+ * external bindings and tile/gather budgets still pass the common validator. */
+me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
+                                       const b2nd_exec_view *views,
+                                       const bool *is_reader, size_t ninputs,
+                                       me_mut_buffer output, size_t max_gather_bytes,
+                                       const b2nd_exec_jobs *jobs,
+                                       size_t *out_tasks, me_error *error,
+                                       size_t planned_slot, bool planned_output);
 /* Readers are serial per-task logical C-order spans laid out as
  * readers[task * reader_stride + slot] (or shared at stride 0 when serial).
  * NULL read selects the corresponding resident view. */

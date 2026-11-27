@@ -9,18 +9,22 @@
 #include <string.h>
 
 #define STORAGE_BLOCK_CACHE_SLOTS 4
+#define STORAGE_CHUNK_CACHE_SLOTS 8
 
 typedef struct {
     const b2nd_array_t *array;
     blosc2_context *dctx;
     blosc2_pthread_mutex_t *frame_mutex;
     unsigned char *decoded;
+    unsigned char *chunk_cache;
+    size_t nslots, clock;
+    int64_t cached_chunks[STORAGE_CHUNK_CACHE_SLOTS];
+    size_t ages[STORAGE_CHUNK_CACHE_SLOTS];
     size_t itemsize, bytes, items, block_items;
     size_t chunk_grid[B2ND_EXEC_MAX_RANK], block_grid[B2ND_EXEC_MAX_RANK];
     size_t dom_ndim, reduction_lanes;
     int64_t dom_shape[B2ND_EXEC_MAX_RANK];
     bool is_reduction, reduced_axis[B2ND_EXEC_MAX_RANK], fast_linear;
-    int64_t cached_chunk;
     size_t decodes, decoded_bytes, cache_hits, read_spans;
 } storage_input;
 
@@ -53,6 +57,30 @@ static me_status storage_error(me_error *error, me_status status, const char *me
         snprintf(error->message, sizeof(error->message), "%s", message);
     }
     return status;
+}
+
+static void storage_mutexes_destroy(blosc2_pthread_mutex_t *mutexes, bool *live, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        if (live[i]) {
+            blosc2_pthread_mutex_destroy(&mutexes[i]);
+            live[i] = false;
+        }
+    }
+}
+
+static me_status storage_frame_mutex_init(blosc2_pthread_mutex_t *mutexes, bool *live,
+                                    size_t slot, me_error *error) {
+#ifdef _WIN32
+    (void)error;
+    blosc2_pthread_mutex_init(&mutexes[slot], NULL);
+#else
+    if (blosc2_pthread_mutex_init(&mutexes[slot], NULL) != 0) {
+        storage_mutexes_destroy(mutexes, live, slot);
+        return storage_error(error, ME_ERR_OOM, "Cannot initialize storage frame mutex");
+    }
+#endif
+    live[slot] = true;
+    return ME_SUCCESS;
 }
 
 static bool storage_product(size_t *product, size_t factor) {
@@ -220,16 +248,24 @@ static me_status storage_validate(storage_input *state, const b2nd_exec_input_me
     state->items = items;
     state->block_items = block_items;
     state->bytes = items ? physical * width : 0;
-    state->cached_chunk = -1;
     return ME_SUCCESS;
 }
 
 static me_status storage_decode_chunk(storage_input *state, size_t chunk,
-                                      me_error *error, bool *was_miss) {
-    if (state->cached_chunk == (int64_t)chunk) {
-        *was_miss = false;
-        return ME_SUCCESS;
+                                       me_error *error, bool *was_miss) {
+    size_t victim = 0;
+    for (size_t s = 0; s < state->nslots; s++) {
+        if (state->cached_chunks[s] == (int64_t)chunk) {
+            state->ages[s] = ++state->clock;
+            state->decoded = state->chunk_cache + s * state->bytes;
+            *was_miss = false;
+            return ME_SUCCESS;
+        }
+        if (state->ages[s] < state->ages[victim]) victim = s;
     }
+    state->decoded = state->chunk_cache + victim * state->bytes;
+    /* A failed decode must not leave an old cache identity on overwritten bytes. */
+    state->cached_chunks[victim] = -1;
     const b2nd_array_t *a = state->array;
     size_t width = state->itemsize;
     /* Fetch without mutating schunk->current_nchunk; serialize frame reads via frame_mutex. */
@@ -249,7 +285,8 @@ static me_status storage_decode_chunk(storage_input *state, size_t chunk,
     if (rc != (int32_t)state->bytes) {
         return storage_error(error, ME_ERR_EVAL, "Storage chunk decode failed");
     }
-    state->cached_chunk = (int64_t)chunk;
+    state->cached_chunks[victim] = (int64_t)chunk;
+    state->ages[victim] = ++state->clock;
     state->decodes++;
     state->decoded_bytes += state->bytes;
     *was_miss = true;
@@ -421,7 +458,7 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
     b2nd_exec_schedule_layout(schedule, 0, NULL, NULL, reduced_axis);
     blosc2_pthread_mutex_t frame_mutexes[B2ND_EXEC_MAX_INPUTS];
-    bool has_frame_mutex[B2ND_EXEC_MAX_INPUTS];
+    bool has_frame_mutex[B2ND_EXEC_MAX_INPUTS] = {0};
     storage_input base_states[B2ND_EXEC_MAX_INPUTS] = {0};
     bool is_reader[B2ND_EXEC_MAX_INPUTS] = {0};
     b2nd_exec_view bound_views[B2ND_EXEC_MAX_INPUTS] = {0};
@@ -481,18 +518,36 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         }
     }
     if (ntasks > B2ND_EXEC_MAX_TASKS) return storage_error(error, ME_ERR_INVALID_ARG, "Task limit exceeded");
+    /* Keep the admitted task geometry; spend only the remaining aggregate
+     * decode budget on per-worker LRU slots. Logical traversal is unchanged. */
+    size_t cache_slots[B2ND_EXEC_MAX_INPUTS] = {0};
+    size_t extra = max_decode_bytes - ntasks * per_job_decode;
+    for (size_t i = 0; i < ninputs; i++) {
+        if (is_reader[i] && base_states[i].bytes) cache_slots[i] = 1;
+    }
+    for (size_t pass = 1; pass < STORAGE_CHUNK_CACHE_SLOTS; pass++) {
+        bool grew = false;
+        for (size_t i = 0; i < ninputs; i++) {
+            if (!cache_slots[i] || cache_slots[i] >= (size_t)arrays[i]->sc->nchunks) continue;
+            size_t cost = ntasks * base_states[i].bytes;
+            if (cost <= extra) {
+                cache_slots[i]++;
+                extra -= cost;
+                grew = true;
+            }
+        }
+        if (!grew) break;
+    }
     for (size_t i = 0; i < ninputs; i++) {
         if (ntasks > 1 && is_reader[i] && base_states[i].array->sc->frame) {
-            blosc2_pthread_mutex_init(&frame_mutexes[i], NULL);
-            has_frame_mutex[i] = true;
+            status = storage_frame_mutex_init(frame_mutexes, has_frame_mutex, i, error);
+            if (status != ME_SUCCESS) return status;
             base_states[i].frame_mutex = &frame_mutexes[i];
         }
     }
     storage_input *states = calloc(ntasks * ninputs, sizeof(*states));
     if (!states) {
-        for (size_t i = 0; i < ninputs; i++) {
-            if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
-        }
+        storage_mutexes_destroy(frame_mutexes, has_frame_mutex, ninputs);
         return storage_error(error, ME_ERR_OOM, "Cannot allocate storage binding metadata");
     }
     report->storage_metadata_bytes = ntasks * ninputs * sizeof(*states);
@@ -501,9 +556,7 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     if (ntasks > 1) {
         readers = calloc(ntasks * ninputs, sizeof(*readers));
         if (!readers) {
-            for (size_t i = 0; i < ninputs; i++) {
-                if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
-            }
+            storage_mutexes_destroy(frame_mutexes, has_frame_mutex, ninputs);
             free(states);
             return storage_error(error, ME_ERR_OOM, "Cannot allocate storage reader workspace");
         }
@@ -513,12 +566,15 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
             size_t idx = t * ninputs + i;
             if (!is_reader[i]) continue;
             states[idx] = base_states[i];
-            states[idx].decoded = states[idx].bytes ? malloc(states[idx].bytes) : NULL;
-            if (states[idx].decoded) report->decode_bytes += states[idx].bytes;
+            states[idx].nslots = cache_slots[i];
+            size_t cache_bytes = states[idx].bytes * states[idx].nslots;
+            states[idx].chunk_cache = cache_bytes ? malloc(cache_bytes) : NULL;
+            for (size_t s = 0; s < states[idx].nslots; s++) states[idx].cached_chunks[s] = -1;
+            if (states[idx].chunk_cache) report->decode_bytes += cache_bytes;
             blosc2_dparams params = BLOSC2_DPARAMS_DEFAULTS;
             params.nthreads = 1;
             states[idx].dctx = blosc2_create_dctx(params);
-            if ((states[idx].bytes && !states[idx].decoded) || !states[idx].dctx) {
+            if ((cache_bytes && !states[idx].chunk_cache) || !states[idx].dctx) {
                 status = storage_error(error, ME_ERR_OOM, "Cannot allocate storage decode workspace");
                 break;
             }
@@ -537,11 +593,9 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         report->cache_hits += states[idx].cache_hits;
         report->read_spans += states[idx].read_spans;
         if (states[idx].dctx) blosc2_free_ctx(states[idx].dctx);
-        free(states[idx].decoded);
+        free(states[idx].chunk_cache);
     }
-    for (size_t i = 0; i < ninputs; i++) {
-        if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
-    }
+    storage_mutexes_destroy(frame_mutexes, has_frame_mutex, ninputs);
     if (readers != stack_readers) free(readers);
     free(states);
     return status;
@@ -1120,7 +1174,10 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         }
     }
     if (!out_items || !out_chunks) {
-        if (raise_mask != 0) report->execution.fp.supported = probe_fp.supported;
+        if (raise_mask != 0) {
+            report->execution.fp_observed = true;
+            report->execution.fp.supported = probe_fp.supported;
+        }
         return ME_SUCCESS;
     }
 
@@ -1172,17 +1229,15 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
     memset(has_frame_mutex, 0, sizeof(has_frame_mutex));
     for (size_t i = 0; i < ninputs; i++) {
         if (nworkers > 1 && sink.needed[i] && sink.is_reader[i] && arrays[i]->sc->frame) {
-            blosc2_pthread_mutex_init(&frame_mutexes[i], NULL);
-            has_frame_mutex[i] = true;
+            status = storage_frame_mutex_init(frame_mutexes, has_frame_mutex, i, error);
+            if (status != ME_SUCCESS) return status;
             sink.frame_mutex[i] = &frame_mutexes[i];
         }
     }
     sink.nworkers = nworkers;
     sink.workers = calloc(nworkers, sizeof(*sink.workers));
     if (!sink.workers) {
-        for (size_t i = 0; i < ninputs; i++) {
-            if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
-        }
+        storage_mutexes_destroy(frame_mutexes, has_frame_mutex, ninputs);
         return storage_error(error, ME_ERR_OOM, "Cannot allocate sink worker metadata");
     }
     report->storage_metadata_bytes = nworkers * sizeof(*sink.workers);
@@ -1334,12 +1389,12 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         free(sw->map_buf);
     }
     free(sink.workers);
-    for (size_t i = 0; i < ninputs; i++) {
-        if (has_frame_mutex[i]) blosc2_pthread_mutex_destroy(&frame_mutexes[i]);
-    }
+    storage_mutexes_destroy(frame_mutexes, has_frame_mutex, ninputs);
     if (any_fp) {
+        report->execution.fp_observed = true;
         report->execution.fp.supported = all_supported;
     } else if (raise_mask != 0) {
+        report->execution.fp_observed = true;
         report->execution.fp.supported = probe_fp.supported;
     }
     if (status == ME_SUCCESS && (report->execution.fp.flags & raise_mask)) {
@@ -1457,6 +1512,7 @@ static me_status source_stream_map(const b2nd_exec_schedule *schedule,
             me_status st = me_fp_scope_begin(&scope, &fp, error);
             if (st != ME_SUCCESS) return st;
             me_status end_st = me_fp_scope_end(&scope, NULL);
+            report->execution.fp_observed = true;
             report->execution.fp.supported = fp.supported;
             if (end_st != ME_SUCCESS) return end_st;
             if (!fp.supported) {
@@ -1513,6 +1569,7 @@ static me_status source_stream_map(const b2nd_exec_schedule *schedule,
     me_fp_status fp = {0};
     me_status status = ME_SUCCESS;
     if (scoped) {
+        report->execution.fp_observed = true;
         status = me_fp_scope_begin(&scope, &fp, error);
         if (status == ME_SUCCESS && raise_mask && !fp.supported) {
             me_fp_scope_end(&scope, NULL);
@@ -1851,6 +1908,56 @@ static void partition_commit_elementwise(const b2nd_exec_partition_layout *part,
     }
 }
 
+me_status b2nd_exec_admit_partitions(const b2nd_exec_schedule *schedule,
+                                     const b2nd_array_t *const *arrays,
+                                     const b2nd_exec_view *views,
+                                     const b2nd_exec_source *sources, size_t ninputs,
+                                     bool *admitted, me_error *error) {
+    if (error) *error = (me_error){0};
+    if (admitted) *admitted = false;
+    b2nd_exec_partition_layout part = {0};
+    b2nd_exec_plan_info info = {0};
+    if (!schedule || !admitted || ninputs > B2ND_EXEC_MAX_INPUTS ||
+        b2nd_exec_schedule_partitions(schedule, &part) != ME_SUCCESS || !part.is_partition_schedule) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid partition admission arguments");
+    }
+    b2nd_exec_schedule_kernel(schedule, &info, NULL, NULL);
+    if (ninputs != info.ninputs) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Partition admission input count mismatch");
+    }
+    for (size_t i = 0; i < ninputs; i++) {
+        b2nd_exec_input_meta meta;
+        b2nd_exec_schedule_input(schedule, i, &meta);
+        me_status st;
+        if (arrays && arrays[i] && sources && sources[i].read) {
+            return storage_error(error, ME_ERR_INVALID_ARG, "Ambiguous partition admission binding");
+        }
+        if (arrays && arrays[i]) {
+            storage_input state = {0};
+            state.array = arrays[i];
+            st = storage_validate(&state, &meta, error);
+            if (st == ME_SUCCESS) st = storage_validate_chunks(&state, NULL, error);
+        } else if (sources && sources[i].read) {
+            const b2nd_exec_source *src = &sources[i];
+            if (src->struct_size != sizeof(*src) || src->dtype != meta.dtype ||
+                src->itemsize != meta.itemsize || src->ndim != meta.ndim ||
+                memcmp(src->shape, meta.shape, meta.ndim * sizeof(meta.shape[0]))) {
+                return storage_error(error, ME_ERR_INVALID_ARG, "Partition admission source metadata mismatch");
+            }
+            st = ME_SUCCESS;
+        } else {
+            st = b2nd_exec_validate_view(schedule, i, views ? &views[i] : NULL, error);
+        }
+        if (st == ME_ERR_UNSUPPORTED) {
+            if (error) *error = (me_error){0};
+            return ME_SUCCESS; /* Capability rejection, never an execution failure. */
+        }
+        if (st != ME_SUCCESS) return st;
+    }
+    *admitted = true;
+    return ME_SUCCESS;
+}
+
 me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
                                        const b2nd_array_t *const *arrays,
                                        const b2nd_exec_view *views,
@@ -1968,7 +2075,10 @@ me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
             me_status st = me_fp_scope_begin(&scope, &fp, error);
             if (st != ME_SUCCESS) return st;
             me_status end_st = me_fp_scope_end(&scope, NULL);
-            if (report) report->execution.fp.supported = fp.supported;
+            if (report) {
+                report->execution.fp_observed = true;
+                report->execution.fp.supported = fp.supported;
+            }
             if (end_st != ME_SUCCESS) return end_st;
             if (!fp.supported) {
                 return storage_error(error, ME_ERR_UNSUPPORTED,
@@ -2077,6 +2187,7 @@ me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
     me_fp_scope scope;
     me_fp_status fp = {0};
     if (status == ME_SUCCESS && scoped) {
+        local_rep.execution.fp_observed = true;
         status = me_fp_scope_begin(&scope, &fp, error);
         if (status == ME_SUCCESS && raise_mask && !fp.supported) {
             me_fp_scope_end(&scope, NULL);

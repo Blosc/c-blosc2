@@ -373,7 +373,7 @@ if(BLOSC2_USE_PARENT_MINIEXPR)
         message(FATAL_ERROR "BLOSC2_USE_PARENT_MINIEXPR requires the parent to define miniexpr::core first")
     endif()
     list(APPEND SOURCES blosc/b2nd-kernel.c blosc/b2nd-exec.c blosc/b2nd-exec-storage.c
-        blosc/b2nd-exec-launch.c)
+        blosc/b2nd-exec-launch.c blosc/b2nd-exec-stages.c)
     if(BUILD_STATIC)
         set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY ON PARENT_SCOPE)
     endif()
@@ -389,7 +389,7 @@ if(BLOSC2_USE_PARENT_MINIEXPR)
     message(STATUS "b2nd ramp constructors: parent miniexpr backend")
 elseif(BLOSC2_MINIEXPR_ROOT)
     list(APPEND SOURCES blosc/b2nd-kernel.c blosc/b2nd-exec.c blosc/b2nd-exec-storage.c
-        blosc/b2nd-exec-launch.c)
+        blosc/b2nd-exec-launch.c blosc/b2nd-exec-stages.c)
     get_filename_component(_miniexpr_root "${BLOSC2_MINIEXPR_ROOT}"
         ABSOLUTE BASE_DIR "${PROJECT_SOURCE_DIR}")
     find_package(miniexpr CONFIG QUIET HINTS "${_miniexpr_root}")

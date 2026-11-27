@@ -543,7 +543,7 @@ int main(void) {
         assert(c_cf && c_din && c_dout);
         assert(b2nd_from_cbuffer(c_cf, &acf, fx, sizeof(fx)) == 0);
         assert(b2nd_from_cbuffer(c_din, &adin, fy, sizeof(fy)) == 0);
-        assert(b2nd_uninit(c_cf, &ocf) == 0);
+        assert(b2nd_from_cbuffer(c_cf, &ocf, fy, sizeof(fy)) == 0);
         assert(b2nd_uninit(c_dout, &adout) == 0);
         b2nd_free_ctx(c_cf); b2nd_free_ctx(c_din); b2nd_free_ctx(c_dout);
         assert(acf->sc->frame && adin->sc->frame && adout->sc->frame && ocf->sc->frame);
@@ -572,6 +572,64 @@ int main(void) {
         assert(acf->sc->current_nchunk == cnc0 && adin->sc->current_nchunk == cnc1);
         for (size_t i = 0; i < 35; i++) assert(fout[i] == fx[i] + fy[i]);
 
+        /* Serial and mixed frame/resident calls leave no uninitialized cleanup
+         * slots; failed initialization/allocation releases only live mutexes. */
+        b2nd_exec_view fviews[2] = {
+            {sizeof(b2nd_exec_view), fx, sizeof(fx), 0, {56, 8}, 0},
+            {sizeof(b2nd_exec_view), fy, sizeof(fy), 0, {56, 8}, 0}};
+        for (size_t resident = 0; resident < 2; resident++) {
+            const b2nd_array_t *mixed[2] = {acf, adin};
+            mixed[resident] = NULL;
+            for (size_t workers = 1; workers <= 3; workers += 2) {
+                b2nd_exec_jobs mixed_jobs = {sizeof(mixed_jobs), workers, 65536};
+                assert(b2nd_exec_execute_arrays_ex(fs, mixed, fviews, 2,
+                    (me_mut_buffer){fout, sizeof(fout)}, 0, fdec, 128,
+                    &mixed_jobs, &fsr, &ferr) == ME_SUCCESS);
+                for (size_t i = 0; i < 35; i++) assert(fout[i] == fx[i] + fy[i]);
+#ifdef STORAGE_FAULT_TEST
+                assert(live_mutexes == 0);
+                allocations = 0;
+                allocation_fail_at = 1;
+                assert(b2nd_exec_execute_arrays_ex(fs, mixed, fviews, 2,
+                    (me_mut_buffer){fout, sizeof(fout)}, 0, fdec, 128,
+                    &mixed_jobs, &fsr, &ferr) == ME_ERR_OOM);
+                assert(live_mutexes == 0 && !fsr.read_spans && !fsr.decodes);
+                allocation_fail_at = 0;
+#endif
+            }
+        }
+#if defined(STORAGE_FAULT_TEST) && !defined(_WIN32)
+        for (size_t failure = 1; failure <= 2; failure++) {
+            mutex_inits = 0;
+            mutex_fail_at = failure;
+            assert(b2nd_exec_execute_arrays_ex(fs, fin, NULL, 2,
+                (me_mut_buffer){fout, sizeof(fout)}, 0, fdec, 128,
+                &fj, &fsr, &ferr) == ME_ERR_OOM);
+            assert(live_mutexes == 0 && !fsr.read_spans && !fsr.decodes);
+        }
+        mutex_fail_at = 0;
+        assert(b2nd_exec_execute_arrays_ex(fs, fin, NULL, 2,
+            (me_mut_buffer){fout, sizeof(fout)}, 0, fdec, 128,
+            &fj, &fsr, &ferr) == ME_SUCCESS);
+        assert(live_mutexes == 0);
+#endif
+
+#if defined(STORAGE_FAULT_TEST) && !defined(_WIN32)
+        /* Sink admission must clean up earlier mutexes and leave compressed
+         * output untouched when any frame-mutex initialization fails. */
+        double sink_before[35];
+        assert(b2nd_to_cbuffer(ocf, sink_before, sizeof(sink_before)) == 0);
+        for (size_t failure = 1; failure <= 2; failure++) {
+            mutex_inits = 0;
+            mutex_fail_at = failure;
+            assert(b2nd_exec_execute_to_array(fs, fin, NULL, 2, ocf, 0, fdec, 64,
+                &fj, &fsr, &ferr) == ME_ERR_OOM);
+            assert(!live_mutexes && !fsr.read_spans && !fsr.decodes);
+            assert(b2nd_to_cbuffer(ocf, got_cf, sizeof(got_cf)) == 0);
+            assert(!memcmp(got_cf, sink_before, sizeof(got_cf)));
+        }
+        mutex_fail_at = 0;
+#endif
         assert(b2nd_exec_execute_to_array(fs, fin, NULL, 2, ocf, 0, fdec, 64, &fj, &fsr, &ferr) == ME_SUCCESS);
         assert(b2nd_to_cbuffer(ocf, got_cf, sizeof(got_cf)) == 0);
         for (size_t i = 0; i < 35; i++) assert(got_cf[i] == fx[i] + fy[i]);
@@ -952,6 +1010,61 @@ int main(void) {
         b2nd_free(pa1); b2nd_free(pa2);
     }
 
+    {
+        /* Bounded LRU preserves strict reduction order, including cancellation
+         * and sNaN-poisoned physical padding, while reusing a full chunk row. */
+        double values[17 * 19];
+        for (size_t i = 0; i < 17 * 19; i++) values[i] = (double)(i % 113 + 1) / 8;
+        values[0] = 1e16; values[1] = 1; values[2] = -1e16;
+        int64_t lshape[] = {17, 19};
+        int32_t lchunks[] = {5, 6}, lblocks[] = {2, 4};
+        blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+        cp.typesize = 8;
+        blosc2_storage storage = {.cparams = &cp};
+        b2nd_context_t *ctx = b2nd_create_ctx(&storage, 2, lshape, lchunks, lblocks, "=f8", 0, NULL, 0);
+        b2nd_array_t *array = NULL;
+        assert(ctx && b2nd_from_cbuffer(ctx, &array, values, sizeof(values)) == 0);
+        b2nd_free_ctx(ctx);
+        poison_padding(array);
+        b2nd_exec_node ln[] = {make_node(0, B2ND_EXEC_INPUT), make_node(1, B2ND_EXEC_SUM)};
+        ln[0].dtype = ME_FLOAT64; ln[0].itemsize = 8; ln[1].nargs = 1;
+        b2nd_exec_descriptor ld = {sizeof(ld), ln, 2, 1, 1};
+        b2nd_exec_plan *lp = NULL;
+        b2nd_exec_schedule *ls = NULL;
+        me_error le;
+        assert(b2nd_exec_prepare(&ld, NULL, &lp, &le) == ME_SUCCESS);
+        b2nd_exec_input_meta lm = {ME_FLOAT64, 8, 2, {17, 19}};
+        assert(b2nd_exec_specialize(lp, &lm, 1, 7, 64, &ls, &le) == ME_SUCCESS);
+        b2nd_exec_view view = {sizeof(view), values, sizeof(values), 0, {19 * 8, 8}, 0};
+        double expected, actual;
+        b2nd_exec_report resident;
+        assert(b2nd_exec_execute_views(ls, &view, 1, (me_mut_buffer){&expected, 8},
+            0, 64, NULL, &resident, &le) == ME_SUCCESS);
+        size_t chunk_bytes = (size_t)array->extchunknitems * 8;
+        b2nd_exec_storage_report lr;
+        const b2nd_array_t *inputs[] = {array};
+        for (size_t slots = 1; slots <= 8; slots *= 2) {
+            assert(b2nd_exec_execute_arrays(ls, inputs, 1, (me_mut_buffer){&actual, 8},
+                0, slots * chunk_bytes, 64, &lr, &le) == ME_SUCCESS);
+            assert(!memcmp(&actual, &expected, 8) && lr.execution.fp.flags == resident.fp.flags);
+            assert(lr.decode_bytes == slots * chunk_bytes);
+            assert(lr.decodes == (slots < 4 ? 68 : 16));
+            assert(lr.decoded_bytes == lr.decodes * chunk_bytes);
+        }
+#ifdef STORAGE_FAULT_TEST
+        for (size_t failure = 1; failure <= 2; failure++) {
+            allocations = 0;
+            allocation_fail_at = failure;
+            assert(b2nd_exec_execute_arrays(ls, inputs, 1, (me_mut_buffer){&actual, 8},
+                0, 8 * chunk_bytes, 64, &lr, &le) == ME_ERR_OOM);
+            assert(!lr.decodes && !lr.read_spans);
+        }
+        allocation_fail_at = 0;
+#endif
+        b2nd_exec_schedule_free(ls);
+        b2nd_exec_plan_free(lp);
+        b2nd_free(array);
+    }
     blosc2_destroy();
     return 0;
 }

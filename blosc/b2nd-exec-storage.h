@@ -6,11 +6,11 @@
 
 typedef struct {
     b2nd_exec_report execution;
-    size_t decode_bytes; /* Owned decoded-chunk caches; excludes codec internals. */
+    size_t decode_bytes; /* Aggregate owned chunk/block caches; excludes codec internals. */
     size_t storage_metadata_bytes;
     size_t decodes; /* Successful chunk decodes, including repeated visits. */
     size_t decoded_bytes;
-    size_t cache_hits; /* Logical item lookups served by the current chunk cache. */
+    size_t cache_hits; /* Logical item lookups served by an owned cache slot. */
     size_t read_spans; /* Attempted logical span reads, including a failing span. */
     size_t evaluated_groups;
     size_t max_group_items;
@@ -65,7 +65,10 @@ typedef struct {
  * (`b2nd_exec_execute_to_array`). Arrays/schunk metadata and contents must remain
  * unchanged for the call. Decode and gather/mapped budgets are independent; all
  * preflight precedes compressed reads or sink writes. Each worker owns single-thread
- * codec contexts and private decode caches without mutating shared `current_nchunk`. */
+ * codec contexts and private decode caches without mutating shared `current_nchunk`.
+ * Resident-output readers grow up to eight LRU chunk slots per operand/worker,
+ * using only decode budget left after task admission. A one-slot budget preserves
+ * the original reader footprint. Cache policy never changes logical reduction order. */
 me_status b2nd_exec_execute_arrays(const b2nd_exec_schedule *schedule,
                                   const b2nd_array_t *const *inputs, size_t ninputs,
                                   me_mut_buffer output, unsigned raise_mask,
@@ -105,6 +108,14 @@ me_status b2nd_exec_execute_sources(const b2nd_exec_schedule *schedule,
 /* Execute a specialized logical-partition schedule over compressed arrays,
  * resident views, and/or generic source callbacks without substituting physical
  * storage blocks for logical groups. */
+/* Metadata/header-only capability admission; never decodes payloads, invokes
+ * callbacks, allocates output or executes a kernel. Success with admitted=false
+ * permits a wrapper's old route. Execution errors must never use this fallback. */
+me_status b2nd_exec_admit_partitions(const b2nd_exec_schedule *schedule,
+                                     const b2nd_array_t *const *arrays,
+                                     const b2nd_exec_view *views,
+                                     const b2nd_exec_source *sources, size_t ninputs,
+                                     bool *admitted, me_error *error);
 me_status b2nd_exec_execute_partitions(const b2nd_exec_schedule *schedule,
                                        const b2nd_array_t *const *arrays,
                                        const b2nd_exec_view *views,

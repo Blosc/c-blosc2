@@ -171,6 +171,7 @@ typedef struct {
     size_t staging_bytes; /* Separate transactional alias staging buffer, if used. */
     size_t interpreter_calls; /* Map routes entered, including failed calls. */
     size_t jit_calls;
+    bool fp_observed; /* Distinguishes absent observation from unsupported FP. */
 } b2nd_exec_report;
 
 /* Writable, native-endian, provably injective destination view. */

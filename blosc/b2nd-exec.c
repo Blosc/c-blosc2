@@ -161,7 +161,8 @@ static bool load_scalar_u64(me_dtype dtype, const void *src, uint64_t *out) {
     }
 }
 
-static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
+me_status b2nd_exec_validate_descriptor(const b2nd_exec_descriptor *d,
+                                       bool allow_stages, me_error *error) {
     if (!d || d->struct_size != sizeof(*d) || !d->nodes ||
         !d->nnodes || d->nnodes > B2ND_EXEC_MAX_NODES ||
         !d->ninputs || d->ninputs > B2ND_EXEC_MAX_INPUTS || d->root >= d->nnodes) {
@@ -191,7 +192,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
         }
         depth[i] = 1;
         for (size_t a = 0; a < n->nargs; a++) {
-            if (n->args[a] >= i || is_reduction_op(d->nodes[n->args[a]].op)) {
+            if (n->args[a] >= i || (!allow_stages && is_reduction_op(d->nodes[n->args[a]].op))) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Forward, cyclic or nested reduction reference");
             }
             unsigned next = depth[n->args[a]] + 1;
@@ -224,7 +225,7 @@ static me_status validate(const b2nd_exec_descriptor *d, me_error *error) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Operation dtype constraints are not yet supported");
         }
         if (is_reduction_op(n->op)) {
-            if (i != d->root) {
+            if (!allow_stages && i != d->root) {
                 return exec_error(error, ME_ERR_UNSUPPORTED, "Only root reductions are supported");
             }
             if ((!n->has_axes && n->naxes) || n->naxes > B2ND_EXEC_MAX_RANK) {
@@ -385,7 +386,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         options->jit_compiler < ME_COMPILER_DEFAULT || options->jit_compiler > ME_COMPILER_CC) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution preparation options");
     }
-    me_status status = validate(d, error);
+    me_status status = b2nd_exec_validate_descriptor(d, false, error);
     if (status != ME_SUCCESS) {
         return status;
     }
@@ -1710,6 +1711,7 @@ static void exec_merge_init_fp(b2nd_exec_report *report, const exec_job *parts, 
         any_fp |= parts[i].fp_seen || parts[i].fp_scoped;
     }
     report->fp.flags |= init_fp.flags;
+    report->fp_observed = true;
     report->fp.supported = any_fp ? (report->fp.supported && init_fp.supported) : init_fp.supported;
 }
 
@@ -1726,6 +1728,7 @@ static void exec_combine(b2nd_exec_report *report, const exec_job *jobs, size_t 
         report->gathered_bytes += jobs[i].gathered_bytes;
         report->fp.flags |= jobs[i].fp.flags;
         if (jobs[i].fp_seen || jobs[i].fp_scoped) {
+            report->fp_observed = true;
             report->fp.supported = seen ? report->fp.supported && jobs[i].fp.supported :
                 jobs[i].fp.supported;
             seen = true;
@@ -1743,7 +1746,8 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
                                     size_t gather_offsets[B2ND_EXEC_MAX_INPUTS],
                                     size_t *out_gather, size_t *out_mapped,
                                     bool *out_scatter, size_t *out_work_items,
-                                    size_t *out_tasks, me_error *error) {
+                                    size_t *out_tasks, me_error *error,
+                                    size_t planned_slot, bool planned_output) {
     const b2nd_exec_plan *plan = schedule->plan;
     if (schedule->partition.is_partition_schedule) {
         return exec_error(error, ME_ERR_INVALID_ARG,
@@ -1753,8 +1757,8 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
     size_t width = plan->info.itemsize;
     size_t output_items = schedule->info.output_items;
     size_t output_bytes = output_items * width;
-    if (!output_valid(output, schedule->info.output_ndim, schedule->info.output_shape,
-                      width, output_items)) {
+    if (!planned_output && !output_valid(output, schedule->info.output_ndim,
+                                         schedule->info.output_shape, width, output_items)) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution output extent, alignment or strides");
     }
     size_t per_job_gather = 0;
@@ -1771,17 +1775,19 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
             }
             continue;
         }
-        if (!view_valid(&inputs[i], &schedule->inputs[i])) {
+        if (i != planned_slot && !view_valid(&inputs[i], &schedule->inputs[i])) {
             return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution input view or extent");
         }
-        if (inputs[i].capacity && output_bytes && output->capacity &&
+        if (i != planned_slot && !planned_output &&
+            inputs[i].capacity && output_bytes && output->capacity &&
             (uintptr_t)inputs[i].base < (uintptr_t)output->base + output->capacity &&
             (uintptr_t)output->base < (uintptr_t)inputs[i].base + inputs[i].capacity) {
             return exec_error(error, ME_ERR_UNSUPPORTED, "Aliased execution output is not yet supported");
         }
         direct[i] = schedule->suffix_reduction && schedule->matches_shape[i] &&
             view_native(&inputs[i]) && view_contiguous(&inputs[i], &schedule->inputs[i]) &&
-            (!items || ((uintptr_t)inputs[i].base + inputs[i].offset) % schedule->inputs[i].itemsize == 0);
+            (i == planned_slot || !items ||
+             ((uintptr_t)inputs[i].base + inputs[i].offset) % schedule->inputs[i].itemsize == 0);
         if (needed && !direct[i] && items && schedule->info.tile_items) {
             size_t tile_bytes = schedule->info.tile_items * schedule->inputs[i].itemsize;
             if (per_job_gather > SIZE_MAX - tile_bytes) {
@@ -1794,7 +1800,7 @@ static me_status exec_plan_bindings(const b2nd_exec_schedule *schedule,
     if (per_job_gather > max_gather_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution gather buffer budget exceeded");
     }
-    bool scatter = !output_contiguous(output, schedule->info.output_ndim,
+    bool scatter = !planned_output && !output_contiguous(output, schedule->info.output_ndim,
                                       schedule->info.output_shape, width);
     size_t per_job_mapped = schedule->info.mapped_bytes;
     if (!plan->info.reduction && scatter && !plan->info.identity && items) {
@@ -1887,7 +1893,7 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
     me_status bind_status = exec_plan_bindings(
         schedule, inputs, is_reader, ninputs, output, max_gather_bytes, jobs,
         direct, gather_offsets, &per_job_gather, &per_job_mapped, &scatter,
-        &work_items, &ntasks, error);
+        &work_items, &ntasks, error, SIZE_MAX, false);
     if (bind_status != ME_SUCCESS) {
         return bind_status;
     }
@@ -2054,6 +2060,7 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
                 me_status restored = me_fp_scope_end(&combine_scope,
                                                      status == ME_SUCCESS ? error : NULL);
                 report->fp.flags |= combine_fp.flags;
+                report->fp_observed = true;
                 report->fp.supported = report->fp.supported && combine_fp.supported;
                 if (status == ME_SUCCESS) {
                     status = restored;
@@ -2207,12 +2214,13 @@ void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,
     }
 }
 
-me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
+me_status b2nd_exec_plan_stage_readers(const b2nd_exec_schedule *schedule,
                                  const b2nd_exec_view *views,
                                  const bool *is_reader, size_t ninputs,
                                  me_mut_buffer output, size_t max_gather_bytes,
                                  const b2nd_exec_jobs *jobs,
-                                 size_t *out_tasks, me_error *error) {
+                                 size_t *out_tasks, me_error *error,
+                                 size_t planned_slot, bool planned_output) {
     if (error) {
         *error = (me_error){0};
     }
@@ -2234,7 +2242,17 @@ me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
     return exec_plan_bindings(schedule, views, is_reader, ninputs, &out,
                               max_gather_bytes, jobs, direct, gather_offsets,
                               &gather, &mapped, &scatter, &work_items,
-                              out_tasks, error);
+                              out_tasks, error, planned_slot, planned_output);
+}
+
+me_status b2nd_exec_plan_readers(const b2nd_exec_schedule *schedule,
+                                 const b2nd_exec_view *views,
+                                 const bool *is_reader, size_t ninputs,
+                                 me_mut_buffer output, size_t max_gather_bytes,
+                                 const b2nd_exec_jobs *jobs,
+                                 size_t *out_tasks, me_error *error) {
+    return b2nd_exec_plan_stage_readers(schedule, views, is_reader, ninputs, output,
+                                        max_gather_bytes, jobs, out_tasks, error, SIZE_MAX, false);
 }
 
 me_status b2nd_exec_execute_readers_ex(const b2nd_exec_schedule *schedule,
