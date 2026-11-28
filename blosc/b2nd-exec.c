@@ -15,6 +15,8 @@ struct b2nd_exec_plan {
     me_kernel *kernel;
     bool owns_kernel;
     me_kernel *initial_kernel;
+    me_kernel *cast_kernel;
+    size_t uncast_width;
     uint64_t initial_value;
     b2nd_exec_op root_op;
     me_dtype requested_dtype;
@@ -25,6 +27,7 @@ struct b2nd_exec_plan {
     uint32_t root;
     uint32_t direct_slot;
     uint32_t mask_slot;
+    bool appended_mask;
     b2nd_exec_input_meta inputs[B2ND_EXEC_MAX_INPUTS];
 };
 
@@ -412,6 +415,7 @@ void b2nd_exec_plan_free(b2nd_exec_plan *plan) {
             me_kernel_free(plan->kernel);
         }
         me_kernel_free(plan->initial_kernel);
+        me_kernel_free(plan->cast_kernel);
         free(plan->nodes);
         free(plan);
     }
@@ -475,10 +479,12 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         options = &defaults;
     }
     if (!out || options->struct_size != sizeof(*options) ||
-        options->execution < ME_EXEC_INTERPRET || options->execution > ME_EXEC_REQUIRE_JIT ||
+        options->execution < ME_EXEC_INTERPRET || options->execution > ME_EXEC_AUTO ||
         options->casting < ME_CAST_UNSAFE || options->casting > ME_CAST_SAFE ||
         options->math_backend < ME_MATH_DEFAULT || options->math_backend > ME_MATH_SCALAR ||
-        options->jit_compiler < ME_COMPILER_DEFAULT || options->jit_compiler > ME_COMPILER_CC) {
+        options->jit_compiler < ME_COMPILER_DEFAULT || options->jit_compiler > ME_COMPILER_CC ||
+        options->fp_mode < ME_FP_DEFAULT || options->fp_mode > ME_FP_FAST ||
+        options->math_accuracy < ME_ACCURACY_DEFAULT || options->math_accuracy > ME_ACCURACY_U35) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution preparation options");
     }
     me_status status = b2nd_exec_validate_descriptor(d, false, error);
@@ -504,7 +510,10 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     plan->info.reducer = reduction_kind(plan->root_op);
     plan->info.reduction = is_reduction_op(plan->root_op);
     plan->info.has_where = d->nodes[d->root].has_where;
-    if (plan->info.has_where) plan->mask_slot = d->nodes[d->nodes[d->root].where].slot;
+    if (plan->info.has_where) {
+        plan->mask_slot = d->nodes[d->nodes[d->root].where].slot;
+        plan->info.where_slot = plan->mask_slot;
+    }
     /* Current DAG map ops are all lane-local; ordered sums/products stay serial. */
     plan->info.partitionable = plan->info.reducer != ME_REDUCTION_SUM &&
         plan->info.reducer != ME_REDUCTION_PROD && !plan->info.has_where;
@@ -536,7 +545,7 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     char input_names[B2ND_EXEC_MAX_INPUTS][24];
     char capture_names[B2ND_EXEC_MAX_CAPTURES][24];
     size_t ncaptures = 0;
-    size_t used = (size_t)snprintf(source, capacity, "# me:fp=strict\ndef mapped(");
+    size_t used = (size_t)snprintf(source, capacity, "def mapped(");
     for (size_t slot = 0; slot < d->ninputs; slot++) {
         snprintf(input_names[slot], sizeof(input_names[slot]), "i%zu", slot);
         used += (size_t)snprintf(source + used, capacity - used, "%si%zu", slot ? ", " : "", slot);
@@ -587,6 +596,8 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     me_prepare_options policy = ME_PREPARE_OPTIONS_INITIALIZER;
     policy.execution = options->execution;
     policy.math_backend = options->math_backend;
+    policy.fp_mode = options->fp_mode;
+    policy.math_accuracy = options->math_accuracy;
     policy.jit_compiler = options->jit_compiler;
     policy.inherit_environment = options->inherit_environment;
     policy.menudet_forbidden_features = ME_MENUDET_FEATURE_BLOCK_REDUCTIONS |
@@ -774,7 +785,96 @@ me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *ou
     }
     *out = plan->info;
     out->has_jit = me_kernel_has_jit(plan->kernel);
+    out->fp_mode = me_kernel_fp_mode(plan->kernel);
+    out->math_backend = me_kernel_math_backend(plan->kernel);
+    out->sleef_accuracy = me_kernel_sleef_accuracy(plan->kernel);
     return ME_SUCCESS;
+}
+
+static me_status exec_prepare_borrowed_kernel_masked(const me_kernel *kernel,
+    me_reduction_kind reducer, const b2nd_exec_reduce_opts *opts,
+    b2nd_exec_plan **out, me_error *error) {
+    if (out) *out = NULL;
+    if (!out || reducer == ME_REDUCTION_NONE) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Mask requires a reduction");
+    }
+    b2nd_exec_plan *plan = NULL;
+    me_status status = b2nd_exec_prepare_borrowed_kernel(kernel, reducer, opts, &plan, error);
+    if (status != ME_SUCCESS) return status;
+    size_t slot = plan->info.ninputs;
+    if (slot == B2ND_EXEC_MAX_INPUTS) {
+        b2nd_exec_plan_free(plan);
+        return exec_error(error, ME_ERR_UNSUPPORTED, "No input slot available for mask");
+    }
+    plan->mask_slot = (uint32_t)slot;
+    plan->info.where_slot = slot;
+    plan->inputs[slot].dtype = ME_BOOL;
+    plan->inputs[slot].itemsize = 1;
+    plan->info.ninputs++;
+    plan->info.has_where = true;
+    plan->info.partitionable = false;
+    plan->appended_mask = true;
+    *out = plan;
+    return ME_SUCCESS;
+}
+
+me_status b2nd_exec_prepare_borrowed_kernel_ex(const me_kernel *kernel,
+    me_reduction_kind reducer, const b2nd_exec_reduce_opts *opts,
+    me_dtype accumulator, bool has_where, b2nd_exec_plan **out, me_error *error) {
+    if (out) *out = NULL;
+    if (!out || (reducer == ME_REDUCTION_NONE && accumulator != ME_AUTO) ||
+        (opts && opts->struct_size != sizeof(*opts))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed reduction options");
+    }
+    if (opts && opts->has_initial &&
+        (reducer == ME_REDUCTION_NONE || reducer == ME_REDUCTION_ANY || reducer == ME_REDUCTION_ALL)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "This reduction does not accept initial values");
+    }
+    b2nd_exec_reduce_opts plain = {0};
+    if (opts) {
+        plain = *opts;
+        plain.has_initial = false;
+    }
+    b2nd_exec_plan *plan = NULL;
+    me_status status = has_where ?
+        exec_prepare_borrowed_kernel_masked(kernel, reducer, opts ? &plain : NULL, &plan, error) :
+        b2nd_exec_prepare_borrowed_kernel(kernel, reducer, opts ? &plain : NULL, &plan, error);
+    if (status != ME_SUCCESS) return status;
+    if (accumulator != ME_AUTO) {
+        me_dtype acc = me_reduce_accumulator_dtype(plan->info.map_dtype, reducer, accumulator);
+        if (acc == ME_AUTO || !numeric_width(acc)) {
+            status = exec_error(error, ME_ERR_SIGNATURE, "Incompatible reduction dtype");
+            goto cleanup_borrowed;
+        }
+        if (acc != plan->info.map_dtype) {
+            me_input_spec input = {"x", plan->info.map_dtype, plan->info.map_itemsize};
+            me_signature sig = ME_SIGNATURE_INITIALIZER;
+            sig.inputs = &input;
+            sig.ninputs = 1;
+            sig.output_dtype = acc;
+            sig.casting = ME_CAST_UNSAFE;
+            status = me_prepare_formula("x", &sig, NULL, &plan->cast_kernel, error);
+            if (status != ME_SUCCESS) goto cleanup_borrowed;
+            plan->uncast_width = plan->info.map_itemsize;
+            plan->info.map_dtype = acc;
+            plan->info.map_itemsize = numeric_width(acc);
+            plan->info.partitionable = false;
+        }
+        plan->info.dtype = acc;
+        plan->info.itemsize = numeric_width(acc);
+    }
+    if (opts && opts->has_initial) {
+        status = exec_setup_reduction(plan, opts->has_axes, opts->naxes, opts->axes,
+            opts->keepdims, true, opts->initial_dtype, opts->initial_category,
+            opts->initial_scalar, opts->initial_size, error);
+    }
+cleanup_borrowed:
+    if (status != ME_SUCCESS) {
+        b2nd_exec_plan_free(plan);
+    } else {
+        *out = plan;
+    }
+    return status;
 }
 
 me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
@@ -938,6 +1038,13 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
     }
     size_t mapped = (plan->info.identity || !plan->info.reduction || !lanes) ?
         0 : lanes * plan->info.map_itemsize;
+    if (plan->cast_kernel && lanes) {
+        /* Align the original map after the accumulator-typed conversion tile. */
+        if (mapped > SIZE_MAX - 7 || lanes > (SIZE_MAX - mapped - 7) / plan->uncast_width) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Execution conversion tile size overflow");
+        }
+        mapped = ((mapped + 7) & ~(size_t)7) + lanes * plan->uncast_width;
+    }
     if (mapped > max_mapped_bytes) {
         return exec_error(error, ME_ERR_INVALID_ARG, "Execution mapped tile budget exceeded");
     }
@@ -946,7 +1053,8 @@ me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,
     for (size_t i = 0; i < ninputs; i++) {
         matches[i] = inputs[i].ndim == out_ndim &&
             (!out_ndim || memcmp(inputs[i].shape, out_shape, out_ndim * sizeof(int64_t)) == 0);
-        if (lanes && (!matches[i] || !suffix) && (!plan->info.identity || i == plan->direct_slot)) {
+        if (lanes && (((!matches[i] || !suffix) && (!plan->info.identity || i == plan->direct_slot)) ||
+                      (plan->info.has_where && i == plan->mask_slot))) {
             if (lanes > SIZE_MAX / inputs[i].itemsize) {
                 return exec_error(error, ME_ERR_INVALID_ARG, "Execution broadcast gather size overflow");
             }
@@ -1431,6 +1539,23 @@ static bool exec_gather_tile(exec_job *job, size_t slot, size_t group,
                              size_t pos, size_t count) {
     if (job->readers && job->readers[slot].read) {
         size_t width = job->schedule->inputs[slot].itemsize;
+        if (job->mask) {
+            /* Preserve participation: readers never observe discarded lanes.
+             * Gaps are initialized only for a well-defined core input buffer. */
+            memset(job->gather_slots[slot], 0, count * width);
+            for (size_t lane = 0; lane < count;) {
+                while (lane < count && !job->mask[lane]) lane++;
+                size_t start = lane;
+                while (lane < count && job->mask[lane]) lane++;
+                if (lane == start) continue;
+                job->status = job->readers[slot].read(job->readers[slot].context,
+                    group, pos + start, lane - start,
+                    (me_mut_buffer){job->gather_slots[slot] + start * width,
+                                    (lane - start) * width}, &job->error);
+                if (job->status != ME_SUCCESS) return false;
+            }
+            return true;
+        }
         job->status = job->readers[slot].read(job->readers[slot].context, group, pos, count,
             (me_mut_buffer){job->gather_slots[slot], count * width}, &job->error);
         return job->status == ME_SUCCESS;
@@ -1644,14 +1769,31 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
      * reducer flags. A raise mask must not truncate later tiles. */
     options.raise_mask = 0;
     void *target = (plan->info.reduction || job->scatter) ? job->mapped : direct_out;
+    if (plan->cast_kernel) {
+        size_t offset = (schedule->info.tile_items * map_width + 7) & ~(size_t)7;
+        target = (unsigned char *)job->mapped + offset;
+    }
     me_execution_backend backend = ME_BACKEND_NONE;
-    job->status = me_eval_block_backend(plan->kernel, spans, job->ninputs,
-        (me_mut_buffer){target, count * map_width}, &block, &options, &backend, &job->error);
+    job->status = me_eval_block_backend(plan->kernel, spans, job->ninputs - plan->appended_mask,
+        (me_mut_buffer){target, count * (plan->cast_kernel ? plan->uncast_width : map_width)},
+        &block, &options, &backend, &job->error);
     job->interpreter_calls += backend == ME_BACKEND_INTERPRETER;
     job->jit_calls += backend == ME_BACKEND_JIT;
     job->fp.flags |= fp.flags;
     job->fp.supported = job->fp_seen ? job->fp.supported && fp.supported : fp.supported;
     job->fp_seen = true;
+    if (job->status == ME_SUCCESS && plan->cast_kernel) {
+        me_buffer source = {target, count * plan->uncast_width};
+        fp = (me_fp_status){0};
+        backend = ME_BACKEND_NONE;
+        job->status = me_eval_block_backend(plan->cast_kernel, &source, 1,
+            (me_mut_buffer){job->mapped, count * map_width}, &block, &options, &backend, &job->error);
+        job->interpreter_calls += backend == ME_BACKEND_INTERPRETER;
+        job->jit_calls += backend == ME_BACKEND_JIT;
+        job->fp.flags |= fp.flags;
+        job->fp.supported = job->fp.supported && fp.supported;
+        target = job->mapped;
+    }
     if (job->status == ME_SUCCESS) {
         job->map_calls++;
         if (!plan->info.reduction && job->scatter) {

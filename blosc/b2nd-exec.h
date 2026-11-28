@@ -106,6 +106,7 @@ typedef struct {
     uint32_t root;
 } b2nd_exec_descriptor;
 
+#define B2ND_EXEC_FP_POLICY_API 1
 typedef struct {
     size_t struct_size;
     me_execution_policy execution;
@@ -114,11 +115,13 @@ typedef struct {
     me_casting casting;
     me_math_backend math_backend;
     me_jit_compiler jit_compiler;
+    me_fp_mode fp_mode;
+    me_math_accuracy math_accuracy;
 } b2nd_exec_options;
 
 #define B2ND_EXEC_OPTIONS_INITIALIZER \
     {sizeof(b2nd_exec_options), ME_EXEC_INTERPRET, false, false, ME_CAST_UNSAFE, \
-     ME_MATH_DEFAULT, ME_COMPILER_DEFAULT}
+     ME_MATH_DEFAULT, ME_COMPILER_DEFAULT, ME_FP_DEFAULT, ME_ACCURACY_DEFAULT}
 
 typedef struct b2nd_exec_plan b2nd_exec_plan;
 typedef struct b2nd_exec_schedule b2nd_exec_schedule;
@@ -150,6 +153,10 @@ typedef struct {
     bool has_initial;
     bool has_jit; /* Prepared availability, not proof that an invocation used JIT. */
     bool has_where;
+    size_t where_slot; /* Meaningful only when has_where is true. */
+    const char *fp_mode; /* Effective immutable core preparation policy. */
+    const char *math_backend;
+    const char *sleef_accuracy;
 } b2nd_exec_plan_info;
 
 typedef struct {
@@ -180,7 +187,9 @@ typedef struct {
     size_t gather_bytes; /* Per-job gather scratch allocation. */
     size_t gathered_bytes;
     size_t staging_bytes; /* Separate transactional alias staging buffer, if used. */
-    size_t interpreter_calls; /* Map routes entered, including failed calls. */
+    /* Core calls, including failed calls and internal accumulator conversions;
+     * a JIT map plus an interpreted conversion increments both counters. */
+    size_t interpreter_calls;
     size_t jit_calls;
     bool fp_observed; /* Distinguishes absent observation from unsupported FP. */
 } b2nd_exec_report;
@@ -231,6 +240,15 @@ typedef struct {
     uint8_t initial_scalar[16];
     size_t initial_size;
 } b2nd_exec_reduce_opts;
+
+/* Optional resident Boolean mask is appended after the kernel's input slots.
+ * The kernel's own signature is unchanged; masked lanes are never evaluated. */
+#define B2ND_EXEC_BORROWED_REDUCTION_API 1
+/* Explicit accumulator casts use an additional bounded core conversion tile;
+ * neither the borrowed kernel nor its output conversion is rewritten. */
+me_status b2nd_exec_prepare_borrowed_kernel_ex(const me_kernel *kernel,
+    me_reduction_kind reducer, const b2nd_exec_reduce_opts *opts,
+    me_dtype accumulator, bool has_where, b2nd_exec_plan **out, me_error *error);
 
 typedef struct {
     size_t struct_size;

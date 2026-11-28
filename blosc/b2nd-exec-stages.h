@@ -57,6 +57,10 @@ me_status b2nd_exec_staged_assemble_ex(const b2nd_exec_stage_spec *stages, size_
                                       size_t ninputs, b2nd_exec_staged_plan **out,
                                       b2nd_exec_stage_diagnostic *diag, me_error *error);
 size_t b2nd_exec_staged_count(const b2nd_exec_staged_plan *plan);
+/* Output and FP/math policy describe the root (final) stage, not a uniform
+ * policy guarantee. Explicitly assembled children may differ; inspect each
+ * borrowed child with b2nd_exec_describe for its effective policy.
+ * has_jit is true only when every child has prepared JIT availability. */
 me_status b2nd_exec_staged_plan_describe(const b2nd_exec_staged_plan *plan,
                                         b2nd_exec_plan_info *out);
 /* Borrow typed child plans/bindings, never an interchange subtree. The parent

@@ -280,6 +280,8 @@ static void test_general_stages(void) {
     map[1].op = B2ND_EXEC_ADD; map[1].nargs = 2;
     b2nd_exec_options interp_opts = B2ND_EXEC_OPTIONS_INITIALIZER;
     interp_opts.execution = ME_EXEC_INTERPRET;
+    interp_opts.fp_mode = ME_FP_FAST;
+    interp_opts.jit_compiler = ME_COMPILER_CC; /* TCC remains strict-only. */
     assert(b2nd_exec_prepare(&md, &interp_opts, &children[0], &error) == ME_SUCCESS);
     b2nd_exec_options jit_opts = B2ND_EXEC_OPTIONS_INITIALIZER;
     jit_opts.execution = ME_EXEC_PREFER_JIT;
@@ -291,6 +293,10 @@ static void test_general_stages(void) {
     assert(b2nd_exec_staged_assemble(jit_specs, 2, 1, &plan, &error) == ME_SUCCESS);
     assert(b2nd_exec_staged_plan_describe(plan, &child_info) == ME_SUCCESS);
     assert(!child_info.has_jit);
+    /* Aggregate policy is root-stage policy; children retain their own policy. */
+    assert(strcmp(child_info.fp_mode, "strict") == 0);
+    assert(b2nd_exec_describe(children[0], &child_info) == ME_SUCCESS);
+    assert(strcmp(child_info.fp_mode, "fast") == 0);
     b2nd_exec_staged_plan_free(plan);
     b2nd_exec_plan_free(children[0]);
     b2nd_exec_plan_free(children[1]);

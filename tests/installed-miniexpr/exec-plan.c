@@ -16,6 +16,49 @@ static b2nd_exec_node node(uint32_t id, b2nd_exec_op op) {
     return n;
 }
 
+static void borrowed_mask_contract(void) {
+    me_input_spec input = {"x", ME_FLOAT64, sizeof(double)};
+    me_signature sig = ME_SIGNATURE_INITIALIZER;
+    sig.inputs = &input;
+    sig.ninputs = 1;
+    me_kernel *kernel = NULL;
+    me_error error;
+    assert(me_prepare_formula("sqrt(x)", &sig, NULL, &kernel, &error) == ME_SUCCESS);
+    b2nd_exec_plan *plan = NULL;
+    assert(b2nd_exec_prepare_borrowed_kernel_ex(kernel, ME_REDUCTION_SUM, NULL,
+        ME_AUTO, true, &plan, &error) == ME_SUCCESS);
+    b2nd_exec_plan_info info;
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
+    assert(info.ninputs == 2 && info.has_where && !info.partitionable);
+    b2nd_exec_input_meta meta[] = {
+        {ME_FLOAT64, sizeof(double), 1, {2}}, {ME_BOOL, 1, 1, {2}}
+    };
+    b2nd_exec_schedule *schedule = NULL;
+    assert(b2nd_exec_specialize(plan, meta, 2, 1, 1024, &schedule, &error) == ME_SUCCESS);
+    double values[] = {-1, 4}, output = -1;
+    bool mask[] = {false, true};
+    me_buffer buffers[] = {{values, sizeof(values)}, {mask, sizeof(mask)}};
+    b2nd_exec_report report;
+    assert(b2nd_exec_execute(schedule, buffers, 2, (me_mut_buffer){&output, sizeof(output)},
+                             0, NULL, &report, &error) == ME_SUCCESS);
+    assert(output == 2 && report.fp.flags == 0);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
+    assert(b2nd_exec_prepare_borrowed_kernel_ex(kernel, ME_REDUCTION_SUM, NULL,
+        ME_FLOAT32, true, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_describe(plan, &info) == ME_SUCCESS);
+    assert(info.dtype == ME_FLOAT32 && info.map_dtype == ME_FLOAT32);
+    assert(b2nd_exec_specialize(plan, meta, 2, 2, 1, &schedule, &error) == ME_ERR_INVALID_ARG);
+    assert(b2nd_exec_specialize(plan, meta, 2, 2, 1024, &schedule, &error) == ME_SUCCESS);
+    float cast_output = -1;
+    assert(b2nd_exec_execute(schedule, buffers, 2,
+        (me_mut_buffer){&cast_output, sizeof(cast_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
+    assert(cast_output == 2 && report.fp.flags == 0 && report.mapped_bytes == 24);
+    b2nd_exec_schedule_free(schedule);
+    b2nd_exec_plan_free(plan);
+    me_kernel_free(kernel);
+}
+
 static double scalar_value(me_dtype dtype, uint64_t bits) {
     if (dtype == ME_INT16) {
         int16_t value; memcpy(&value, &bits, sizeof(value)); return value;
@@ -45,8 +88,10 @@ static void backend_contracts(bool require_jit) {
     double values[17], result;
     for (size_t i = 0; i < 17; i++) values[i] = (double)i;
     me_buffer input = {values, sizeof(values)};
-    for (int policy = ME_EXEC_INTERPRET;
-         policy <= (require_jit ? ME_EXEC_REQUIRE_JIT : ME_EXEC_PREFER_JIT); policy++) {
+    for (int policy = ME_EXEC_INTERPRET; policy <= ME_EXEC_AUTO; policy++) {
+        if (policy == ME_EXEC_REQUIRE_JIT && !require_jit) {
+            continue;
+        }
         b2nd_exec_options options = B2ND_EXEC_OPTIONS_INITIALIZER;
         options.execution = (me_execution_policy)policy;
         options.jit_compiler = ME_COMPILER_CC;
@@ -147,6 +192,7 @@ static void backend_contracts(bool require_jit) {
 }
 
 int main(int argc, char **argv) {
+    borrowed_mask_contract();
     backend_contracts(argc > 1 && !strcmp(argv[1], "--require-jit"));
     /* The shared scope restores caller rounding/flags and nests collectors. */
 #ifndef __EMSCRIPTEN__

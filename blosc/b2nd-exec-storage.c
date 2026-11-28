@@ -458,7 +458,10 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
     b2nd_exec_plan_info plan_info = {0};
     b2nd_exec_schedule_info sched_info = {0};
     b2nd_exec_schedule_kernel(schedule, &plan_info, &sched_info, NULL);
-    if (plan_info.has_where) {
+    if (ninputs != plan_info.ninputs) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Storage input count mismatch");
+    }
+    if (plan_info.has_where && arrays && arrays[plan_info.where_slot]) {
         return storage_error(error, ME_ERR_UNSUPPORTED, "Compressed masked execution is not admitted");
     }
     bool reduced_axis[B2ND_EXEC_MAX_RANK] = {0};
@@ -1755,7 +1758,7 @@ static me_status exec_execute_sources_impl(const b2nd_exec_schedule *schedule,
 
     size_t idx_bytes = (has_cb && sched_info.nitems && sched_info.tile_items)
         ? sched_info.tile_items * sizeof(size_t) : 0;
-    if (has_cb && plan_info.has_where) {
+    if (plan_info.has_where && is_cb[plan_info.where_slot]) {
         return storage_error(error, ME_ERR_UNSUPPORTED, "Reader-backed masked execution is not admitted");
     }
     size_t *idx_buf = idx_bytes ? malloc(idx_bytes) : NULL;
