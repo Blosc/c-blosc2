@@ -575,12 +575,14 @@ int main(void) {
         blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
         cp.typesize = 8;
         blosc2_storage st_cf = {.contiguous = true, .cparams = &cp};
+        /* CTest runs in the build directory; relative paths keep the
+         * frame-backed cases portable to Windows, where /tmp is not writable. */
 #ifdef STORAGE_FAULT_TEST
-        const char *p_in = "/tmp/b2_exec_storage_fault_in.b2nd";
-        const char *p_out = "/tmp/b2_exec_storage_fault_out.b2nd";
+        const char *p_in = "b2_exec_storage_fault_in.b2nd";
+        const char *p_out = "b2_exec_storage_fault_out.b2nd";
 #else
-        const char *p_in = "/tmp/b2_exec_storage_test_in.b2nd";
-        const char *p_out = "/tmp/b2_exec_storage_test_out.b2nd";
+        const char *p_in = "b2_exec_storage_test_in.b2nd";
+        const char *p_out = "b2_exec_storage_test_out.b2nd";
 #endif
         remove(p_in); remove(p_out);
         blosc2_storage st_disk_in = {.contiguous = true, .urlpath = (char *)p_in, .cparams = &cp};

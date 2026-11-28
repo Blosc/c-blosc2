@@ -615,8 +615,9 @@ int main(int argc, char **argv) {
         assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
             0, &jobs, &report, &error) == ME_SUCCESS);
         assert(parallel_result == 100002);
-        assert(report.tasks == expected_tasks(4) && report.worker_bytes == 512 &&
-               report.map_calls == 63);
+        /* 128 mapped bytes per admitted task; the budget admits four tasks. */
+        assert(report.tasks == expected_tasks(4) &&
+               report.worker_bytes == report.tasks * 128 && report.map_calls == 63);
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
         free(many);
