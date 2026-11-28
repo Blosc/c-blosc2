@@ -46,3 +46,15 @@ add_executable(installed_public_exec_kernel public-exec-kernel.c)
 set_property(TARGET installed_public_exec_kernel PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
 target_link_libraries(installed_public_exec_kernel PRIVATE Blosc2::blosc2_static miniexpr::core)
 add_test(NAME installed_public_exec_kernel COMMAND installed_public_exec_kernel)
+
+# These fixtures use assertions for both setup and verification. Keep them live
+# in Release as well as Debug; otherwise setup calls disappear under NDEBUG.
+foreach(_consumer installed_miniexpr_consumer installed_exec_plan
+        installed_exec_storage installed_exec_launcher installed_exec_stages
+        installed_public_exec installed_public_exec_kernel)
+    if(MSVC)
+        target_compile_options(${_consumer} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${_consumer} PRIVATE -UNDEBUG)
+    endif()
+endforeach()
