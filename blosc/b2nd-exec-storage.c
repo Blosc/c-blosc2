@@ -1180,7 +1180,9 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
     if (per_worker_gather > max_gather_bytes) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Execution gather scratch budget exceeded");
     }
-    if (jobs && jobs->max_worker_scratch && per_worker_scratch > jobs->max_worker_scratch) {
+    /* A supplied zero cap forbids scratch; only a missing jobs descriptor means
+     * that no aggregate worker-scratch cap was requested. */
+    if (jobs && per_worker_scratch > jobs->max_worker_scratch) {
         return storage_error(error, ME_ERR_INVALID_ARG, "Execution worker scratch budget exceeded");
     }
     me_fp_status probe_fp = {0};
@@ -1213,7 +1215,7 @@ me_status b2nd_exec_execute_to_array(const b2nd_exec_schedule *schedule,
         size_t fit = max_decode_bytes / per_worker_decode;
         if (nworkers > fit) nworkers = fit;
     }
-    if (jobs && jobs->max_worker_scratch && per_worker_scratch) {
+    if (jobs && per_worker_scratch) {
         size_t fit = jobs->max_worker_scratch / per_worker_scratch;
         if (nworkers > fit) nworkers = fit;
     }

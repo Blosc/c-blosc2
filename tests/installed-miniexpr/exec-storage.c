@@ -147,8 +147,17 @@ int main(void) {
             size_t gather_budget = geometry.tile_items * 8 * 2;
             b2nd_exec_storage_report report;
             int64_t current_chunks[] = {arrays[0]->sc->current_nchunk, arrays[1]->sc->current_nchunk};
+#ifdef __EMSCRIPTEN__
+            /* Unobservable FP flags must reject raise masks before storage reads. */
             assert(b2nd_exec_execute_arrays(schedule, inputs, 2, (me_mut_buffer){actual, bytes},
-                ME_FP_INVALID, decode_budget, gather_budget, &report, &error) == ME_SUCCESS);
+                ME_FP_INVALID, decode_budget, gather_budget, &report, &error) == ME_ERR_UNSUPPORTED);
+            assert(!report.decodes && !report.execution.tiles);
+            unsigned raise_mask = 0;
+#else
+            unsigned raise_mask = ME_FP_INVALID;
+#endif
+            assert(b2nd_exec_execute_arrays(schedule, inputs, 2, (me_mut_buffer){actual, bytes},
+                raise_mask, decode_budget, gather_budget, &report, &error) == ME_SUCCESS);
             assert(!memcmp(actual, expected, bytes));
             assert(report.execution.tiles == reference.tiles);
             assert(report.execution.map_calls == reference.map_calls);
@@ -343,7 +352,12 @@ int main(void) {
         assert(b2nd_to_cbuffer(out_match, got, sizeof(got)) == 0);
         for (size_t i = 0; i < 35; i++) assert(got[i] == x[i] + y_swap_buf[i]);
         assert(sr.execution.fp.flags == 0 && sr.execution.gather_bytes == 0);
-        assert(sr.decode_bytes == sr.execution.tasks * match_dec_b);
+        /* Decode buffers are allocated for planned workers. The codec may
+         * dispatch work to fewer workers; tasks counts only entered workers. */
+        assert(sr.execution.tasks > 0 && sr.execution.tasks <= sj.workers);
+        assert(sr.decode_bytes >= sr.execution.tasks * match_dec_b);
+        assert(sr.decode_bytes <= sj.workers * match_dec_b);
+        assert(sr.decode_bytes % match_dec_b == 0);
 
         const b2nd_array_t *in_mis[] = {ax, ay_mis};
         size_t mis_dec_b = (size_t)(ax->extchunknitems + ay_mis->extchunknitems) * 8;
@@ -359,6 +373,15 @@ int main(void) {
         assert(b2nd_exec_execute_to_array(ss, in_mis, NULL, 2, out_mis, 0,
                                           mis_dec_b, 2 * 4 * 8 - 1, NULL, &sr, &serr) == ME_ERR_INVALID_ARG);
         assert(!sr.decodes);
+        /* A present zero worker cap is not an unlimited allowance. Reject
+         * before decoding or publishing any replacement sink chunks. */
+        b2nd_exec_jobs zero_scratch = {sizeof(zero_scratch), 3, 0};
+        assert(b2nd_exec_execute_to_array(ss, in_mis, NULL, 2, out_mis, 0,
+                                          mis_dec_b * 3, 65536, &zero_scratch,
+                                          &sr, &serr) == ME_ERR_INVALID_ARG);
+        assert(!sr.decodes && !sr.execution.tiles);
+        assert(b2nd_to_cbuffer(out_mis, got, sizeof(got)) == 0);
+        for (size_t i = 0; i < 35; i++) assert(got[i] == x[i] + y_swap_buf[i]);
         const b2nd_array_t *alias_in[] = {out_match, ay_match};
         assert(b2nd_exec_execute_to_array(ss, alias_in, NULL, 2, out_match, 0,
                                           match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_UNSUPPORTED);
@@ -388,9 +411,15 @@ int main(void) {
         assert(cnan && b2nd_from_cbuffer(cnan, &anan, x_nan, sizeof(x_nan)) == 0);
         b2nd_free_ctx(cnan);
         const b2nd_array_t *in_nan[] = {anan, ay_match};
+#ifdef __EMSCRIPTEN__
+        assert(b2nd_exec_execute_to_array(ss, in_nan, NULL, 2, out_match, ME_FP_INVALID,
+                                          match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_UNSUPPORTED);
+        assert(!sr.decodes && !sr.execution.tiles);
+#else
         assert(b2nd_exec_execute_to_array(ss, in_nan, NULL, 2, out_match, ME_FP_INVALID,
                                           match_dec_b, 64, NULL, &sr, &serr) == ME_ERR_EVAL);
         assert(sr.execution.fp.flags & ME_FP_INVALID);
+#endif
         b2nd_free(anan);
 
         /* Empty 0-item sink succeeds cleanly. */
@@ -1008,6 +1037,53 @@ int main(void) {
         me_kernel_free(gk);
 
         b2nd_free(pa1); b2nd_free(pa2);
+    }
+
+    {
+        /* 1-D logical partition block_sum preserves exact boundaries and budget rejections. */
+        double d1[7] = {1, 2, 3, 4, 5, 6, 7};
+        int64_t sh1[] = {7};
+        int32_t c1d[] = {5}, b1d[] = {2};
+        blosc2_cparams cp1 = BLOSC2_CPARAMS_DEFAULTS;
+        cp1.typesize = sizeof(double);
+        blosc2_storage st1 = {.cparams = &cp1};
+        b2nd_context_t *ctx1 = b2nd_create_ctx(&st1, 1, sh1, c1d, b1d, "=f8", 0, NULL, 0);
+        b2nd_array_t *arr1d = NULL;
+        assert(ctx1 && b2nd_from_cbuffer(ctx1, &arr1d, d1, sizeof(d1)) == 0);
+        b2nd_free_ctx(ctx1);
+        poison_padding(arr1d);
+        me_input_spec pspec1 = {"x", ME_FLOAT64, sizeof(double)};
+        me_signature bsig1 = ME_SIGNATURE_INITIALIZER;
+        bsig1.inputs = &pspec1;
+        bsig1.ninputs = 1;
+        bsig1.output_dtype = ME_FLOAT64;
+        bsig1.cardinality = ME_BLOCK_SCALAR;
+        me_kernel *bk1 = NULL;
+        me_error perr1 = {0};
+        assert(me_prepare_menudet("0.2", "def k(x):\n    return block_sum(x)\n",
+                                  &bsig1, NULL, &bk1, &perr1) == ME_SUCCESS);
+        b2nd_exec_plan *bp1 = NULL;
+        assert(b2nd_exec_prepare_borrowed_kernel(bk1, ME_REDUCTION_NONE, NULL, &bp1, &perr1) == ME_SUCCESS);
+        b2nd_exec_input_meta pm1 = {ME_FLOAT64, sizeof(double), 1, {7}};
+        b2nd_exec_partition_spec part1 = {sizeof(part1), 1, {7}, {3}, false, {0}, {0}};
+        b2nd_exec_schedule *ps1 = NULL;
+        assert(b2nd_exec_specialize_partitions(bp1, &pm1, 1, &part1, sizeof(double) - 1,
+                                               &ps1, &perr1) == ME_ERR_INVALID_ARG);
+        assert(b2nd_exec_specialize_partitions(bp1, &pm1, 1, &part1, sizeof(double),
+                                               &ps1, &perr1) == ME_SUCCESS);
+        double out1d[3] = {-1, -1, -1};
+        const b2nd_array_t *in1d[1] = {arr1d};
+        b2nd_exec_storage_report rep1d = {0};
+        assert(b2nd_exec_execute_partitions(ps1, in1d, NULL, NULL, 1, (me_mut_buffer){out1d, sizeof(out1d)},
+                                            0, 1 << 20, 3 * sizeof(double) - 1, &rep1d, &perr1) == ME_ERR_INVALID_ARG);
+        assert(!rep1d.decodes && !rep1d.evaluated_groups && out1d[0] == -1);
+        assert(b2nd_exec_execute_partitions(ps1, in1d, NULL, NULL, 1, (me_mut_buffer){out1d, sizeof(out1d)},
+                                            0, 1 << 20, 3 * sizeof(double), &rep1d, &perr1) == ME_SUCCESS);
+        assert(rep1d.evaluated_groups == 3 && out1d[0] == 6.0 && out1d[1] == 15.0 && out1d[2] == 7.0);
+        b2nd_exec_schedule_free(ps1);
+        b2nd_exec_plan_free(bp1);
+        me_kernel_free(bk1);
+        b2nd_free(arr1d);
     }
 
     {

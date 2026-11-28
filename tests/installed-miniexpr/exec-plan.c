@@ -1,4 +1,5 @@
 /* Wire-free descriptor and borrowed-schedule contract. No artifact headers. */
+#undef NDEBUG
 #include "b2nd-exec.h"
 #include <assert.h>
 #include <fenv.h>
@@ -53,7 +54,13 @@ static void borrowed_mask_contract(void) {
     float cast_output = -1;
     assert(b2nd_exec_execute(schedule, buffers, 2,
         (me_mut_buffer){&cast_output, sizeof(cast_output)}, 0, NULL, &report, &error) == ME_SUCCESS);
-    assert(cast_output == 2 && report.fp.flags == 0 && report.mapped_bytes == 24);
+    if (cast_output != 2) {
+        fprintf(stderr, "Borrowed accumulator conversion: output=%a scratch=%zu flags=%u\n",
+                (double)cast_output, report.mapped_bytes, report.fp.flags);
+    }
+    assert(cast_output == 2);
+    assert(report.fp.flags == 0);
+    assert(report.mapped_bytes == 24);
     b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
     me_kernel_free(kernel);
@@ -293,6 +300,41 @@ int main(int argc, char **argv) {
     metadata[0].shape[0] = INT64_MAX;
     metadata[0].shape[1] = INT64_MAX;
     assert(b2nd_exec_specialize(plan, metadata, 2, 8, 64, &schedule, &error) == ME_ERR_INVALID_ARG);
+    b2nd_exec_plan_free(plan);
+
+    /* Map overflow wraps in int64 before min reduction without FP flags. */
+    int64_t wrap_x[17];
+    for (size_t i = 0; i < 17; i++) {
+        wrap_x[i] = 100;
+    }
+    wrap_x[4] = INT64_MAX;
+    me_buffer wrap_buf = {wrap_x, sizeof(wrap_x)};
+    b2nd_exec_node wrap_nodes[4];
+    wrap_nodes[0] = node(0, B2ND_EXEC_INPUT);
+    wrap_nodes[0].dtype = ME_INT64;
+    wrap_nodes[0].itemsize = 8;
+    wrap_nodes[1] = node(1, B2ND_EXEC_CAPTURE);
+    wrap_nodes[1].dtype = ME_INT64;
+    wrap_nodes[1].itemsize = wrap_nodes[1].scalar_size = 8;
+    wrap_nodes[1].category = ME_CAPTURE_WEAK;
+    int64_t one = 1;
+    memcpy(wrap_nodes[1].scalar, &one, 8);
+    wrap_nodes[2] = node(2, B2ND_EXEC_ADD);
+    wrap_nodes[2].nargs = 2;
+    wrap_nodes[2].args[0] = 0;
+    wrap_nodes[2].args[1] = 1;
+    wrap_nodes[3] = node(3, B2ND_EXEC_MIN);
+    wrap_nodes[3].nargs = 1;
+    wrap_nodes[3].args[0] = 2;
+    b2nd_exec_descriptor wrap_d = {sizeof(wrap_d), wrap_nodes, 4, 1, 3};
+    b2nd_exec_input_meta wrap_meta = {ME_INT64, 8, 1, {17}};
+    assert(b2nd_exec_prepare(&wrap_d, NULL, &plan, &error) == ME_SUCCESS);
+    assert(b2nd_exec_specialize(plan, &wrap_meta, 1, 8, 64, &schedule, &error) == ME_SUCCESS);
+    result = 0;
+    assert(b2nd_exec_execute(schedule, &wrap_buf, 1, (me_mut_buffer){&result, 8}, 0,
+        NULL, &report, &error) == ME_SUCCESS);
+    assert(result == INT64_MIN && report.tiles == 3 && !report.fp.flags);
+    b2nd_exec_schedule_free(schedule);
     b2nd_exec_plan_free(plan);
 
     /* Malformed descriptors must fail and always clear the caller's out slot. */

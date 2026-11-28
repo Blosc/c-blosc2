@@ -604,6 +604,9 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
         ME_MENUDET_FEATURE_CONTROL_FLOW | ME_MENUDET_FEATURE_FIXED_STRINGS;
     status = me_prepare_menudet("0.2", source, &signature, &policy, &plan->kernel, error);
     if (status == ME_SUCCESS) {
+        /* The prepared kernel is owned even if later result/accumulator
+         * validation fails and the plan never reaches publication. */
+        plan->owns_kernel = true;
         me_kernel_info info = ME_KERNEL_INFO_INITIALIZER;
         status = me_describe(plan->kernel, &info);
         if (status == ME_SUCCESS && (!numeric_width(info.output_dtype) ||
@@ -634,7 +637,6 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
                 status = exec_error(error, ME_ERR_SIGNATURE, "Incompatible reduction dtype");
             } else {
                 plan->info.partitionable &= me_kernel_is_partitionable(plan->kernel);
-                plan->owns_kernel = true;
             }
         }
     }
