@@ -92,8 +92,10 @@ static void reverse_callback(void *data, void (*run)(void *), int count,
 #endif
 
 int main(void) {
-#ifdef _WIN32
-    return 77; /* Portable wiring is not Windows numerical qualification. */
+#if defined(_WIN32) || defined(__EMSCRIPTEN__)
+    /* The persistent-pool launcher is a POSIX-thread contract. Windows and
+     * Emscripten keep the compiled wiring check and skip runtime qualification. */
+    return 77;
 #else
     fixture state = {0};
     blosc2_set_threads_callback(reverse_callback, &state);

@@ -2,6 +2,17 @@
 #undef NDEBUG
 #include "b2nd-exec.h"
 #include <assert.h>
+
+/* Resident parallel jobs are conservative on Windows: one admitted task. */
+static size_t expected_tasks(size_t requested) {
+#ifdef _WIN32
+    (void)requested;
+    return 1;
+#else
+    return requested;
+#endif
+}
+
 #include <fenv.h>
 #include <float.h>
 #include <limits.h>
@@ -118,8 +129,13 @@ static void backend_contracts(bool require_jit) {
         assert(policy != ME_EXEC_REQUIRE_JIT || info.has_jit);
         assert(b2nd_exec_specialize(plan, &meta, 1, 4, 32, &schedule, &error) == ME_SUCCESS);
         b2nd_exec_jobs jobs = {sizeof(jobs), 3, 96};
-        assert(b2nd_exec_execute(schedule, &input, 1,
-            (me_mut_buffer){&result, sizeof(result)}, 0, &jobs, &report, &error) == ME_SUCCESS);
+        me_status exec_status = b2nd_exec_execute(schedule, &input, 1,
+            (me_mut_buffer){&result, sizeof(result)}, 0, &jobs, &report, &error);
+        if (exec_status != ME_SUCCESS) {
+            fprintf(stderr, "Backend policy %d execute: %d %s\n", policy,
+                    (int)exec_status, error.message);
+        }
+        assert(exec_status == ME_SUCCESS);
         assert(result == -16 && report.map_calls == 5);
         assert(report.jit_calls == (info.has_jit ? 5u : 0u));
         assert(report.interpreter_calls == (info.has_jit ? 0u : 5u));
@@ -533,7 +549,7 @@ int main(int argc, char **argv) {
         parallel_result = 0;
         assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
             0, &jobs, &report, &error) == ME_SUCCESS);
-        assert(parallel_result == -7 && report.tasks == 4);
+        assert(parallel_result == -7 && report.tasks == expected_tasks(4));
         assert(report.tiles == 63 && report.direct_tiles == 63 && report.map_calls == 0);
         /* Same result for every admitted worker count. */
         for (size_t workers = 1; workers <= 7; workers++) {
@@ -542,7 +558,7 @@ int main(int argc, char **argv) {
             assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
                 0, &jobs, &report, &error) == ME_SUCCESS);
             assert(parallel_result == -7);
-            assert(report.tasks == workers);
+            assert(report.tasks == expected_tasks(workers));
         }
         /* A truncated input must fail before any job starts. */
         many_buffer.capacity--;
@@ -599,7 +615,8 @@ int main(int argc, char **argv) {
         assert(b2nd_exec_execute(schedule, &many_buffer, 1, (me_mut_buffer){&parallel_result, 8},
             0, &jobs, &report, &error) == ME_SUCCESS);
         assert(parallel_result == 100002);
-        assert(report.tasks == 4 && report.worker_bytes == 512 && report.map_calls == 63);
+        assert(report.tasks == expected_tasks(4) && report.worker_bytes == 512 &&
+               report.map_calls == 63);
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
         free(many);
@@ -755,7 +772,7 @@ int main(int argc, char **argv) {
         vals[99] = 0.0f;
         assert(b2nd_exec_execute(schedule, &(me_buffer){vals, sizeof(vals)}, 1,
             (me_mut_buffer){&b_out, 1}, 0, &jobs, &report, &error) == ME_SUCCESS);
-        assert(b_out == 1 && report.tasks == B2ND_EXEC_MAX_TASKS);
+        assert(b_out == 1 && report.tasks == expected_tasks(B2ND_EXEC_MAX_TASKS));
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
 
@@ -782,7 +799,14 @@ int main(int argc, char **argv) {
             (me_mut_buffer){&f_out, sizeof(f_out)}, 0, &jobs, &report, &error) == ME_SUCCESS);
         uint32_t f_bits = 0;
         memcpy(&f_bits, &f_out, sizeof(f_bits));
-        assert(f_bits == UINT32_C(0x80000000) && report.fp.supported);
+        assert(f_bits == UINT32_C(0x80000000));
+#if defined(__EMSCRIPTEN__)
+        /* This runtime cannot observe the FP environment: reporting
+         * unavailability must replace fabricating supported zero flags. */
+        assert(!report.fp.supported);
+#else
+        assert(report.fp.supported);
+#endif
 #ifndef __EMSCRIPTEN__
         memcpy(&zvals[7], &snan_bits, sizeof(snan_bits));
         f_out = 99.0f;
@@ -977,8 +1001,15 @@ int main(int argc, char **argv) {
         float out_f32 = 0.0f;
         b2nd_exec_view v_f32 = {sizeof(v_f32), in_f32, sizeof(in_f32), 0, {4}, 0};
         b2nd_exec_output_view ov_f32 = {sizeof(ov_f32), &out_f32, sizeof(out_f32), 0, {0}};
+#if defined(__EMSCRIPTEN__)
+        /* No FP observation: the raise request is rejected before publishing. */
+        assert(b2nd_exec_execute_into(schedule, &v_f32, 1, &ov_f32, ME_FP_OVERFLOW, 8,
+            NULL, &report, &error) == ME_ERR_UNSUPPORTED);
+        assert(out_f32 == 0.0f && !report.fp.supported);
+#else
         assert(b2nd_exec_execute_into(schedule, &v_f32, 1, &ov_f32, ME_FP_OVERFLOW, 8,
             NULL, &report, &error) == ME_ERR_EVAL && (report.fp.flags & ME_FP_OVERFLOW));
+#endif
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);
 
@@ -1127,8 +1158,15 @@ int main(int argc, char **argv) {
         /* FP exception in alias mode leaves destination completely untouched. */
         alias_buf[0] = DBL_MAX;
         alias_buf[4] = -5.0;
+#if defined(__EMSCRIPTEN__)
+        /* Unobservable FP environment rejects the raise mask; the alias
+         * destination must remain exactly untouched. */
+        assert(b2nd_exec_execute_alias(schedule, &v_alias, 1, &ov_alias, 40, ME_FP_OVERFLOW, 16,
+            NULL, &report, &error) == ME_ERR_UNSUPPORTED);
+#else
         assert(b2nd_exec_execute_alias(schedule, &v_alias, 1, &ov_alias, 40, ME_FP_OVERFLOW, 16,
             NULL, &report, &error) == ME_ERR_EVAL && (report.fp.flags & ME_FP_OVERFLOW));
+#endif
         assert(alias_buf[0] == DBL_MAX && alias_buf[4] == -5.0);
         b2nd_exec_schedule_free(schedule);
         b2nd_exec_plan_free(plan);

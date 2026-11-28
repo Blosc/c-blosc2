@@ -359,7 +359,15 @@ int blosc2_run_parallel(int16_t nthreads, void (*dojob)(void *),
     return BLOSC2_ERROR_SUCCESS;
   }
 
-#if !defined(_WIN32)
+#if defined(__EMSCRIPTEN__)
+  /* A default Emscripten build without pthreads cannot create workers. Honor
+   * the same callback contract by running every accepted logical job inline
+   * and in order; callers keep their own reductions, ordering and budgets. */
+  for (int16_t i = 0; i < nthreads; ++i) {
+    dojob((uint8_t *)jobdata + (size_t)i * jobdata_elsize);
+  }
+  return BLOSC2_ERROR_SUCCESS;
+#elif !defined(_WIN32)
   return run_parallel_shared_pool(nthreads, dojob, jobdata_elsize, jobdata);
 #else
   blosc2_pthread_t *threads = malloc((size_t)nthreads * sizeof(blosc2_pthread_t));
