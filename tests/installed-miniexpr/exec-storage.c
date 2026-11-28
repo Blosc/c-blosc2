@@ -1108,6 +1108,79 @@ int main(void) {
         b2nd_free(arr1d);
     }
 
+    for (int32_t chunk_items = 47; chunk_items <= 51; chunk_items += 4) {
+        /* Matching 1-D scans never revisit an earlier chunk within a job.
+         * Extra decode budget must not expand their one-slot working set.
+         * Padding, short tails, task boundaries and reports stay unchanged. */
+        double values[257], actual[257];
+        for (size_t i = 0; i < 257; i++) values[i] = (double)i + 1;
+        int64_t shape1[] = {257};
+        int32_t chunks1[] = {chunk_items}, blocks1[] = {13};
+        blosc2_cparams cp = BLOSC2_CPARAMS_DEFAULTS;
+        cp.typesize = 8;
+        blosc2_storage storage = {.cparams = &cp};
+        b2nd_context_t *ctx = b2nd_create_ctx(&storage, 1, shape1, chunks1, blocks1, "=f8", 0, NULL, 0);
+        b2nd_array_t *array = NULL;
+        assert(ctx && b2nd_from_cbuffer(ctx, &array, values, sizeof(values)) == 0);
+        b2nd_free_ctx(ctx);
+        poison_padding(array);
+        const b2nd_array_t *inputs[] = {array};
+        size_t chunk_bytes = (size_t)array->extchunknitems * 8;
+        const b2nd_exec_op ops[] = {B2ND_EXEC_INPUT, B2ND_EXEC_MIN, B2ND_EXEC_SUM};
+        for (size_t op = 0; op < sizeof(ops) / sizeof(*ops); op++) {
+            b2nd_exec_node nodes1[] = {make_node(0, B2ND_EXEC_INPUT), make_node(1, ops[op])};
+            nodes1[0].dtype = ME_FLOAT64; nodes1[0].itemsize = 8; nodes1[1].nargs = 1;
+            size_t root = ops[op] == B2ND_EXEC_INPUT ? 0 : 1;
+            b2nd_exec_descriptor descriptor1 = {sizeof(descriptor1), nodes1, root + 1, 1, (uint32_t)root};
+            b2nd_exec_input_meta meta1 = {ME_FLOAT64, 8, 1, {257}};
+            b2nd_exec_plan *plan1 = NULL;
+            b2nd_exec_schedule *schedule1 = NULL;
+            me_error error1;
+            assert(b2nd_exec_prepare(&descriptor1, NULL, &plan1, &error1) == ME_SUCCESS);
+            assert(b2nd_exec_specialize(plan1, &meta1, 1, 17, 136, &schedule1, &error1) == ME_SUCCESS);
+            b2nd_exec_jobs jobs1 = {sizeof(jobs1), ops[op] == B2ND_EXEC_SUM ? 1 : 3, 4096};
+            b2nd_exec_storage_report report1;
+            size_t bytes = root ? 8 : sizeof(actual);
+            assert(b2nd_exec_execute_arrays_ex(schedule1, inputs, NULL, 1,
+                (me_mut_buffer){actual, bytes}, 0, 24 * chunk_bytes, 136,
+                &jobs1, &report1, &error1) == ME_SUCCESS);
+            if (ops[op] == B2ND_EXEC_INPUT) assert(!memcmp(actual, values, bytes));
+            else assert(actual[0] == (ops[op] == B2ND_EXEC_MIN ? 1.0 : 257.0 * 258.0 / 2));
+            assert(report1.execution.tasks == expected_tasks(jobs1.workers));
+            assert(report1.decode_bytes == report1.execution.tasks * chunk_bytes);
+            assert(report1.decodes >= (size_t)array->sc->nchunks);
+            assert(report1.decodes <= (size_t)array->sc->nchunks + report1.execution.tasks - 1);
+            assert(report1.decoded_bytes == report1.decodes * chunk_bytes);
+            assert(report1.cache_hits + report1.decodes == 257);
+            /* With chunks=51, tile-aligned jobs decode each chunk only once.
+             * With chunks=47, five boundary tiles still need gathering.
+             * Borrowed tiles also cross physical block boundaries (13/17). */
+            assert(report1.execution.gathered_bytes ==
+                   (chunk_items == 47 ? 5 * 17 * sizeof(double) : 0));
+            if (chunk_items == 51) assert(report1.decodes == (size_t)array->sc->nchunks);
+            actual[0] = -1;
+            assert(b2nd_exec_execute_arrays_ex(schedule1, inputs, NULL, 1,
+                (me_mut_buffer){actual, bytes}, 0, chunk_bytes - 1, 136,
+                &jobs1, &report1, &error1) == ME_ERR_INVALID_ARG);
+            assert(actual[0] == -1 && !report1.decodes && !report1.read_spans);
+#ifdef STORAGE_FAULT_TEST
+            /* A failed borrowed decode is reported once, never retried via
+             * the gather fallback, and cannot publish a reduction result. */
+            decode_calls = 0; decode_fail_at = 1;
+            b2nd_exec_jobs serial1 = {sizeof(serial1), 1, 4096};
+            assert(b2nd_exec_execute_arrays_ex(schedule1, inputs, NULL, 1,
+                (me_mut_buffer){actual, bytes}, 0, 24 * chunk_bytes, 136,
+                &serial1, &report1, &error1) == ME_ERR_EVAL);
+            assert(decode_calls == 1 && report1.read_spans == 1);
+            assert(!report1.decodes && !report1.execution.tiles && actual[0] == -1);
+            decode_fail_at = 0;
+#endif
+            b2nd_exec_schedule_free(schedule1);
+            b2nd_exec_plan_free(plan1);
+        }
+        b2nd_free(array);
+    }
+
     {
         /* Bounded LRU preserves strict reduction order, including cancellation
          * and sNaN-poisoned physical padding, while reusing a full chunk row. */

@@ -296,6 +296,32 @@ static me_status storage_decode_chunk(storage_input *state, size_t chunk,
     return ME_SUCCESS;
 }
 
+/* In 1-D, physical blocks are consecutive within a decoded chunk, including
+ * when a logical span crosses a block boundary. Never borrow across chunks:
+ * a later decode could overwrite the first part of the requested span.
+ * Budgets still reserve gather scratch for the boundary fallback. */
+static me_status storage_borrow(void *context, size_t group, size_t pos, size_t count,
+                                me_buffer *output, me_error *error) {
+    storage_input *state = context;
+    const b2nd_array_t *a = state->array;
+    *output = (me_buffer){0};
+    if (!state->fast_linear || a->ndim != 1 || !count) return ME_SUCCESS;
+    size_t start = state->is_reduction ? group * state->reduction_lanes + pos : pos;
+    if (start > state->items || count > state->items - start) {
+        return storage_error(error, ME_ERR_INVALID_ARG, "Invalid logical storage span");
+    }
+    size_t chunk_items = (size_t)a->chunkshape[0];
+    size_t local = start % chunk_items;
+    if (count > chunk_items - local) return ME_SUCCESS;
+    bool miss = false;
+    state->read_spans++;
+    me_status status = storage_decode_chunk(state, start / chunk_items, error, &miss);
+    if (status != ME_SUCCESS) return status;
+    state->cache_hits += count - (miss ? 1 : 0);
+    *output = (me_buffer){state->decoded + local * state->itemsize, count * state->itemsize};
+    return ME_SUCCESS;
+}
+
 static me_status storage_read(void *context, size_t group, size_t pos, size_t count,
                               me_mut_buffer output, me_error *error) {
     storage_input *state = context;
@@ -538,6 +564,12 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
         bool grew = false;
         for (size_t i = 0; i < ninputs; i++) {
             if (!cache_slots[i] || cache_slots[i] >= (size_t)arrays[i]->sc->nchunks) continue;
+            /* A matching 1-D map/plain reduction visits chunks monotonically
+             * within each job. Retaining past chunks cannot produce a hit and
+             * needlessly expands the decode working set. Keep multi-scan
+             * moments/arg-extrema and N-D/broadcast traversal on the LRU path. */
+            if (base_states[i].fast_linear && arrays[i]->ndim == 1 &&
+                (!plan_info.reduction || plan_info.reducer != ME_REDUCTION_NONE)) continue;
             size_t cost = ntasks * base_states[i].bytes;
             if (cost <= extra) {
                 cache_slots[i]++;
@@ -587,7 +619,10 @@ me_status b2nd_exec_execute_arrays_ex(const b2nd_exec_schedule *schedule,
                 status = storage_error(error, ME_ERR_OOM, "Cannot allocate storage decode workspace");
                 break;
             }
-            readers[idx] = (b2nd_exec_reader){&states[idx], storage_read};
+            readers[idx] = (b2nd_exec_reader){
+                .context = &states[idx], .read = storage_read, .borrow = storage_borrow,
+                .partition_items = states[idx].fast_linear && states[idx].array->ndim == 1 ?
+                    (size_t)states[idx].array->chunkshape[0] : 0};
         }
     }
     if (status == ME_SUCCESS) {
@@ -1781,7 +1816,7 @@ static me_status exec_execute_sources_impl(const b2nd_exec_schedule *schedule,
         b2nd_exec_reader readers[B2ND_EXEC_MAX_INPUTS] = {0};
         for (size_t i = 0; i < ninputs; i++) {
             if (is_cb[i]) {
-                readers[i] = (b2nd_exec_reader){&src_states[i], source_read_trampoline};
+                readers[i] = (b2nd_exec_reader){.context = &src_states[i], .read = source_read_trampoline};
             }
         }
         local_rep.index_buffer_bytes = idx_bytes;

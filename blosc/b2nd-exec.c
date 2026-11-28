@@ -1568,6 +1568,20 @@ static bool exec_gather_tile(exec_job *job, size_t slot, size_t group,
     return true;
 }
 
+static const void *exec_input_tile(exec_job *job, size_t slot, size_t group,
+                                    size_t pos, size_t count) {
+    if (!job->mask && job->readers && job->readers[slot].borrow) {
+        me_buffer span = {0};
+        job->status = job->readers[slot].borrow(job->readers[slot].context,
+                                               group, pos, count, &span, &job->error);
+        if (job->status != ME_SUCCESS) return NULL;
+        if (span.data) return span.data;
+    }
+    if (!exec_gather_tile(job, slot, group, pos, count)) return NULL;
+    job->gathered_bytes += count * job->schedule->inputs[slot].itemsize;
+    return job->gather_slots[slot];
+}
+
 static void view_gather_tile(const b2nd_exec_schedule *schedule, size_t input_idx,
                              const b2nd_exec_view *view, size_t group, size_t pos,
                              size_t count, unsigned char *dst) {
@@ -1725,9 +1739,8 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
             values = (const unsigned char *)job->views[direct_slot].base +
                 job->views[direct_slot].offset + linear * map_width;
         } else {
-            if (!exec_gather_tile(job, direct_slot, group, pos, count)) return;
-            job->gathered_bytes += count * map_width;
-            values = job->gather_slots[direct_slot];
+            values = exec_input_tile(job, direct_slot, group, pos, count);
+            if (job->status != ME_SUCCESS) return;
         }
         job->direct_tiles++;
         if (!plan->info.reduction) {
@@ -1756,9 +1769,9 @@ static void exec_eval_tile(exec_job *job, size_t group, size_t pos, size_t count
                     job->views[i].offset + linear * input_width,
                 count * input_width};
         } else {
-            if (!exec_gather_tile(job, i, group, pos, count)) return;
-            job->gathered_bytes += count * input_width;
-            spans[i] = (me_buffer){job->gather_slots[i], count * input_width};
+            const void *input = exec_input_tile(job, i, group, pos, count);
+            if (job->status != ME_SUCCESS) return;
+            spans[i] = (me_buffer){input, count * input_width};
         }
     }
     me_block block = ME_BLOCK_INITIALIZER;
@@ -2324,7 +2337,22 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
         return exec_error(error, ME_ERR_OOM, "Cannot allocate execution jobs");
     }
     bool single_group_acc = plan->info.reduction && groups == 1 && ntasks == 1;
-    size_t per_task = work_items / ntasks, extra = work_items % ntasks, cursor = 0;
+    size_t grain = 1, units = work_items;
+    /* For an admitted parallel linear scan, keep chunks within one task when
+     * their boundaries coincide with logical tiles. This avoids duplicate
+     * boundary decodes without changing tile evaluation/reduction order.
+     * Ignore the hint if it would leave any admitted task empty. */
+    if (ntasks > 1 && ninputs == 1 && readers && readers[0].partition_items &&
+        (!plan->info.reduction || groups == 1) && schedule->info.tile_items &&
+        readers[0].partition_items % schedule->info.tile_items == 0) {
+        size_t hint = readers[0].partition_items / schedule->info.tile_items;
+        size_t chunks = work_items ? 1 + (work_items - 1) / hint : 0;
+        if (chunks >= ntasks) {
+            grain = hint;
+            units = chunks;
+        }
+    }
+    size_t per_task = units / ntasks, extra = units % ntasks, cursor = 0;
     for (size_t i = 0; i < ntasks; i++) {
         size_t count = per_task + (i < extra ? 1 : 0);
         const b2nd_exec_reader *task_readers = readers ?
@@ -2332,7 +2360,7 @@ static me_status exec_execute_into(const b2nd_exec_schedule *schedule,
         parts[i] = (exec_job){
             schedule, inputs, direct, ninputs, output, scatter, raise_mask,
             mapped ? mapped + i * per_job_mapped : NULL, {0},
-            cursor, cursor + count,
+            cursor * grain, i + 1 == ntasks ? work_items : (cursor + count) * grain,
             plan->info.has_initial, initial_val,
             single_group_acc && (plan->info.has_initial ||
                 (plan->info.reducer != ME_REDUCTION_MIN && plan->info.reducer != ME_REDUCTION_MAX)),

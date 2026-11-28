@@ -12,6 +12,14 @@ typedef struct {
     void *context;
     me_status (*read)(void *context, size_t group, size_t pos, size_t count,
                       me_mut_buffer output, me_error *error);
+    /* Optional native contiguous span, valid until the next call on this
+     * reader. Success with NULL data declines without reading or mutating
+     * state; errors never fall back/replay. Masked reads always use read. */
+    me_status (*borrow)(void *context, size_t group, size_t pos, size_t count,
+                        me_buffer *output, me_error *error);
+    /* Optional partition alignment for a matching single-input linear scan.
+     * A hint only: the scheduler preserves its admitted task count/budgets. */
+    size_t partition_items;
 } b2nd_exec_reader;
 
 me_status b2nd_exec_schedule_input(const b2nd_exec_schedule *schedule, size_t slot,
