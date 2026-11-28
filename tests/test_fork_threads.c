@@ -101,7 +101,11 @@ static int run_in_child(int (*fn)(void), const char *name) {
     if (rc == 0) {
       blosc2_destroy();
     }
-    exit(rc);
+    /* Do not run inherited process-exit handlers in the fork child. Other
+     * threads no longer exist here, so their copied TLS allocations are not
+     * meaningful leak roots. The parent still joins and checks its workers,
+     * and the child's explicit blosc2_destroy() above remains exercised. */
+    _exit(rc);
   }
   int status;
   if (pid < 0 || waitpid(pid, &status, 0) != pid) {

@@ -6277,11 +6277,13 @@ static int release_thread_backend(blosc2_context *context) {
     blosc2_pthread_mutex_destroy(&context->delta_mutex);
     blosc2_pthread_mutex_destroy(&context->count_mutex);
   }
-#endif  /* _WIN32 */
+#else
+  /* The persistent shared pool is a POSIX backend, not a Windows context. */
   else if (context->thread_backend == BLOSC_BACKEND_SHARED_POOL && context->thread_pool != NULL) {
     release_shared_pool_ref(context->thread_pool, context->pool_epoch);
     context->thread_pool = NULL;
   }
+#endif  /* _WIN32 */
 
   context->threads_started = 0;
   context->thread_backend = BLOSC_BACKEND_SERIAL;

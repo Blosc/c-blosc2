@@ -4,9 +4,8 @@
 #include "blosc-parallel.h"
 #include "blosc2.h"
 #include <assert.h>
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <pthread.h>
-
-#ifndef _WIN32
 typedef struct {
     b2nd_exec_schedule *schedule;
     me_buffer input;
@@ -17,15 +16,33 @@ typedef struct {
 } fixture;
 
 typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t ready;
+    int entered;
+} probe_gate;
+
+typedef struct {
     pthread_t caller;
     pthread_t seen;
     bool nest;
     int nested_sum;
+    probe_gate *gate;
 } pool_probe;
 
 static void probe_run(void *data) {
     pool_probe *p = data;
     p->seen = pthread_self();
+    if (p->gate != NULL) {
+        /* Force all four jobs to overlap: without this, a fast worker may run
+         * several jobs and the observed subset of persistent threads can vary. */
+        pthread_mutex_lock(&p->gate->mutex);
+        p->gate->entered++;
+        pthread_cond_broadcast(&p->gate->ready);
+        while (p->gate->entered < 4) {
+            pthread_cond_wait(&p->gate->ready, &p->gate->mutex);
+        }
+        pthread_mutex_unlock(&p->gate->mutex);
+    }
     if (p->nest) {
         pool_probe sub[3] = {{0}};
         assert(blosc2_run_parallel(3, probe_run, sizeof(*sub), sub) == BLOSC2_ERROR_SUCCESS);
@@ -124,9 +141,15 @@ int main(void) {
      * inline nesting on pool workers, and destroy/re-init recovery. */
     blosc2_set_threads_callback(NULL, NULL);
     pool_probe first[4] = {{0}}, second[4] = {{0}};
+    probe_gate gate = {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0};
+    for (int i = 0; i < 4; i++) {
+        first[i].gate = &gate;
+        second[i].gate = &gate;
+    }
     first[1].nest = true;
     assert(blosc2_run_parallel(4, probe_run, sizeof(*first), first) == BLOSC2_ERROR_SUCCESS);
     assert(first[1].nested_sum == 3);
+    gate.entered = 0;
     assert(blosc2_run_parallel(4, probe_run, sizeof(*second), second) == BLOSC2_ERROR_SUCCESS);
     pthread_t self = pthread_self();
     assert(pthread_equal(first[0].seen, self) && pthread_equal(second[0].seen, self));
@@ -138,6 +161,8 @@ int main(void) {
         }
         assert(matched);
     }
+    pthread_cond_destroy(&gate.ready);
+    pthread_mutex_destroy(&gate.mutex);
 
     outer_req reqs[4];
     pthread_t callers[4];
