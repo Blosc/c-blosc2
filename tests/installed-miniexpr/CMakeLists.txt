@@ -36,3 +36,13 @@ set_property(TARGET installed_exec_stages PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
 target_include_directories(installed_exec_stages PRIVATE ../../blosc)
 target_link_libraries(installed_exec_stages PRIVATE Blosc2::blosc2_static miniexpr::core)
 add_test(NAME installed_exec_stages COMMAND installed_exec_stages)
+
+add_executable(installed_public_exec public-exec.c)
+set_property(TARGET installed_public_exec PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+target_link_libraries(installed_public_exec PRIVATE Blosc2::blosc2_static)
+add_test(NAME installed_public_exec COMMAND installed_public_exec)
+
+add_executable(installed_public_exec_kernel public-exec-kernel.c)
+set_property(TARGET installed_public_exec_kernel PROPERTY NO_SYSTEM_FROM_IMPORTED TRUE)
+target_link_libraries(installed_public_exec_kernel PRIVATE Blosc2::blosc2_static miniexpr::core)
+add_test(NAME installed_public_exec_kernel COMMAND installed_public_exec_kernel)

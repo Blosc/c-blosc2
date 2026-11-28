@@ -747,6 +747,7 @@ else()
 endif()
 
 set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY OFF)
+set(BLOSC2_HAVE_MINIEXPR_INSTALL OFF)
 add_subdirectory(blosc)
 
 if(BUILD_TESTS)
@@ -789,6 +790,10 @@ if(BLOSC_INSTALL)
     # C++ files
     install(FILES ${PROJECT_SOURCE_DIR}/include/blosc2.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
     install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
+    install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd_exec.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
+    if(BLOSC2_HAVE_MINIEXPR_INSTALL)
+        install(FILES ${PROJECT_SOURCE_DIR}/include/b2nd_exec_kernel.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT DEV)
+    endif()
     install(FILES
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-export.h
             ${PROJECT_SOURCE_DIR}/include/blosc2/blosc2-common.h

@@ -657,128 +657,203 @@ me_status b2nd_exec_prepare(const b2nd_exec_descriptor *d, const b2nd_exec_optio
     return ME_SUCCESS;
 }
 
-me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer,
-                                  b2nd_exec_plan **out, me_error *error) {
+static b2nd_exec_op exec_op_from_reducer(me_reduction_kind reducer) {
+    switch (reducer) {
+        case ME_REDUCTION_MIN: return B2ND_EXEC_MIN;
+        case ME_REDUCTION_MAX: return B2ND_EXEC_MAX;
+        case ME_REDUCTION_SUM: return B2ND_EXEC_SUM;
+        case ME_REDUCTION_PROD: return B2ND_EXEC_PROD;
+        case ME_REDUCTION_ANY: return B2ND_EXEC_ANY;
+        case ME_REDUCTION_ALL: return B2ND_EXEC_ALL;
+        default: return B2ND_EXEC_INPUT;
+    }
+}
+
+b2nd_exec_op b2nd_exec_plan_root_op(const b2nd_exec_plan *plan) {
+    return plan ? plan->root_op : B2ND_EXEC_INPUT;
+}
+
+me_status b2nd_exec_prepare_kernel_ex(me_kernel **kernel, bool take_ownership,
+                                      b2nd_exec_op root_op,
+                                      const b2nd_exec_reduce_opts *opts,
+                                      me_dtype accumulator, bool has_where,
+                                      double ddof, b2nd_exec_plan **out,
+                                      me_error *error) {
     if (out) {
         *out = NULL;
     }
-    if (!kernel || !*kernel || !out) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid direct execution kernel");
+    if (error) {
+        *error = (me_error){0};
+    }
+    if (!out || !kernel || !*kernel) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid execution kernel");
+    }
+    if (opts && opts->struct_size != sizeof(*opts)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid reduction options descriptor");
+    }
+    bool is_red = root_op != B2ND_EXEC_INPUT;
+    if (is_red && !is_reduction_op(root_op)) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid kernel reduction operation");
+    }
+    me_reduction_kind reducer = reduction_kind(root_op);
+    if (!is_red && (has_where || accumulator != ME_AUTO || ddof != 0.0 ||
+                    (opts && (opts->has_axes || opts->naxes || opts->keepdims || opts->has_initial)))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Unexpected reduction options on non-reduction plan");
+    }
+    if (is_moments_op(root_op)) {
+        if (!isfinite(ddof) || ddof < 0.0) {
+            return exec_error(error, ME_ERR_INVALID_ARG, "Invalid ddof for statistical reduction");
+        }
+        if (has_where) {
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Masked statistical reductions are not admitted");
+        }
+        if (accumulator != ME_AUTO && accumulator != ME_FLOAT32 && accumulator != ME_FLOAT64) {
+            return exec_error(error, ME_ERR_SIGNATURE, "Statistical reductions require a floating output dtype");
+        }
+    } else if (ddof != 0.0) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "Unexpected ddof on non-moment reduction");
+    }
+    if (is_argextrema_op(root_op)) {
+        if (has_where) {
+            return exec_error(error, ME_ERR_UNSUPPORTED, "Masked arg-extrema reductions are not admitted");
+        }
+        if (accumulator != ME_AUTO && accumulator != ME_INT64) {
+            return exec_error(error, ME_ERR_SIGNATURE, "Arg-extrema reductions return int64");
+        }
+    }
+    if (has_where && (reducer == ME_REDUCTION_MIN || reducer == ME_REDUCTION_MAX) &&
+        (!opts || !opts->has_initial)) {
+        return exec_error(error, ME_ERR_UNSUPPORTED,
+                          "Masked extrema reductions require an explicit initial scalar");
+    }
+    if (opts && opts->has_initial &&
+        (reducer == ME_REDUCTION_ANY || reducer == ME_REDUCTION_ALL ||
+         is_argextrema_op(root_op) || is_moments_op(root_op))) {
+        return exec_error(error, ME_ERR_INVALID_ARG, "This reduction does not accept initial values");
     }
     me_kernel_info info = ME_KERNEL_INFO_INITIALIZER;
     size_t count = 0;
     if (me_describe(*kernel, &info) != ME_SUCCESS ||
         me_describe_input_count(*kernel, &count) != ME_SUCCESS ||
         count > B2ND_EXEC_MAX_INPUTS || !info.output_itemsize) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid direct kernel metadata");
+        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid kernel metadata");
     }
-    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL ||
-        (reducer != ME_REDUCTION_NONE &&
-         (info.cardinality != ME_ELEMENTWISE || !numeric_width(info.output_dtype)))) {
-        return exec_error(error, ME_ERR_UNSUPPORTED, "Direct kernel cannot feed this reducer");
+    if (is_red && (info.cardinality != ME_ELEMENTWISE || info.context_ndim ||
+                   !numeric_width(info.output_dtype))) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Kernel cannot feed this reduction");
+    }
+    if (has_where && count == B2ND_EXEC_MAX_INPUTS) {
+        return exec_error(error, ME_ERR_UNSUPPORTED, "No input slot available for mask");
     }
     b2nd_exec_plan *plan = calloc(1, sizeof(*plan));
     if (!plan) {
-        return exec_error(error, ME_ERR_OOM, "Cannot allocate direct execution plan");
+        return exec_error(error, ME_ERR_OOM, "Cannot allocate execution plan");
     }
-    plan->root_op = B2ND_EXEC_INPUT;
+    plan->root_op = root_op;
+    plan->requested_dtype = is_red ? accumulator : ME_AUTO;
+    plan->ddof = ddof;
     plan->info.ninputs = count;
     plan->info.reducer = reducer;
-    plan->info.reduction = reducer != ME_REDUCTION_NONE;
+    plan->info.reduction = is_red;
     plan->info.partitionable = reducer != ME_REDUCTION_SUM && reducer != ME_REDUCTION_PROD &&
-        me_kernel_is_partitionable(*kernel);
-    result_info(&plan->info, B2ND_EXEC_INPUT, ME_AUTO, &info);
-    /* Direct complex/string kernels remain inspectable, not resident-admitted. */
-    if (reducer == ME_REDUCTION_NONE) {
+        !has_where && me_kernel_is_partitionable(*kernel);
+    result_info(&plan->info, root_op, accumulator, &info);
+    if (!is_red) {
         plan->info.dtype = info.output_dtype;
         plan->info.itemsize = info.output_itemsize;
+    } else if (!plan->info.itemsize) {
+        free(plan);
+        return exec_error(error, ME_ERR_SIGNATURE, "Incompatible reduction dtype");
     }
     for (size_t i = 0; i < count; i++) {
         me_input_spec input;
         if (me_describe_input(*kernel, i, &input) != ME_SUCCESS) {
             free(plan);
-            return exec_error(error, ME_ERR_INVALID_ARG, "Cannot describe direct kernel input");
+            return exec_error(error, ME_ERR_INVALID_ARG, "Cannot describe kernel input");
         }
         plan->inputs[i].dtype = input.dtype;
         plan->inputs[i].itemsize = input.itemsize;
     }
+    /* Borrow first so cleanup leaves *kernel untouched if validation fails. */
     plan->kernel = *kernel;
-    plan->owns_kernel = true;
-    *kernel = NULL;
+    plan->owns_kernel = false;
+    me_status status = ME_SUCCESS;
+    if (has_where) {
+        plan->mask_slot = (uint32_t)count;
+        plan->info.where_slot = count;
+        plan->inputs[count].dtype = ME_BOOL;
+        plan->inputs[count].itemsize = 1;
+        plan->info.ninputs++;
+        plan->info.has_where = true;
+        plan->info.partitionable = false;
+        plan->appended_mask = true;
+    }
+    if (status == ME_SUCCESS && is_moments_op(root_op) && accumulator != ME_AUTO) {
+        plan->info.dtype = accumulator;
+        plan->info.itemsize = numeric_width(accumulator);
+    } else if (status == ME_SUCCESS && reducer != ME_REDUCTION_NONE && accumulator != ME_AUTO) {
+        me_dtype acc = me_reduce_accumulator_dtype(plan->info.map_dtype, reducer, accumulator);
+        if (acc == ME_AUTO || !numeric_width(acc)) {
+            status = exec_error(error, ME_ERR_SIGNATURE, "Incompatible reduction dtype");
+        } else if (acc != plan->info.map_dtype) {
+            me_input_spec input = {"x", plan->info.map_dtype, plan->info.map_itemsize};
+            me_signature sig = ME_SIGNATURE_INITIALIZER;
+            sig.inputs = &input;
+            sig.ninputs = 1;
+            sig.output_dtype = acc;
+            sig.casting = ME_CAST_UNSAFE;
+            status = me_prepare_formula("x", &sig, NULL, &plan->cast_kernel, error);
+            if (status == ME_SUCCESS) {
+                plan->uncast_width = plan->info.map_itemsize;
+                plan->info.map_dtype = acc;
+                plan->info.map_itemsize = numeric_width(acc);
+                plan->info.partitionable = false;
+            }
+        }
+        if (status == ME_SUCCESS) {
+            plan->info.dtype = acc;
+            plan->info.itemsize = numeric_width(acc);
+        }
+    }
+    if (status == ME_SUCCESS && is_red && opts) {
+        status = exec_setup_reduction(plan, opts->has_axes, opts->naxes, opts->axes,
+                                      opts->keepdims, opts->has_initial, opts->initial_dtype,
+                                      opts->initial_category, opts->initial_scalar,
+                                      opts->initial_size, error);
+    }
+    if (status != ME_SUCCESS) {
+        b2nd_exec_plan_free(plan);
+        return status;
+    }
+    if (take_ownership) {
+        plan->owns_kernel = true;
+        *kernel = NULL;
+    }
     plan->info.plan_metadata_bytes = sizeof(*plan);
     *out = plan;
     return ME_SUCCESS;
 }
 
+me_status b2nd_exec_prepare_kernel(me_kernel **kernel, me_reduction_kind reducer,
+                                  b2nd_exec_plan **out, me_error *error) {
+    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL) {
+        if (out) *out = NULL;
+        return exec_error(error, ME_ERR_UNSUPPORTED, "Direct kernel cannot feed this reducer");
+    }
+    return b2nd_exec_prepare_kernel_ex(kernel, true, exec_op_from_reducer(reducer),
+                                       NULL, ME_AUTO, false, 0.0, out, error);
+}
+
 me_status b2nd_exec_prepare_borrowed_kernel(const me_kernel *kernel, me_reduction_kind reducer,
                                            const b2nd_exec_reduce_opts *opts,
                                            b2nd_exec_plan **out, me_error *error) {
-    if (out) *out = NULL;
-    if (error) *error = (me_error){0};
-    if (!kernel || !out) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed execution kernel");
-    }
-    if (opts && opts->struct_size != sizeof(*opts)) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid reduction options descriptor");
-    }
-    me_kernel_info info = ME_KERNEL_INFO_INITIALIZER;
-    size_t count = 0;
-    if (me_describe(kernel, &info) != ME_SUCCESS ||
-        me_describe_input_count(kernel, &count) != ME_SUCCESS ||
-        count > B2ND_EXEC_MAX_INPUTS || !info.output_itemsize) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed kernel metadata");
-    }
-    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL ||
-        (reducer != ME_REDUCTION_NONE &&
-         (info.cardinality != ME_ELEMENTWISE || info.context_ndim ||
-          !numeric_width(info.output_dtype)))) {
+    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL) {
+        if (out) *out = NULL;
         return exec_error(error, ME_ERR_UNSUPPORTED, "Borrowed kernel cannot feed this reducer");
     }
-    if (reducer == ME_REDUCTION_NONE && opts && (opts->has_axes || opts->naxes || opts->keepdims || opts->has_initial)) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Unexpected reduction options on non-reduction plan");
-    }
-    if ((reducer == ME_REDUCTION_ANY || reducer == ME_REDUCTION_ALL) && opts && opts->has_initial) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Boolean reductions do not accept initial values");
-    }
-    b2nd_exec_plan *plan = calloc(1, sizeof(*plan));
-    if (!plan) {
-        return exec_error(error, ME_ERR_OOM, "Cannot allocate borrowed execution plan");
-    }
-    plan->root_op = B2ND_EXEC_INPUT;
-    plan->info.ninputs = count;
-    plan->info.reducer = reducer;
-    plan->info.reduction = reducer != ME_REDUCTION_NONE;
-    plan->info.partitionable = reducer != ME_REDUCTION_SUM && reducer != ME_REDUCTION_PROD &&
-        me_kernel_is_partitionable(kernel);
-    result_info(&plan->info, B2ND_EXEC_INPUT, ME_AUTO, &info);
-    if (reducer == ME_REDUCTION_NONE) {
-        plan->info.dtype = info.output_dtype;
-        plan->info.itemsize = info.output_itemsize;
-    }
-    for (size_t i = 0; i < count; i++) {
-        me_input_spec input;
-        if (me_describe_input(kernel, i, &input) != ME_SUCCESS) {
-            free(plan);
-            return exec_error(error, ME_ERR_INVALID_ARG, "Cannot describe borrowed kernel input");
-        }
-        plan->inputs[i].dtype = input.dtype;
-        plan->inputs[i].itemsize = input.itemsize;
-    }
-    plan->kernel = (me_kernel *)kernel;
-    plan->owns_kernel = false;
-    if (plan->info.reduction && opts) {
-        me_status st = exec_setup_reduction(plan, opts->has_axes, opts->naxes, opts->axes,
-                                            opts->keepdims, opts->has_initial, opts->initial_dtype,
-                                            opts->initial_category, opts->initial_scalar,
-                                            opts->initial_size, error);
-        if (st != ME_SUCCESS) {
-            b2nd_exec_plan_free(plan);
-            return st;
-        }
-    }
-    plan->info.plan_metadata_bytes = sizeof(*plan);
-    *out = plan;
-    return ME_SUCCESS;
+    me_kernel *borrowed = (me_kernel *)kernel;
+    return b2nd_exec_prepare_kernel_ex(&borrowed, false, exec_op_from_reducer(reducer),
+                                       opts, ME_AUTO, false, 0.0, out, error);
 }
 
 me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *out) {
@@ -793,90 +868,16 @@ me_status b2nd_exec_describe(const b2nd_exec_plan *plan, b2nd_exec_plan_info *ou
     return ME_SUCCESS;
 }
 
-static me_status exec_prepare_borrowed_kernel_masked(const me_kernel *kernel,
-    me_reduction_kind reducer, const b2nd_exec_reduce_opts *opts,
-    b2nd_exec_plan **out, me_error *error) {
-    if (out) *out = NULL;
-    if (!out || reducer == ME_REDUCTION_NONE) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "Mask requires a reduction");
-    }
-    b2nd_exec_plan *plan = NULL;
-    me_status status = b2nd_exec_prepare_borrowed_kernel(kernel, reducer, opts, &plan, error);
-    if (status != ME_SUCCESS) return status;
-    size_t slot = plan->info.ninputs;
-    if (slot == B2ND_EXEC_MAX_INPUTS) {
-        b2nd_exec_plan_free(plan);
-        return exec_error(error, ME_ERR_UNSUPPORTED, "No input slot available for mask");
-    }
-    plan->mask_slot = (uint32_t)slot;
-    plan->info.where_slot = slot;
-    plan->inputs[slot].dtype = ME_BOOL;
-    plan->inputs[slot].itemsize = 1;
-    plan->info.ninputs++;
-    plan->info.has_where = true;
-    plan->info.partitionable = false;
-    plan->appended_mask = true;
-    *out = plan;
-    return ME_SUCCESS;
-}
-
 me_status b2nd_exec_prepare_borrowed_kernel_ex(const me_kernel *kernel,
     me_reduction_kind reducer, const b2nd_exec_reduce_opts *opts,
     me_dtype accumulator, bool has_where, b2nd_exec_plan **out, me_error *error) {
-    if (out) *out = NULL;
-    if (!out || (reducer == ME_REDUCTION_NONE && accumulator != ME_AUTO) ||
-        (opts && opts->struct_size != sizeof(*opts))) {
+    if (reducer < ME_REDUCTION_NONE || reducer > ME_REDUCTION_ALL) {
+        if (out) *out = NULL;
         return exec_error(error, ME_ERR_INVALID_ARG, "Invalid borrowed reduction options");
     }
-    if (opts && opts->has_initial &&
-        (reducer == ME_REDUCTION_NONE || reducer == ME_REDUCTION_ANY || reducer == ME_REDUCTION_ALL)) {
-        return exec_error(error, ME_ERR_INVALID_ARG, "This reduction does not accept initial values");
-    }
-    b2nd_exec_reduce_opts plain = {0};
-    if (opts) {
-        plain = *opts;
-        plain.has_initial = false;
-    }
-    b2nd_exec_plan *plan = NULL;
-    me_status status = has_where ?
-        exec_prepare_borrowed_kernel_masked(kernel, reducer, opts ? &plain : NULL, &plan, error) :
-        b2nd_exec_prepare_borrowed_kernel(kernel, reducer, opts ? &plain : NULL, &plan, error);
-    if (status != ME_SUCCESS) return status;
-    if (accumulator != ME_AUTO) {
-        me_dtype acc = me_reduce_accumulator_dtype(plan->info.map_dtype, reducer, accumulator);
-        if (acc == ME_AUTO || !numeric_width(acc)) {
-            status = exec_error(error, ME_ERR_SIGNATURE, "Incompatible reduction dtype");
-            goto cleanup_borrowed;
-        }
-        if (acc != plan->info.map_dtype) {
-            me_input_spec input = {"x", plan->info.map_dtype, plan->info.map_itemsize};
-            me_signature sig = ME_SIGNATURE_INITIALIZER;
-            sig.inputs = &input;
-            sig.ninputs = 1;
-            sig.output_dtype = acc;
-            sig.casting = ME_CAST_UNSAFE;
-            status = me_prepare_formula("x", &sig, NULL, &plan->cast_kernel, error);
-            if (status != ME_SUCCESS) goto cleanup_borrowed;
-            plan->uncast_width = plan->info.map_itemsize;
-            plan->info.map_dtype = acc;
-            plan->info.map_itemsize = numeric_width(acc);
-            plan->info.partitionable = false;
-        }
-        plan->info.dtype = acc;
-        plan->info.itemsize = numeric_width(acc);
-    }
-    if (opts && opts->has_initial) {
-        status = exec_setup_reduction(plan, opts->has_axes, opts->naxes, opts->axes,
-            opts->keepdims, true, opts->initial_dtype, opts->initial_category,
-            opts->initial_scalar, opts->initial_size, error);
-    }
-cleanup_borrowed:
-    if (status != ME_SUCCESS) {
-        b2nd_exec_plan_free(plan);
-    } else {
-        *out = plan;
-    }
-    return status;
+    me_kernel *borrowed = (me_kernel *)kernel;
+    return b2nd_exec_prepare_kernel_ex(&borrowed, false, exec_op_from_reducer(reducer),
+                                       opts, accumulator, has_where, 0.0, out, error);
 }
 
 me_status b2nd_exec_specialize_ex(const b2nd_exec_plan *plan,

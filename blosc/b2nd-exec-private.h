@@ -95,4 +95,11 @@ void b2nd_exec_gather_span(const b2nd_exec_schedule *schedule, size_t slot,
 void b2nd_exec_gather_box(const b2nd_exec_schedule *schedule, size_t slot,
                           const b2nd_exec_view *view, const size_t *origin,
                           const size_t *extent, unsigned char *dst);
+b2nd_exec_op b2nd_exec_plan_root_op(const b2nd_exec_plan *plan);
+me_status b2nd_exec_prepare_kernel_ex(me_kernel **kernel, bool take_ownership,
+                                      b2nd_exec_op root_op,
+                                      const b2nd_exec_reduce_opts *opts,
+                                      me_dtype accumulator, bool has_where,
+                                      double ddof, b2nd_exec_plan **out,
+                                      me_error *error);
 #endif

@@ -203,6 +203,7 @@ list(APPEND SOURCES
     blosc/b2nd.c
     blosc/b2nd-constructors.c
     blosc/b2nd_utils.c
+    blosc/b2nd-exec-api.c
 )
 if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL arm64)
     if(COMPILER_SUPPORT_SSE2)
@@ -377,6 +378,7 @@ if(BLOSC2_USE_PARENT_MINIEXPR)
     if(BUILD_STATIC)
         set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY ON PARENT_SCOPE)
     endif()
+    set(BLOSC2_HAVE_MINIEXPR_INSTALL ON PARENT_SCOPE)
     foreach(_target blosc2_shared blosc2_static blosc_testing)
         if(TARGET ${_target})
             target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
@@ -399,6 +401,7 @@ elseif(BLOSC2_MINIEXPR_ROOT)
         if(BUILD_STATIC)
             set(BLOSC2_MINIEXPR_CONFIG_DEPENDENCY ON PARENT_SCOPE)
         endif()
+        set(BLOSC2_HAVE_MINIEXPR_INSTALL ON PARENT_SCOPE)
         foreach(_target blosc2_shared blosc2_static blosc_testing)
             if(TARGET ${_target})
                 target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
@@ -412,6 +415,7 @@ elseif(BLOSC2_MINIEXPR_ROOT)
             HINTS "${_miniexpr_root}/src" "${_miniexpr_root}/include" REQUIRED)
         find_library(BLOSC2_MINIEXPR_LIBRARY NAMES miniexpr
             HINTS "${_miniexpr_root}/build" "${_miniexpr_root}/lib" REQUIRED)
+        set(BLOSC2_HAVE_MINIEXPR_INSTALL ON PARENT_SCOPE)
         foreach(_target blosc2_shared blosc2_static blosc_testing)
             if(TARGET ${_target})
                 target_compile_definitions(${_target} PRIVATE BLOSC2_HAVE_MINIEXPR)
